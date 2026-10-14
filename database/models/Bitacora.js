@@ -19,7 +19,9 @@ const BitacoraSchema = new Schema({
   fecha: { type: Date, default: Date.now },
 });
 
-BitacoraSchema.index({ entidad: 1, entidadId: 1, fecha: -1 });
+// Toda consulta va acotada por empresa (salvo superAdmin), así que empresa va primero.
+BitacoraSchema.index({ empresa: 1, entidad: 1, entidadId: 1, fecha: -1 });
 BitacoraSchema.index({ empresa: 1, fecha: -1 });
+BitacoraSchema.index({ entidad: 1, entidadId: 1, fecha: -1 });
 
 export default mongoose.model('Bitacora', BitacoraSchema);

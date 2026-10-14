@@ -3,39 +3,59 @@ import Clientes from './components/Clientes';
 import Proveedores from './components/Proveedores';
 import Reservaciones from './components/Reservaciones';
 import Pagos from './components/Pagos';
+import Cobranza from './components/Cobranza';
 import Agentes from './components/Agentes';
 import Empresas from './components/Empresas';
 import Prospectos from './components/Prospectos';
+import Dashboard from './components/Dashboard';
+import MiPanel from './components/MiPanel';
 import Login from './components/Login';
-import { authApi, clientesApi, reservacionesApi, pagosApi, setUnauthorizedHandler } from './api';
+import { authApi, dashboardApi, empresasApi, setUnauthorizedHandler } from './api';
 import { obtenerSesion } from './utils/sesion';
 import logo from './assets/logo.png';
 import {
   Users, Truck, Compass, DollarSign, Plane, Bell, ChevronDown,
-  Menu, X, LogOut, TreePalm, Users2, UserCog, Building2, UserPlus,
+  Menu, X, LogOut, TreePalm, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { key: 'clientes', label: 'Clientes', icon: Users },
+  // Tablero de ventas: solo el Administrador (dueño) de cada empresa.
+  { key: 'dashboard', label: 'Tablero de Ventas', icon: LayoutDashboard, visible: (rol) => rol === 'Administrador' },
+  // Panel inicial con los pendientes del agente.
+  { key: 'inicio', label: 'Mi Panel', icon: Home, visible: (rol) => rol === 'Agente' },
+  // Clientes y proveedores son datos de negocio de cada empresa: el superAdmin no los ve.
+  { key: 'clientes', label: 'Clientes', icon: Users, visible: (rol) => rol !== 'superAdmin' },
   // superAdmin no consulta ni gestiona prospectos de ninguna empresa.
   { key: 'prospectos', label: 'Prospectos', icon: UserPlus, visible: (rol) => rol !== 'superAdmin' },
   // Empresas solo lo administra el superAdmin.
   { key: 'empresas', label: 'Empresas', icon: Building2, visible: (rol) => rol === 'superAdmin' },
-  { key: 'proveedores', label: 'Proveedores', icon: Truck },
+  { key: 'proveedores', label: 'Proveedores', icon: Truck, visible: (rol) => rol !== 'superAdmin' },
   // superAdmin no consulta ni gestiona reservaciones de ninguna empresa.
   { key: 'reservaciones', label: 'Reservaciones', icon: Compass, visible: (rol) => rol !== 'superAdmin' },
-  { key: 'pagos', label: 'Registro de Pagos', icon: DollarSign },
+  // superAdmin no consulta ni registra pagos de ninguna empresa.
+  { key: 'pagos', label: 'Registro de Pagos', icon: DollarSign, visible: (rol) => rol !== 'superAdmin' },
+  { key: 'cobranza', label: 'Cobranza', icon: Wallet, visible: (rol) => rol !== 'superAdmin' },
   // Un Agente no puede ver el módulo de Agentes en absoluto.
   { key: 'agentes', label: 'Agentes', icon: UserCog, visible: (rol) => rol !== 'Agente' },
 ];
 
+// Pantalla con la que arranca cada rol al iniciar sesión.
+const TAB_INICIAL = { Administrador: 'dashboard', Agente: 'inicio', superAdmin: 'empresas' };
+const tabInicial = (rol) => TAB_INICIAL[rol] || 'inicio';
+
+// Pantallas que ocupan todo el ancho (sin el panel lateral de frase + resumen).
+const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio']);
+
 const PAGE_TITLES = {
+  dashboard: 'Panel de Control',
+  inicio: 'Panel de Control',
   clientes: 'Panel de Control',
   prospectos: 'Panel de Control',
   empresas: 'Panel de Control',
   proveedores: 'Panel de Control',
   reservaciones: 'Panel de Control',
   pagos: 'Panel de Control',
+  cobranza: 'Panel de Control',
   agentes: 'Panel de Control',
 };
 
@@ -49,9 +69,9 @@ function iniciales(nombre) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('clientes');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [auth, setAuth] = useState(obtenerSesion);
+  const [activeTab, setActiveTab] = useState(() => tabInicial(obtenerSesion()?.rol));
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [resumen, setResumen] = useState({ clientesRegistrados: 0, reservacionesActivas: 0, pagosDelMes: 0 });
 
@@ -73,6 +93,7 @@ export default function App() {
     localStorage.setItem('token', token);
     localStorage.setItem('agente', JSON.stringify(agente));
     setAuth(agente);
+    setActiveTab(tabInicial(agente.rol));
   };
 
   useEffect(() => {
@@ -80,28 +101,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!auth) return;
+    // superAdmin no tiene acceso a los datos de negocio de las empresas (el backend responde 403).
+    if (!auth || auth.rol === 'superAdmin') return;
     let cancelado = false;
     (async () => {
       try {
-        const [clientes, reservaciones, pagos] = await Promise.all([
-          clientesApi.list(),
-          reservacionesApi.list(),
-          pagosApi.list(),
-        ]);
-        if (cancelado) return;
-        const ahora = new Date();
-        const pagosDelMes = pagos
-          .filter(p => {
-            const f = new Date(p.fecha);
-            return f.getMonth() === ahora.getMonth() && f.getFullYear() === ahora.getFullYear();
-          })
-          .reduce((acc, p) => acc + p.monto, 0);
-        setResumen({
-          clientesRegistrados: clientes.length,
-          reservacionesActivas: reservaciones.length,
-          pagosDelMes,
-        });
+        // Contadores calculados en el servidor (antes se descargaban listas completas).
+        const r = await dashboardApi.resumen();
+        if (!cancelado) setResumen(r);
       } catch (err) {
         console.error('No se pudo cargar el resumen:', err.message);
       }
@@ -109,9 +116,38 @@ export default function App() {
     return () => { cancelado = true; };
   }, [activeTab, auth]);
 
+  // Logo de la empresa del usuario para la barra lateral. El superAdmin y las
+  // empresas sin logo ven el de la plataforma (Feliz Viaje).
+  const [logoEmpresa, setLogoEmpresa] = useState(null);
+  useEffect(() => {
+    if (!auth?.empresa) { setLogoEmpresa(null); return undefined; }
+    let url = null;
+    let cancelado = false;
+    empresasApi.descargarLogo(auth.empresa)
+      .then(blob => {
+        if (cancelado) return;
+        url = URL.createObjectURL(blob);
+        setLogoEmpresa(url);
+      })
+      .catch(() => { if (!cancelado) setLogoEmpresa(null); }); // 404 = la empresa no tiene logo
+    return () => {
+      cancelado = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [auth?.empresa]);
+
+  // Reservación que Cobranza manda preseleccionada al abrir Registro de Pagos.
+  const [reservaParaAbonar, setReservaParaAbonar] = useState('');
+
   const goTo = (key) => {
     setActiveTab(key);
+    setReservaParaAbonar('');
     setSidebarOpen(false);
+  };
+
+  const abonarDesdeCobranza = (idReservacion) => {
+    setReservaParaAbonar(idReservacion);
+    setActiveTab('pagos');
   };
 
   if (!auth) {
@@ -128,10 +164,17 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`fixed md:static inset-y-0 left-0 z-40 w-64 shrink-0 flex flex-col text-white bg-gradient-to-b from-brand-tealDark to-brand-teal transition-transform duration-200 overflow-y-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex items-center justify-between px-6 py-6">
-          <div className="w-28 h-28 rounded-full bg-white shadow-sm shrink-0 flex items-center justify-center overflow-hidden p-1.5">
-            <img src={logo} alt="Feliz Viaje" className="w-full h-full object-contain" />
-          </div>
+        <div className="flex items-center justify-between gap-3 px-6 py-6">
+          {logoEmpresa ? (
+            // Los logos de empresa suelen ser horizontales: recuadro en vez de círculo para no recortarlos.
+            <div className="flex-1 min-w-0 h-24 rounded-2xl bg-white shadow-sm flex items-center justify-center overflow-hidden p-2">
+              <img src={logoEmpresa} alt="Logo de la empresa" className="max-w-full max-h-full object-contain" />
+            </div>
+          ) : (
+            <div className="w-28 h-28 rounded-full bg-white shadow-sm shrink-0 flex items-center justify-center overflow-hidden p-1.5">
+              <img src={logo} alt="Feliz Viaje" className="w-full h-full object-contain" />
+            </div>
+          )}
           <button className="md:hidden text-white/80" onClick={() => setSidebarOpen(false)}>
             <X size={20} />
           </button>
@@ -192,17 +235,20 @@ export default function App() {
 
         <div className="flex-1 flex flex-col xl:flex-row gap-6 p-4 md:p-8">
           <main className="flex-1 min-w-0">
-            {activeTab === 'clientes' && <Clientes />}
+            {activeTab === 'dashboard' && auth.rol === 'Administrador' && <Dashboard />}
+            {activeTab === 'inicio' && auth.rol === 'Agente' && <MiPanel nombre={auth.nombre} onAbonar={abonarDesdeCobranza} onIr={goTo} />}
+            {activeTab === 'clientes' && auth.rol !== 'superAdmin' && <Clientes />}
             {activeTab === 'prospectos' && auth.rol !== 'superAdmin' && <Prospectos />}
             {activeTab === 'empresas' && auth.rol === 'superAdmin' && <Empresas />}
-            {activeTab === 'proveedores' && <Proveedores />}
+            {activeTab === 'proveedores' && auth.rol !== 'superAdmin' && <Proveedores />}
             {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones />}
-            {activeTab === 'pagos' && <Pagos />}
+            {activeTab === 'pagos' && auth.rol !== 'superAdmin' && <Pagos reservaInicial={reservaParaAbonar} />}
+            {activeTab === 'cobranza' && auth.rol !== 'superAdmin' && <Cobranza onAbonar={abonarDesdeCobranza} />}
             {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}
           </main>
 
           {/* Right panel: promo + resumen */}
-          <aside className="w-full xl:w-72 shrink-0 flex flex-col gap-6">
+          <aside className={`w-full xl:w-72 shrink-0 flex-col gap-6 ${PANTALLA_COMPLETA.has(activeTab) ? 'hidden' : 'flex'}`}>
             <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-brand-teal to-brand-purple p-6 min-h-[220px] flex flex-col justify-between shadow-sm">
               <TreePalm size={90} className="absolute -bottom-3 -left-3 text-white/15" />
               <Plane size={36} className="absolute top-4 right-4 rotate-45 text-white/25" />
@@ -212,7 +258,7 @@ export default function App() {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-5 ${auth.rol === 'superAdmin' ? 'hidden' : ''}`}>
               <h3 className="text-sm font-bold text-slate-700 mb-4">Resumen</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -224,6 +270,7 @@ export default function App() {
                     <div className="text-lg font-bold text-slate-800">{resumen.clientesRegistrados}</div>
                   </div>
                 </div>
+                {auth.rol !== 'superAdmin' && (<>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-brand-purple text-white flex items-center justify-center shrink-0">
                     <Compass size={18} />
@@ -244,6 +291,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+                </>)}
               </div>
             </div>
           </aside>

@@ -1,14 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { prospectosApi } from '../api';
+import React, { useEffect, useState } from 'react';
+import { prospectosApi, agentesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
 import PageHeader from './common/PageHeader';
+import Paginacion, { SelectorPorPagina } from './common/Paginacion';
+import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
 import {
-  UserPlus, Plus, X, Save, Search, Pencil, UserCheck, ChevronLeft, ChevronRight,
+  UserPlus, Plus, X, Save, Search, Pencil, UserCheck, Eye,
   Mail, Phone, CheckCircle2, Circle, TrendingUp,
 } from 'lucide-react';
-
-const OPCIONES_POR_PAGINA = [25, 50, 100];
 
 const EMPTY_FORM = {
   _id: null, nombreCompleto: '', correo: '', telefono: '',
@@ -25,36 +25,34 @@ export default function Prospectos() {
   const sesion = obtenerSesion();
   const esAdministrador = sesion?.rol === 'Administrador';
 
-  const [prospectos, setProspectos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [notas, setNotas] = useState([]);
-
-  const [busqueda, setBusqueda] = useState('');
-  const [porPagina, setPorPagina] = useState(25);
-  const [pagina, setPagina] = useState(1);
 
   const [estadisticas, setEstadisticas] = useState(null);
   const [loadingEstadisticas, setLoadingEstadisticas] = useState(false);
 
   const esEdicion = Boolean(form._id);
 
-  const cargarProspectos = async () => {
-    try {
-      setLoading(true);
-      setProspectos(await prospectosApi.list());
-      setError('');
-    } catch (err) {
-      setError('No se pudo conectar con el servidor. ¿Está corriendo "npm run server"?');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Todos consultan los prospectos de la empresa; editar y convertir es del
+  // agente responsable o del Administrador.
+  const puedeGestionar = (p) => esAdministrador || (p.agente?._id || p.agente) === sesion?.id;
 
-  useEffect(() => { cargarProspectos(); }, []);
+  const [agentes, setAgentes] = useState([]);
+  useEffect(() => {
+    agentesApi.list({ estatus: 'Activo', orden: 'nombre', porPagina: 100 })
+      .then(r => setAgentes(r.datos.filter(a => a.rol !== 'superAdmin')))
+      .catch(() => setAgentes([]));
+  }, []);
+  // '' = todos, 'mios' = mis prospectos, o el id de un agente.
+  const [filtroAgente, setFiltroAgente] = useState('');
+
+  const listado = useListadoRemoto(params => prospectosApi.list(params), {
+    filtros: filtroAgente === 'mios' ? { mios: 1 } : filtroAgente ? { agente: filtroAgente } : {},
+  });
+  const cargarProspectos = listado.recargar;
+  const { error } = listado;
 
   const cargarEstadisticas = async () => {
     if (!esAdministrador) return;
@@ -70,24 +68,6 @@ export default function Prospectos() {
 
   useEffect(() => { cargarEstadisticas(); }, [esAdministrador]);
 
-  const prospectosFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return prospectos;
-    return prospectos.filter(p =>
-      p.nombreCompleto.toLowerCase().includes(q) ||
-      (p.correo || '').toLowerCase().includes(q) ||
-      (p.ciudad || '').toLowerCase().includes(q)
-    );
-  }, [prospectos, busqueda]);
-
-  const totalPaginas = Math.max(1, Math.ceil(prospectosFiltrados.length / porPagina));
-  const paginaSegura = Math.min(pagina, totalPaginas);
-  const prospectosPaginados = useMemo(() => {
-    const inicio = (paginaSegura - 1) * porPagina;
-    return prospectosFiltrados.slice(inicio, inicio + porPagina);
-  }, [prospectosFiltrados, paginaSegura, porPagina]);
-
-  useEffect(() => { setPagina(1); }, [busqueda, porPagina]);
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -174,15 +154,34 @@ export default function Prospectos() {
       ...prospecto,
       fechaNacimiento: prospecto.fechaNacimiento ? prospecto.fechaNacimiento.slice(0, 10) : '',
     });
+    // Se conservan _id y fechas para que al guardar no se recreen las notas y
+    // acciones con la fecha de hoy (el panel del agente las ordena por fecha).
     setNotas((prospecto.notas || []).map(n => ({
       key: n._id || nuevaKey(),
+      _id: n._id,
+      fecha: n.fecha,
       texto: n.texto,
       accionesNotas: (n.accionesNotas || []).map(a => ({
         key: a._id || nuevaKey(),
+        _id: a._id,
+        fecha: a.fecha,
+        fechaCompletada: a.fechaCompletada,
         descripcion: a.descripcion,
         estatus: a.estatus,
       })),
     })));
+  };
+
+  // Consulta de solo lectura para quien no es el responsable (p.ej. para atender
+  // al prospecto si su agente no está disponible).
+  const handleVer = (p) => {
+    const seguimiento = (p.notas || []).map(n =>
+      `• ${n.texto}\n${(n.accionesNotas || []).map(a => `   - [${a.estatus}] ${a.descripcion}`).join('\n')}`
+    ).join('\n');
+    alert(
+      `${p.nombreCompleto}\nTel. ${p.telefono}${p.correo ? ` · ${p.correo}` : ''}\nAgente responsable: ${p.agente?.nombre || '—'}\n\n` +
+      `Seguimiento:\n${seguimiento || 'Sin notas registradas.'}`
+    );
   };
 
   const handleConvertir = async (prospecto) => {
@@ -405,17 +404,17 @@ export default function Prospectos() {
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <input type="text" placeholder="Buscar prospecto..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              <input type="text" placeholder="Buscar nombre, correo, teléfono..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
                 className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600 shrink-0">
-              Mostrar
-              <select value={porPagina} onChange={e => setPorPagina(Number(e.target.value))}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
-                {OPCIONES_POR_PAGINA.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
+            <select value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)} title="Agente responsable"
+              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+              <option value="">Todos los agentes</option>
+              <option value="mios">Mis prospectos</option>
+              {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
+            </select>
+            <SelectorPorPagina listado={listado} />
           </div>
         </div>
 
@@ -433,10 +432,10 @@ export default function Prospectos() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading && (
+              {listado.cargando && listado.datos.length === 0 && (
                 <tr><td colSpan={7} className="p-6 text-center text-slate-400 text-sm">Cargando prospectos...</td></tr>
               )}
-              {!loading && prospectosPaginados.map(p => (
+              {listado.datos.map(p => (
                 <tr key={p._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{p.nombreCompleto}</td>
                   <td className="p-3 text-slate-600">{p.correo}</td>
@@ -446,17 +445,25 @@ export default function Prospectos() {
                   <td className="p-3 text-slate-600">{new Date(p.fechaRegistro).toLocaleDateString('es-MX')}</td>
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => handleEditar(p)} title="Editar" className="w-8 h-8 rounded-full bg-brand-yellow hover:brightness-95 text-brand-tealDark flex items-center justify-center">
-                        <Pencil size={14} />
-                      </button>
-                      <button onClick={() => handleConvertir(p)} title="Convertir a Cliente" className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center">
-                        <UserCheck size={14} />
-                      </button>
+                      {puedeGestionar(p) ? (
+                        <>
+                          <button onClick={() => handleEditar(p)} title="Editar" className="w-8 h-8 rounded-full bg-brand-yellow hover:brightness-95 text-brand-tealDark flex items-center justify-center">
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => handleConvertir(p)} title="Convertir a Cliente" className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center">
+                            <UserCheck size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => handleVer(p)} title="Ver seguimiento" className="w-8 h-8 rounded-full bg-brand-teal hover:bg-brand-tealDark text-white flex items-center justify-center">
+                          <Eye size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
-              {!loading && prospectosFiltrados.length === 0 && (
+              {!listado.cargando && listado.total === 0 && (
                 <tr>
                   <td colSpan={7} className="p-6 text-center text-slate-400 text-sm">No se encontraron prospectos.</td>
                 </tr>
@@ -465,24 +472,7 @@ export default function Prospectos() {
           </table>
         </div>
 
-        {!loading && prospectosFiltrados.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
-            <p className="text-sm text-slate-500">
-              Mostrando {(paginaSegura - 1) * porPagina + 1}–{Math.min(paginaSegura * porPagina, prospectosFiltrados.length)} de {prospectosFiltrados.length} prospectos
-            </p>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={paginaSegura === 1}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-sm text-slate-600 px-2">Página {paginaSegura} de {totalPaginas}</span>
-              <button type="button" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={paginaSegura === totalPaginas}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        <Paginacion listado={listado} etiqueta="prospectos" />
       </div>
     </div>
   );

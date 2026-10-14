@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { agentesApi, empresasApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
 import PageHeader from './common/PageHeader';
-import { UserCog, Plus, X, Save, Search, Pencil, Trash2, Lock, Eye, EyeOff, AtSign, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import Paginacion, { SelectorPorPagina } from './common/Paginacion';
+import SelectorRemoto from './common/SelectorRemoto';
+import { useListadoRemoto } from '../hooks/useListadoRemoto';
+import { UserCog, Plus, X, Save, Search, Pencil, Trash2, Lock, Eye, EyeOff, AtSign } from 'lucide-react';
 
-const OPCIONES_POR_PAGINA = [25, 50, 100];
-
-const EMPTY_FORM = { _id: null, nombre: '', userId: '', rol: 'Agente', empresa: '', estatus: 'Activo', password: '', confirmPassword: '' };
+const EMPTY_FORM = { _id: null, nombre: '', userId: '', rol: 'Agente', empresa: '', empresaNombre: '', estatus: 'Activo', password: '', confirmPassword: '' };
 
 // Debe reflejar la misma regla que valida el backend (database/models/Agente.js):
 // mínimo 8 caracteres, al menos una mayúscula, un número y un carácter especial.
@@ -26,56 +27,20 @@ export default function Agentes() {
 
   const formVacio = () => ({ ...EMPTY_FORM, rol: rolFijo });
 
-  const [agentes, setAgentes] = useState([]);
-  const [empresas, setEmpresas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState(formVacio);
-  const [busqueda, setBusqueda] = useState('');
-  const [porPagina, setPorPagina] = useState(25);
-  const [pagina, setPagina] = useState(1);
   const [verPassword, setVerPassword] = useState(false);
   const [verConfirmPassword, setVerConfirmPassword] = useState(false);
 
   const esEdicion = Boolean(form._id);
 
-  const cargarAgentes = async () => {
-    try {
-      setLoading(true);
-      setAgentes(await agentesApi.list());
-      setError('');
-    } catch (err) {
-      setError('No se pudo conectar con el servidor. ¿Está corriendo "npm run server"?');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Listado paginado y filtrado en el servidor.
+  const listado = useListadoRemoto(params => agentesApi.list(params));
+  const cargarAgentes = listado.recargar;
+  const { error } = listado;
 
-  useEffect(() => { cargarAgentes(); }, []);
-
-  // El select de empresas solo lo necesita (y lo puede ver) el superAdmin.
-  useEffect(() => {
-    if (!esSuperAdmin) return;
-    (async () => {
-      try {
-        setEmpresas(await empresasApi.list());
-      } catch (err) {
-        setError('No se pudo conectar con el servidor. ¿Está corriendo "npm run server"?');
-      }
-    })();
-  }, [esSuperAdmin]);
-
-  const empresasActivas = useMemo(() => empresas.filter(e => e.estatus === 'Activo'), [empresas]);
-  // Si se edita un agente cuya empresa ya no está activa, igual la dejamos como opción
-  // seleccionable para que no "desaparezca" del formulario.
-  const opcionesEmpresa = useMemo(() => {
-    if (form.empresa && !empresasActivas.some(e => e._id === form.empresa)) {
-      const actual = empresas.find(e => e._id === form.empresa);
-      if (actual) return [...empresasActivas, actual];
-    }
-    return empresasActivas;
-  }, [empresas, empresasActivas, form.empresa]);
+  // El selector de empresa (solo superAdmin) busca en el servidor entre las empresas activas.
+  const buscarEmpresas = (q) => empresasApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
 
   // El rol también queda fijo según quién está creando; al editar un registro con
   // otro rol (p.ej. un superAdmin abriendo un Agente ya existente) lo dejamos visible.
@@ -85,25 +50,6 @@ export default function Agentes() {
     return base;
   }, [rolFijo, form.rol]);
 
-  const agentesFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return agentes;
-    return agentes.filter(a =>
-      a.nombre.toLowerCase().includes(q) ||
-      (a.userId || '').toLowerCase().includes(q) ||
-      (a.empresa?.nombreEmpresa || '').toLowerCase().includes(q)
-    );
-  }, [agentes, busqueda]);
-
-  const totalPaginas = Math.max(1, Math.ceil(agentesFiltrados.length / porPagina));
-  const paginaSegura = Math.min(pagina, totalPaginas);
-  const agentesPaginados = useMemo(() => {
-    const inicio = (paginaSegura - 1) * porPagina;
-    return agentesFiltrados.slice(inicio, inicio + porPagina);
-  }, [agentesFiltrados, paginaSegura, porPagina]);
-
-  // Si cambia la búsqueda o el tamaño de página, siempre volvemos a la página 1.
-  useEffect(() => { setPagina(1); }, [busqueda, porPagina]);
 
   const resetForm = () => {
     setForm(formVacio());
@@ -131,7 +77,7 @@ export default function Agentes() {
       return;
     }
 
-    const { _id, confirmPassword, password, ...resto } = form;
+    const { _id, confirmPassword, password, empresaNombre, ...resto } = form;
     const payload = password ? { ...resto, password } : resto;
 
     setGuardando(true);
@@ -155,6 +101,7 @@ export default function Agentes() {
     ...formVacio(),
     ...agente,
     empresa: agente.empresa?._id || agente.empresa || '',
+    empresaNombre: agente.empresa?.nombreEmpresa || '',
     password: '',
     confirmPassword: '',
   });
@@ -234,13 +181,11 @@ export default function Agentes() {
             {esSuperAdmin && (
               <div className="md:col-span-2">
                 <label className={labelClass}>Empresa *</label>
-                <div className="relative">
-                  <select required className={`${inputClass} bg-white pr-9`}
-                    value={form.empresa} onChange={e => setForm({ ...form, empresa: e.target.value })}>
-                    <option value="">Selecciona una empresa</option>
-                    {opcionesEmpresa.map(emp => <option key={emp._id} value={emp._id}>{emp.nombreEmpresa}</option>)}
-                  </select>
-                  <Building2 size={16} className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400" />
+                <div className="mt-1">
+                  <SelectorRemoto required buscar={buscarEmpresas} placeholder="Busca y selecciona una empresa"
+                    valor={form.empresa} etiquetaValor={form.empresaNombre}
+                    etiqueta={emp => emp.nombreEmpresa} detalle={emp => `RFC ${emp.rfc}${emp.ciudad ? ` · ${emp.ciudad}` : ''}`}
+                    onCambio={(id, emp) => setForm({ ...form, empresa: id, empresaNombre: emp?.nombreEmpresa || '' })} />
                 </div>
               </div>
             )}
@@ -297,17 +242,11 @@ export default function Agentes() {
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <input type="text" placeholder="Buscar por nombre, usuario o empresa..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              <input type="text" placeholder="Buscar por nombre o usuario..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
                 className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600 shrink-0">
-              Mostrar
-              <select value={porPagina} onChange={e => setPorPagina(Number(e.target.value))}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
-                {OPCIONES_POR_PAGINA.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
+            <SelectorPorPagina listado={listado} />
           </div>
         </div>
 
@@ -324,10 +263,10 @@ export default function Agentes() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading && (
+              {listado.cargando && listado.datos.length === 0 && (
                 <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">Cargando agentes...</td></tr>
               )}
-              {!loading && agentesPaginados.map(a => (
+              {listado.datos.map(a => (
                 <tr key={a._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{a.nombre}</td>
                   <td className="p-3 text-slate-600 font-mono text-xs">{a.userId}</td>
@@ -354,7 +293,7 @@ export default function Agentes() {
                   </td>
                 </tr>
               ))}
-              {!loading && agentesFiltrados.length === 0 && (
+              {!listado.cargando && listado.total === 0 && (
                 <tr>
                   <td colSpan={6} className="p-6 text-center text-slate-400 text-sm">No se encontraron agentes.</td>
                 </tr>
@@ -363,24 +302,7 @@ export default function Agentes() {
           </table>
         </div>
 
-        {!loading && agentesFiltrados.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
-            <p className="text-sm text-slate-500">
-              Mostrando {(paginaSegura - 1) * porPagina + 1}–{Math.min(paginaSegura * porPagina, agentesFiltrados.length)} de {agentesFiltrados.length} agentes
-            </p>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={paginaSegura === 1}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-sm text-slate-600 px-2">Página {paginaSegura} de {totalPaginas}</span>
-              <button type="button" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={paginaSegura === totalPaginas}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        <Paginacion listado={listado} etiqueta="agentes" />
       </div>
     </div>
   );

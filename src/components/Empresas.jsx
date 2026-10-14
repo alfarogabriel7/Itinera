@@ -1,76 +1,101 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { empresasApi } from '../api';
 import PageHeader from './common/PageHeader';
-import { Building2, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Building2, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, ImagePlus } from 'lucide-react';
+import Paginacion, { SelectorPorPagina } from './common/Paginacion';
+import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion, soloRFC } from '../utils/validadores';
 
-const OPCIONES_POR_PAGINA = [25, 50, 100];
 
 const EMPTY_FORM = {
   _id: null, nombreEmpresa: '', correo: '', nombreTitular: '', direccion: '',
   telefonoPrincipal: '', telefonoSecundario: '', rfc: '', ciudad: '', pais: 'México', estatus: 'Activo',
 };
 
-const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal';
+// Mismo límite y tipos que valida el servidor (allá se revisa el contenido real).
+const LIMITE_LOGO = 1024 * 1024;
+const TIPOS_LOGO = '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp';
+
+const inputClass ='mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal';
 const labelClass = 'block text-sm font-semibold text-slate-700';
 
 export default function Empresas() {
-  const [empresas, setEmpresas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [busqueda, setBusqueda] = useState('');
-  const [porPagina, setPorPagina] = useState(25);
-  const [pagina, setPagina] = useState(1);
 
-  const cargarEmpresas = async () => {
-    try {
-      setLoading(true);
-      setEmpresas(await empresasApi.list());
-      setError('');
-    } catch (err) {
-      setError('No se pudo conectar con el servidor. ¿Está corriendo "npm run server"?');
-    } finally {
-      setLoading(false);
-    }
+  // Listado paginado y filtrado en el servidor.
+  const listado = useListadoRemoto(params => empresasApi.list(params));
+  const cargarEmpresas = listado.recargar;
+  const { error } = listado;
+
+  // Logo: archivo nuevo elegido, vista previa (del archivo o del guardado) y si se pidió quitarlo.
+  const [logoArchivo, setLogoArchivo] = useState(null);
+  const [logoPreview, setLogoPreview] = useState('');
+  const [quitarLogo, setQuitarLogo] = useState(false);
+  const inputLogo = useRef(null);
+
+  const cambiarPreview = (url) => {
+    setLogoPreview(anterior => {
+      if (anterior) URL.revokeObjectURL(anterior);
+      return url;
+    });
   };
 
-  useEffect(() => { cargarEmpresas(); }, []);
+  const limpiarLogo = () => {
+    setLogoArchivo(null);
+    setQuitarLogo(false);
+    cambiarPreview('');
+    if (inputLogo.current) inputLogo.current.value = '';
+  };
 
-  const empresasFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return empresas;
-    return empresas.filter(e =>
-      e.nombreEmpresa.toLowerCase().includes(q) ||
-      (e.rfc || '').toLowerCase().includes(q) ||
-      (e.correo || '').toLowerCase().includes(q)
-    );
-  }, [empresas, busqueda]);
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    limpiarLogo();
+  };
 
-  const totalPaginas = Math.max(1, Math.ceil(empresasFiltradas.length / porPagina));
-  const paginaSegura = Math.min(pagina, totalPaginas);
-  const empresasPaginadas = useMemo(() => {
-    const inicio = (paginaSegura - 1) * porPagina;
-    return empresasFiltradas.slice(inicio, inicio + porPagina);
-  }, [empresasFiltradas, paginaSegura, porPagina]);
+  const handleLogo = (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    if (!/\.(png|jpe?g|webp)$/i.test(archivo.name)) {
+      alert('El logo debe ser una imagen PNG, JPG o WEBP.');
+      e.target.value = '';
+      return;
+    }
+    if (archivo.size > LIMITE_LOGO) {
+      alert('El logo no puede pesar más de 1 MB.');
+      e.target.value = '';
+      return;
+    }
+    setLogoArchivo(archivo);
+    setQuitarLogo(false);
+    cambiarPreview(URL.createObjectURL(archivo));
+  };
 
-  // Si cambia la búsqueda o el tamaño de página, siempre volvemos a la página 1.
-  useEffect(() => { setPagina(1); }, [busqueda, porPagina]);
+  const handleQuitarLogo = () => {
+    setLogoArchivo(null);
+    setQuitarLogo(true);
+    cambiarPreview('');
+    if (inputLogo.current) inputLogo.current.value = '';
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { _id, ...payload } = form;
     setGuardando(true);
     try {
-      if (_id) {
-        await empresasApi.update(_id, payload);
-      } else {
-        await empresasApi.create(payload);
+      const guardada = _id ? await empresasApi.update(_id, payload) : await empresasApi.create(payload);
+      // El logo va en una petición aparte, ya con el id de la empresa.
+      let avisoLogo = '';
+      try {
+        if (logoArchivo) await empresasApi.subirLogo(guardada._id, logoArchivo);
+        else if (quitarLogo && _id) await empresasApi.quitarLogo(_id);
+      } catch (err) {
+        avisoLogo = `\n\nLos datos se guardaron, pero no se pudo actualizar el logo: ${err.message}`;
       }
-      setForm(EMPTY_FORM);
+      resetForm();
       await cargarEmpresas();
-      alert('Se guardaron correctamente los datos.');
+      alert(`Se guardaron correctamente los datos.${avisoLogo}`);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -78,7 +103,17 @@ export default function Empresas() {
     }
   };
 
-  const handleEditar = (empresa) => setForm({ ...EMPTY_FORM, ...empresa });
+  const handleEditar = async (empresa) => {
+    setForm({ ...EMPTY_FORM, ...empresa });
+    limpiarLogo();
+    if (empresa.logo?.tipo) {
+      try {
+        cambiarPreview(URL.createObjectURL(await empresasApi.descargarLogo(empresa._id)));
+      } catch {
+        /* sin vista previa: el resto del formulario sigue editable */
+      }
+    }
+  };
 
   // No se elimina el registro de la BD: se da de baja lógicamente (estatus = Baja)
   // para conservar el historial de la empresa.
@@ -104,7 +139,7 @@ export default function Empresas() {
         subtitle="Administra las empresas y su información de contacto."
         action={
           <button
-            onClick={() => setForm(EMPTY_FORM)}
+            onClick={resetForm}
             className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
           >
             <Plus size={16} /> Nueva Empresa
@@ -196,8 +231,36 @@ export default function Empresas() {
             </select>
           </div>
 
+          <div className="md:col-span-2">
+            <label className={labelClass}>Logo de la empresa <span className="font-normal text-slate-400">(opcional · se imprime en los recibos al cliente)</span></label>
+            <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-dashed border-slate-300 rounded-xl bg-slate-50">
+              <div className="w-40 h-20 shrink-0 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden">
+                {logoPreview
+                  ? <img src={logoPreview} alt="Logo de la empresa" className="max-w-full max-h-full object-contain p-1" />
+                  : <ImagePlus size={28} className="text-slate-300" />}
+              </div>
+              <div className="flex-1 text-sm text-slate-500">
+                <p>PNG, JPG o WEBP de máximo 1 MB. Se recomienda fondo blanco o transparente, en horizontal.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => inputLogo.current.click()}
+                    className="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-semibold">
+                    <ImagePlus size={16} /> {logoPreview ? 'Cambiar logo' : 'Subir logo'}
+                  </button>
+                  {logoPreview && (
+                    <button type="button" onClick={handleQuitarLogo}
+                      className="inline-flex items-center gap-2 bg-white border border-red-200 hover:bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-semibold">
+                      <Trash2 size={16} /> Quitar logo
+                    </button>
+                  )}
+                </div>
+                {quitarLogo && <p className="mt-2 text-xs text-red-600">El logo se quitará al guardar.</p>}
+              </div>
+              <input ref={inputLogo} type="file" accept={TIPOS_LOGO} className="hidden" onChange={handleLogo} />
+            </div>
+          </div>
+
           <div className="md:col-span-2 flex justify-end gap-3 mt-4">
-            <button type="button" onClick={() => setForm(EMPTY_FORM)}
+            <button type="button" onClick={resetForm}
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
               <X size={16} /> Cancelar
             </button>
@@ -217,17 +280,11 @@ export default function Empresas() {
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <input type="text" placeholder="Buscar empresa..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              <input type="text" placeholder="Buscar empresa, RFC o correo..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
                 className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600 shrink-0">
-              Mostrar
-              <select value={porPagina} onChange={e => setPorPagina(Number(e.target.value))}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
-                {OPCIONES_POR_PAGINA.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
+            <SelectorPorPagina listado={listado} />
           </div>
         </div>
 
@@ -245,12 +302,15 @@ export default function Empresas() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading && (
+              {listado.cargando && listado.datos.length === 0 && (
                 <tr><td colSpan={7} className="p-6 text-center text-slate-400 text-sm">Cargando empresas...</td></tr>
               )}
-              {!loading && empresasPaginadas.map(e => (
+              {listado.datos.map(e => (
                 <tr key={e._id} className="text-sm hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-700">{e.nombreEmpresa}</td>
+                  <td className="p-3 font-medium text-slate-700">
+                    {e.nombreEmpresa}
+                    {e.logo?.tipo && <span className="ml-2 px-1.5 py-0.5 rounded text-2xs font-semibold bg-teal-50 text-brand-tealDark">Con logo</span>}
+                  </td>
                   <td className="p-3 text-slate-600 font-mono text-xs">{e.rfc}</td>
                   <td className="p-3 text-slate-600">{e.nombreTitular}</td>
                   <td className="p-3 text-slate-600">{e.correo}</td>
@@ -275,7 +335,7 @@ export default function Empresas() {
                   </td>
                 </tr>
               ))}
-              {!loading && empresasFiltradas.length === 0 && (
+              {!listado.cargando && listado.total === 0 && (
                 <tr>
                   <td colSpan={7} className="p-6 text-center text-slate-400 text-sm">No se encontraron empresas.</td>
                 </tr>
@@ -284,24 +344,7 @@ export default function Empresas() {
           </table>
         </div>
 
-        {!loading && empresasFiltradas.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
-            <p className="text-sm text-slate-500">
-              Mostrando {(paginaSegura - 1) * porPagina + 1}–{Math.min(paginaSegura * porPagina, empresasFiltradas.length)} de {empresasFiltradas.length} empresas
-            </p>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={paginaSegura === 1}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-sm text-slate-600 px-2">Página {paginaSegura} de {totalPaginas}</span>
-              <button type="button" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={paginaSegura === totalPaginas}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        <Paginacion listado={listado} etiqueta="empresas" />
       </div>
     </div>
   );

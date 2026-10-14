@@ -17,6 +17,15 @@ const EmpresaSchema = new mongoose.Schema(
     ciudad: { type: String, trim: true },
     pais: { type: String, required: true, default: 'México', trim: true },
     estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
+    // Logo que se imprime en los recibos al cliente. Se guarda en Mongo (en Vercel
+    // no hay disco persistente); los bytes no se cargan salvo que se pidan con
+    // .select('+logo.datos'), así listar empresas no arrastra las imágenes.
+    logo: {
+      datos: { type: Buffer, select: false },
+      tipo: String,
+      tamano: Number,
+      actualizado: Date,
+    },
   },
   { timestamps: true }
 );

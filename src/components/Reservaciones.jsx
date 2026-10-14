@@ -1,85 +1,45 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { clientesApi, proveedoresApi, reservacionesApi } from '../api';
-import { obtenerSesion } from '../utils/sesion';
+import React, { useEffect, useState } from 'react';
+import { clientesApi, proveedoresApi, reservacionesApi, agentesApi } from '../api';
 import PageHeader from './common/PageHeader';
-import { Compass, Plus, Send, Search, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import Paginacion, { SelectorPorPagina } from './common/Paginacion';
+import SelectorRemoto from './common/SelectorRemoto';
+import { useListadoRemoto } from '../hooks/useListadoRemoto';
+import { Compass, Plus, Send, Search, Eye, X } from 'lucide-react';
+import { fechaViaje } from '../utils/formato';
 
-const OPCIONES_POR_PAGINA = [25, 50, 100];
+const MAESTRO_VACIO = { idCliente: '', clienteNombre: '', fechaEntrada: '', fechaSalida: '', destino: '', descripcion: '', montoTotal: '', notas: '' };
 
-const MAESTRO_VACIO = { idCliente: '', fechaEntrada: '', fechaSalida: '', destino: '', descripcion: '', montoTotal: '', notas: '' };
+// Catálogos con búsqueda en el servidor (pueden tener miles de registros).
+const buscarClientes = (q) => clientesApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
+const buscarProveedores = (q) => proveedoresApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
 
 export default function Reservaciones() {
-  const sesion = obtenerSesion();
-
-  const [clientes, setClientes] = useState([]);
-  const [proveedores, setProveedores] = useState([]);
-  const [reservaciones, setReservaciones] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingListado, setLoadingListado] = useState(true);
-  const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   const [maestro, setMaestro] = useState(MAESTRO_VACIO);
   const [detalles, setDetalles] = useState([]);
 
-  const [busqueda, setBusqueda] = useState('');
-  const [porPagina, setPorPagina] = useState(25);
-  const [pagina, setPagina] = useState(1);
-
+  const [agentes, setAgentes] = useState([]);
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const [c, p] = await Promise.all([clientesApi.list(), proveedoresApi.list()]);
-        setClientes(c);
-        setProveedores(p);
-        setError('');
-      } catch (err) {
-        setError('No se pudo conectar con el servidor. ¿Está corriendo "npm run server"?');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    agentesApi.list({ estatus: 'Activo', orden: 'nombre', porPagina: 100 })
+      .then(r => setAgentes(r.datos.filter(a => a.rol !== 'superAdmin')))
+      .catch(() => setAgentes([]));
   }, []);
+  // Filtros del listado: agente que vendió ('' todos, 'mios', o id) y estatus.
+  const [filtroAgente, setFiltroAgente] = useState('');
+  const [filtroEstatus, setFiltroEstatus] = useState('');
 
-  const cargarReservaciones = async () => {
-    try {
-      setLoadingListado(true);
-      setReservaciones(await reservacionesApi.list());
-      setError('');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoadingListado(false);
-    }
-  };
-
-  useEffect(() => { cargarReservaciones(); }, []);
-
-  const clientesActivos = clientes.filter(c => c.estatus === 'Activo');
-  const proveedoresActivos = proveedores.filter(p => p.estatus === 'Activo');
-
-  const reservacionesFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return reservaciones;
-    return reservaciones.filter(r =>
-      r.destino.toLowerCase().includes(q) ||
-      (r.idCliente?.nombreCompleto || '').toLowerCase().includes(q) ||
-      (r.agente?.nombre || '').toLowerCase().includes(q)
-    );
-  }, [reservaciones, busqueda]);
-
-  const totalPaginas = Math.max(1, Math.ceil(reservacionesFiltradas.length / porPagina));
-  const paginaSegura = Math.min(pagina, totalPaginas);
-  const reservacionesPaginadas = useMemo(() => {
-    const inicio = (paginaSegura - 1) * porPagina;
-    return reservacionesFiltradas.slice(inicio, inicio + porPagina);
-  }, [reservacionesFiltradas, paginaSegura, porPagina]);
-
-  useEffect(() => { setPagina(1); }, [busqueda, porPagina]);
+  const listado = useListadoRemoto(params => reservacionesApi.list(params), {
+    filtros: {
+      ...(filtroAgente === 'mios' ? { mios: 1 } : filtroAgente ? { agente: filtroAgente } : {}),
+      ...(filtroEstatus ? { estatus: filtroEstatus } : {}),
+    },
+  });
+  const cargarReservaciones = listado.recargar;
+  const { error } = listado;
 
   const agregarFilaDetalle = () => {
-    setDetalles([...detalles, { key: Date.now(), manual: false, idProveedor: '', claveReservacion: '', montoReservacion: 0, porcentajeReservacion: 0, montoComisionable: 0, totalReservacion: 0 }]);
+    setDetalles([...detalles, { key: Date.now(), manual: false, idProveedor: '', proveedorNombre: '', claveReservacion: '', montoReservacion: 0, porcentajeReservacion: 0, montoComisionable: 0, totalReservacion: 0 }]);
   };
 
   // Si se dio varias veces clic en "Añadir Proveedor/Servicio", esto permite
@@ -92,7 +52,11 @@ export default function Reservaciones() {
     const nuevosDetalles = [...detalles];
     const fila = { ...nuevosDetalles[index] };
 
-    if (field === 'manual') {
+    if (field === 'proveedor') {
+      // value = { id, nombre } desde el selector con búsqueda
+      fila.idProveedor = value.id;
+      fila.proveedorNombre = value.nombre;
+    } else if (field === 'manual') {
       fila.manual = value;
       if (value) {
         // Modo manual: el % descuento se limpia y queda bloqueado.
@@ -131,11 +95,12 @@ export default function Reservaciones() {
     }
     setGuardando(true);
     try {
+      const { clienteNombre, ...datosMaestro } = maestro;
       await reservacionesApi.create({
-        ...maestro,
+        ...datosMaestro,
         // Se manda totalReservacion ya calculado: en modo manual sale de
         // monto base - monto comisionable, una fórmula que el backend no conoce.
-        detalleReservacion: detalles.map(({ key, manual, ...d }) => d),
+        detalleReservacion: detalles.map(({ key, manual, proveedorNombre, ...d }) => d),
       });
       setMaestro(MAESTRO_VACIO);
       setDetalles([]);
@@ -154,7 +119,7 @@ export default function Reservaciones() {
       .join('\n');
     alert(
       `Destino: ${r.destino}\nCliente: ${r.idCliente?.nombreCompleto || ''}\nAgente: ${r.agente?.nombre || ''}\n` +
-      `Entrada: ${new Date(r.fechaEntrada).toLocaleDateString('es-MX')}  Salida: ${new Date(r.fechaSalida).toLocaleDateString('es-MX')}\n` +
+      `Entrada: ${fechaViaje(r.fechaEntrada)}  Salida: ${fechaViaje(r.fechaSalida)}\n` +
       `Descripción: ${r.descripcion || '—'}\nNotas: ${r.notas || '—'}\n\nServicios:\n${servicios || '—'}\n\n` +
       `Monto Total de la Reservación: $${r.montoTotal.toFixed(2)}\nCosto con Proveedores: $${r.totalViaje.toFixed(2)}`
     );
@@ -174,10 +139,13 @@ export default function Reservaciones() {
             <div className="md:col-span-3 font-semibold text-brand-tealDark text-sm">Datos del viaje</div>
             <div>
               <label className="block text-xs font-bold text-slate-600">Cliente Activo *</label>
-              <select required disabled={loading} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" value={maestro.idCliente} onChange={e => setMaestro({ ...maestro, idCliente: e.target.value })}>
-                <option value="">-- Seleccionar --</option>
-                {clientesActivos.map(c => <option key={c._id} value={c._id}>{c.nombreCompleto}</option>)}
-              </select>
+              <div className="mt-1">
+                <SelectorRemoto required buscar={buscarClientes} placeholder="Busca por nombre o teléfono"
+                  valor={maestro.idCliente} etiquetaValor={maestro.clienteNombre}
+                  etiqueta={c => c.nombreCompleto}
+                  detalle={c => `${c.telefono}${c.agente?.nombre ? ` · Agente: ${c.agente.nombre}` : ''}`}
+                  onCambio={(id, c) => setMaestro({ ...maestro, idCliente: id, clienteNombre: c?.nombreCompleto || '' })} />
+              </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600">Fecha de Entrada *</label>
@@ -208,7 +176,7 @@ export default function Reservaciones() {
           <div className="border border-slate-100 rounded-xl p-4">
             <div className="flex justify-between items-center mb-4">
               <span className="font-semibold text-slate-700 text-sm">Detalle de servicios / proveedores</span>
-              <button type="button" onClick={agregarFilaDetalle} disabled={loading} className="inline-flex items-center gap-1.5 bg-brand-purple text-white px-3 py-1.5 text-xs font-semibold rounded-lg hover:brightness-90 disabled:opacity-60">
+              <button type="button" onClick={agregarFilaDetalle} className="inline-flex items-center gap-1.5 bg-brand-purple text-white px-3 py-1.5 text-xs font-semibold rounded-lg hover:brightness-90 disabled:opacity-60">
                 <Plus size={14} /> Añadir Proveedor/Servicio
               </button>
             </div>
@@ -234,10 +202,10 @@ export default function Reservaciones() {
                     <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Proveedor *</label>
-                        <select required className="w-full p-1.5 border border-slate-300 rounded bg-white text-xs" value={d.idProveedor} onChange={e => handleDetalleChange(index, 'idProveedor', e.target.value)}>
-                          <option value="">-- Prov --</option>
-                          {proveedoresActivos.map(p => <option key={p._id} value={p._id}>{p.nombreProveedor}</option>)}
-                        </select>
+                        <SelectorRemoto required compacto buscar={buscarProveedores} placeholder="-- Prov --"
+                          valor={d.idProveedor} etiquetaValor={d.proveedorNombre}
+                          etiqueta={p => p.nombreProveedor}
+                          onCambio={(id, p) => handleDetalleChange(index, 'proveedor', { id, nombre: p?.nombreProveedor || '' })} />
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Clave Confirmación *</label>
@@ -282,23 +250,28 @@ export default function Reservaciones() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Compass size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">
-              {sesion?.rol === 'Agente' ? 'Mis Reservaciones' : 'Listado de Reservaciones'}
-            </h2>
+            <h2 className="text-base font-bold text-brand-tealDark">Listado de Reservaciones</h2>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
-              <input type="text" placeholder="Buscar por destino, cliente o agente..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              <input type="text" placeholder="Buscar destino, cliente o teléfono..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
                 className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600 shrink-0">
-              Mostrar
-              <select value={porPagina} onChange={e => setPorPagina(Number(e.target.value))}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
-                {OPCIONES_POR_PAGINA.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
+            <select value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)} title="Agente que vendió"
+              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+              <option value="">Todos los agentes</option>
+              <option value="mios">Mis reservaciones</option>
+              {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
+            </select>
+            <select value={filtroEstatus} onChange={e => setFiltroEstatus(e.target.value)} title="Estatus"
+              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+              <option value="">Todos los estatus</option>
+              <option value="Activa">Activas</option>
+              <option value="Completada">Completadas</option>
+              <option value="Cancelada">Canceladas</option>
+            </select>
+            <SelectorPorPagina listado={listado} />
           </div>
         </div>
 
@@ -317,15 +290,15 @@ export default function Reservaciones() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loadingListado && (
+              {listado.cargando && listado.datos.length === 0 && (
                 <tr><td colSpan={8} className="p-6 text-center text-slate-400 text-sm">Cargando reservaciones...</td></tr>
               )}
-              {!loadingListado && reservacionesPaginadas.map(r => (
+              {listado.datos.map(r => (
                 <tr key={r._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{r.idCliente?.nombreCompleto || '—'}</td>
                   <td className="p-3 text-slate-600">{r.destino}</td>
-                  <td className="p-3 text-slate-600">{new Date(r.fechaEntrada).toLocaleDateString('es-MX')}</td>
-                  <td className="p-3 text-slate-600">{new Date(r.fechaSalida).toLocaleDateString('es-MX')}</td>
+                  <td className="p-3 text-slate-600">{fechaViaje(r.fechaEntrada)}</td>
+                  <td className="p-3 text-slate-600">{fechaViaje(r.fechaSalida)}</td>
                   <td className="p-3 text-slate-600">{r.agente?.nombre || '—'}</td>
                   <td className="p-3 text-slate-600 font-mono text-xs">${r.totalViaje.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
                   <td className="p-3">
@@ -340,7 +313,7 @@ export default function Reservaciones() {
                   </td>
                 </tr>
               ))}
-              {!loadingListado && reservacionesFiltradas.length === 0 && (
+              {!listado.cargando && listado.total === 0 && (
                 <tr>
                   <td colSpan={8} className="p-6 text-center text-slate-400 text-sm">No se encontraron reservaciones.</td>
                 </tr>
@@ -349,24 +322,7 @@ export default function Reservaciones() {
           </table>
         </div>
 
-        {!loadingListado && reservacionesFiltradas.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
-            <p className="text-sm text-slate-500">
-              Mostrando {(paginaSegura - 1) * porPagina + 1}–{Math.min(paginaSegura * porPagina, reservacionesFiltradas.length)} de {reservacionesFiltradas.length} reservaciones
-            </p>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={paginaSegura === 1}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-sm text-slate-600 px-2">Página {paginaSegura} de {totalPaginas}</span>
-              <button type="button" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={paginaSegura === totalPaginas}
-                className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        <Paginacion listado={listado} etiqueta="reservaciones" />
       </div>
     </div>
   );

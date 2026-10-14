@@ -44,6 +44,7 @@ const AgenteSchema = new mongoose.Schema(
 );
 
 AgenteSchema.index({ nombre: 'text' });
+AgenteSchema.index({ empresa: 1, estatus: 1 });
 
 // Regla de negocio: solo puede existir un Administrador por empresa.
 // partialFilterExpression hace que el índice único solo aplique a los
