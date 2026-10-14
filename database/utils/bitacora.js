@@ -20,6 +20,7 @@ export async function registrarCambios({ entidad, entidadId, anterior, nuevo, us
     if (CAMPOS_IGNORADOS.has(campo)) continue;
     const valorAnterior = anterior[campo];
     const valorNuevo = nuevo[campo];
+    if (valorNuevo === undefined) continue; // el campo no venía en la petición
     if (aTexto(valorAnterior) === aTexto(valorNuevo)) continue;
 
     cambios.push({
@@ -38,4 +39,20 @@ export async function registrarCambios({ entidad, entidadId, anterior, nuevo, us
   if (cambios.length > 0) {
     await Bitacora.insertMany(cambios);
   }
+}
+
+/**
+ * Registra un evento puntual que no es un cambio de campo (alta de un registro,
+ * conversión de prospecto, etc.). Se guarda con campo = evento.
+ */
+export async function registrarEvento({ entidad, entidadId, empresa, evento, detalle, usuario }) {
+  await Bitacora.create({
+    entidad,
+    entidadId,
+    campo: evento,
+    valorAnterior: null,
+    valorNuevo: detalle ?? null,
+    usuario,
+    empresa: empresa ?? null,
+  });
 }

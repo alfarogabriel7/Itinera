@@ -10,6 +10,10 @@ const DetalleReservacionSchema = new Schema(
     porcentajeReservacion: { type: Number, default: 0, min: 0, max: 100 },
     montoComisionable: { type: Number, required: true, min: 0 },
     totalReservacion: { type: Number, min: 0 },
+    // Acumulado de pagos aplicados al proveedor por este servicio. Lo mantiene
+    // el servidor con $inc atómicos (ver database/utils/saldos.js); nunca se
+    // toma del body.
+    pagado: { type: Number, default: 0 },
   },
   { _id: true }
 );
@@ -40,13 +44,21 @@ const ReservacionSchema = new Schema(
     notas: { type: String, trim: true, maxlength: 1000 },
     detalleReservacion: { type: [DetalleReservacionSchema], default: [] },
     estatus: { type: String, enum: ['Activa', 'Cancelada', 'Completada'], default: 'Activa' },
+    // Acumulado de abonos aplicados del cliente (lo mantiene el servidor con $inc atómicos).
+    abonado: { type: Number, default: 0 },
   },
-  { timestamps: true }
+  // optimisticConcurrency: si alguien registra un pago mientras otro edita la
+  // reservación, el guardado de la edición falla (409) en vez de pisar los acumulados.
+  { timestamps: true, optimisticConcurrency: true }
 );
 
-ReservacionSchema.index({ empresa: 1 });
-ReservacionSchema.index({ agente: 1 });
+// Índices pensados para las consultas reales (siempre filtradas por empresa):
+// listados por agente, cobranza por estatus y fecha de viaje, ventas por fecha.
+ReservacionSchema.index({ empresa: 1, agente: 1, createdAt: -1 });
+ReservacionSchema.index({ empresa: 1, estatus: 1, fechaEntrada: 1 });
+ReservacionSchema.index({ empresa: 1, createdAt: -1 });
 ReservacionSchema.index({ idCliente: 1 });
+ReservacionSchema.index({ 'detalleReservacion.idProveedor': 1 });
 ReservacionSchema.index({ destino: 'text' });
 
 // Costo total del viaje (suma del detalle embebido).

@@ -4,6 +4,9 @@ const ClienteSchema = new mongoose.Schema(
   {
     // Empresa a la que pertenece el cliente (multi-tenant, igual que Agente).
     empresa: { type: mongoose.Schema.Types.ObjectId, ref: 'Empresa', required: true },
+    // Agente responsable del cliente (de la misma empresa). Un Agente solo ve a
+    // sus clientes; el Administrador ve todos y puede reasignarlos.
+    agente: { type: mongoose.Schema.Types.ObjectId, ref: 'Agente', required: true },
     nombreCompleto: { type: String, required: true, trim: true, maxlength: 120 },
     tipoDocumento: { type: String, enum: ['INE', 'Pasaporte', 'Cédula'] },
     numeroDocumento: { type: String, trim: true },
@@ -11,6 +14,8 @@ const ClienteSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
+      // El formulario manda '' cuando no hay correo: se guarda como "sin correo".
+      set: (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
       match: [/^\S+@\S+\.\S+$/, 'Correo electrónico inválido'],
     },
     telefono: { type: String, required: true, trim: true },
@@ -26,7 +31,13 @@ const ClienteSchema = new mongoose.Schema(
 
 // Único por empresa, no global: dos empresas distintas sí pueden tener
 // cada una un cliente con el mismo correo.
-ClienteSchema.index({ empresa: 1, correo: 1 }, { unique: true, sparse: true });
+// Correo único por empresa, solo entre clientes que sí tienen correo. (Con
+// `sparse` en un índice compuesto no bastaba: como empresa siempre existe, dos
+// clientes sin correo de la misma empresa chocaban.)
+ClienteSchema.index({ empresa: 1, correo: 1 }, { unique: true, partialFilterExpression: { correo: { $gt: '' } } });
+// Listados por empresa y por agente, más recientes primero.
+ClienteSchema.index({ empresa: 1, agente: 1, createdAt: -1 });
+ClienteSchema.index({ empresa: 1, createdAt: -1 });
 ClienteSchema.index({ nombreCompleto: 'text', ciudad: 'text' });
 
 export default mongoose.model('Cliente', ClienteSchema);

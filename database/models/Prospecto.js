@@ -8,9 +8,18 @@ const AccionNotaSchema = new Schema(
     // Nace "En seguimiento"; la única transición esperada es marcarla "Completada".
     estatus: { type: String, enum: ['En seguimiento', 'Completada'], default: 'En seguimiento' },
     fecha: { type: Date, default: Date.now },
+    // Cuándo se marcó como completada; lo mantiene el hook de abajo.
+    fechaCompletada: { type: Date },
   },
   { _id: true }
 );
+
+// La fecha de completado la fija siempre el servidor según el estatus, venga
+// el cambio del panel del agente o del formulario de Prospectos.
+AccionNotaSchema.pre('validate', function () {
+  if (this.estatus === 'Completada' && !this.fechaCompletada) this.fechaCompletada = new Date();
+  if (this.estatus !== 'Completada') this.fechaCompletada = undefined;
+});
 
 const NotaProspectoSchema = new Schema(
   {
@@ -52,10 +61,9 @@ const ProspectoSchema = new Schema(
   { timestamps: true }
 );
 
-ProspectoSchema.index({ empresa: 1 });
-ProspectoSchema.index({ agente: 1 });
-ProspectoSchema.index({ estatus: 1 });
-ProspectoSchema.index({ fechaRegistro: 1 });
+ProspectoSchema.index({ empresa: 1, agente: 1, estatus: 1, createdAt: -1 });
+ProspectoSchema.index({ empresa: 1, estatus: 1, createdAt: -1 });
+ProspectoSchema.index({ empresa: 1, fechaRegistro: 1 });
 ProspectoSchema.index({ nombreCompleto: 'text', ciudad: 'text' });
 
 export default mongoose.model('Prospecto', ProspectoSchema);
