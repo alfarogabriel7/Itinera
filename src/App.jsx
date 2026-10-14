@@ -1,0 +1,254 @@
+import React, { useEffect, useState } from 'react';
+import Clientes from './components/Clientes';
+import Proveedores from './components/Proveedores';
+import Reservaciones from './components/Reservaciones';
+import Pagos from './components/Pagos';
+import Agentes from './components/Agentes';
+import Empresas from './components/Empresas';
+import Prospectos from './components/Prospectos';
+import Login from './components/Login';
+import { authApi, clientesApi, reservacionesApi, pagosApi, setUnauthorizedHandler } from './api';
+import { obtenerSesion } from './utils/sesion';
+import logo from './assets/logo.png';
+import {
+  Users, Truck, Compass, DollarSign, Plane, Bell, ChevronDown,
+  Menu, X, LogOut, TreePalm, Users2, UserCog, Building2, UserPlus,
+} from 'lucide-react';
+
+const NAV_ITEMS = [
+  { key: 'clientes', label: 'Clientes', icon: Users },
+  // superAdmin no consulta ni gestiona prospectos de ninguna empresa.
+  { key: 'prospectos', label: 'Prospectos', icon: UserPlus, visible: (rol) => rol !== 'superAdmin' },
+  // Empresas solo lo administra el superAdmin.
+  { key: 'empresas', label: 'Empresas', icon: Building2, visible: (rol) => rol === 'superAdmin' },
+  { key: 'proveedores', label: 'Proveedores', icon: Truck },
+  // superAdmin no consulta ni gestiona reservaciones de ninguna empresa.
+  { key: 'reservaciones', label: 'Reservaciones', icon: Compass, visible: (rol) => rol !== 'superAdmin' },
+  { key: 'pagos', label: 'Registro de Pagos', icon: DollarSign },
+  // Un Agente no puede ver el módulo de Agentes en absoluto.
+  { key: 'agentes', label: 'Agentes', icon: UserCog, visible: (rol) => rol !== 'Agente' },
+];
+
+const PAGE_TITLES = {
+  clientes: 'Panel de Control',
+  prospectos: 'Panel de Control',
+  empresas: 'Panel de Control',
+  proveedores: 'Panel de Control',
+  reservaciones: 'Panel de Control',
+  pagos: 'Panel de Control',
+  agentes: 'Panel de Control',
+};
+
+function iniciales(nombre) {
+  return nombre
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p[0].toUpperCase())
+    .join('');
+}
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('clientes');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [auth, setAuth] = useState(obtenerSesion);
+
+  const [resumen, setResumen] = useState({ clientesRegistrados: 0, reservacionesActivas: 0, pagosDelMes: 0 });
+
+  // Destruye la sesión por completo: revoca el token en el servidor (así ya no
+  // sirve aunque alguien lo hubiera copiado), borra lo guardado en el navegador
+  // y limpia el estado en memoria, para que el siguiente login (de otro usuario
+  // u otro rol) arranque limpio y no arrastre datos del usuario anterior.
+  const handleLogout = () => {
+    authApi.logout().catch(() => {}); // best-effort: el logout local sigue aunque falle la red
+    localStorage.clear();
+    sessionStorage.clear();
+    setAuth(null);
+    setActiveTab('clientes');
+    setSidebarOpen(false);
+    setResumen({ clientesRegistrados: 0, reservacionesActivas: 0, pagosDelMes: 0 });
+  };
+
+  const handleLoginSuccess = (token, agente) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('agente', JSON.stringify(agente));
+    setAuth(agente);
+  };
+
+  useEffect(() => {
+    setUnauthorizedHandler(handleLogout);
+  }, []);
+
+  useEffect(() => {
+    if (!auth) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const [clientes, reservaciones, pagos] = await Promise.all([
+          clientesApi.list(),
+          reservacionesApi.list(),
+          pagosApi.list(),
+        ]);
+        if (cancelado) return;
+        const ahora = new Date();
+        const pagosDelMes = pagos
+          .filter(p => {
+            const f = new Date(p.fecha);
+            return f.getMonth() === ahora.getMonth() && f.getFullYear() === ahora.getFullYear();
+          })
+          .reduce((acc, p) => acc + p.monto, 0);
+        setResumen({
+          clientesRegistrados: clientes.length,
+          reservacionesActivas: reservaciones.length,
+          pagosDelMes,
+        });
+      } catch (err) {
+        console.error('No se pudo cargar el resumen:', err.message);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [activeTab, auth]);
+
+  const goTo = (key) => {
+    setActiveTab(key);
+    setSidebarOpen(false);
+  };
+
+  if (!auth) {
+    return <Login onSuccess={handleLoginSuccess} />;
+  }
+
+  const navItemsVisibles = NAV_ITEMS.filter(item => !item.visible || item.visible(auth.rol));
+
+  return (
+    <div className="min-h-screen bg-slate-100 md:flex">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-64 shrink-0 flex flex-col text-white bg-gradient-to-b from-brand-tealDark to-brand-teal transition-transform duration-200 overflow-y-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="flex items-center justify-between px-6 py-6">
+          <div className="w-28 h-28 rounded-full bg-white shadow-sm shrink-0 flex items-center justify-center overflow-hidden p-1.5">
+            <img src={logo} alt="Feliz Viaje" className="w-full h-full object-contain" />
+          </div>
+          <button className="md:hidden text-white/80" onClick={() => setSidebarOpen(false)}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav className="flex-1 px-4 py-2 space-y-1">
+          {navItemsVisibles.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => goTo(key)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${
+                activeTab === key
+                  ? 'bg-white text-brand-tealDark shadow-sm'
+                  : 'text-white/75 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Icon size={18} />
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="relative px-6 py-6 min-h-[64px] overflow-hidden shrink-0">
+          <TreePalm size={90} className="absolute -bottom-4 -left-4 text-white/10" />
+          <Plane size={36} className="absolute top-2 right-4 -rotate-12 text-white/10" />
+        </div>
+
+        <button onClick={handleLogout} className="shrink-0 flex items-center gap-3 px-6 py-5 text-sm font-medium text-white/75 hover:text-white hover:bg-white/10 border-t border-white/10">
+          <LogOut size={18} />
+          Cerrar sesión
+        </button>
+      </aside>
+
+      {/* Right column: header + content */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <header className="sticky top-0 z-20 flex items-center justify-between gap-4 bg-white px-4 md:px-8 py-4 shadow-sm border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <button className="md:hidden text-slate-500" onClick={() => setSidebarOpen(true)}>
+              <Menu size={22} />
+            </button>
+            <Menu className="hidden md:block text-slate-400" size={20} />
+            <h2 className="text-lg font-semibold text-slate-700">{PAGE_TITLES[activeTab]}</h2>
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="relative text-slate-400 hover:text-slate-600">
+              <Bell size={20} />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" />
+            </button>
+            <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-teal to-brand-purple text-white flex items-center justify-center text-xs font-bold">
+                {iniciales(auth.nombre)}
+              </div>
+              <span className="hidden sm:block text-sm font-medium text-slate-700">{auth.nombre}</span>
+              <ChevronDown size={16} className="text-slate-400" />
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 flex flex-col xl:flex-row gap-6 p-4 md:p-8">
+          <main className="flex-1 min-w-0">
+            {activeTab === 'clientes' && <Clientes />}
+            {activeTab === 'prospectos' && auth.rol !== 'superAdmin' && <Prospectos />}
+            {activeTab === 'empresas' && auth.rol === 'superAdmin' && <Empresas />}
+            {activeTab === 'proveedores' && <Proveedores />}
+            {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones />}
+            {activeTab === 'pagos' && <Pagos />}
+            {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}
+          </main>
+
+          {/* Right panel: promo + resumen */}
+          <aside className="w-full xl:w-72 shrink-0 flex flex-col gap-6">
+            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-brand-teal to-brand-purple p-6 min-h-[220px] flex flex-col justify-between shadow-sm">
+              <TreePalm size={90} className="absolute -bottom-3 -left-3 text-white/15" />
+              <Plane size={36} className="absolute top-4 right-4 rotate-45 text-white/25" />
+              <div />
+              <p className="relative text-white text-center italic font-medium leading-snug">
+                "Viajar es la única cosa que compras y te hace más rico."
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+              <h3 className="text-sm font-bold text-slate-700 mb-4">Resumen</h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-teal text-white flex items-center justify-center shrink-0">
+                    <Users2 size={18} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Clientes registrados</div>
+                    <div className="text-lg font-bold text-slate-800">{resumen.clientesRegistrados}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-purple text-white flex items-center justify-center shrink-0">
+                    <Compass size={18} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Reservaciones activas</div>
+                    <div className="text-lg font-bold text-slate-800">{resumen.reservacionesActivas}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-yellow text-brand-tealDark flex items-center justify-center shrink-0">
+                    <DollarSign size={18} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Pagos este mes</div>
+                    <div className="text-lg font-bold text-slate-800">
+                      ${resumen.pagosDelMes.toLocaleString('es-MX', { maximumFractionDigits: 0 })} MXN
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
