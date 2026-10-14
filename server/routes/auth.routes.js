@@ -1,27 +1,67 @@
 import { Router } from 'express';
-import { Agente } from '../../database/index.js';
+import { Agente, Empresa, IntentoLogin } from '../../database/index.js';
 import { signToken, revokeToken } from '../middleware/auth.js';
 
 const router = Router();
 
+// Límite de intentos fallidos (fuerza bruta), en una ventana de 15 minutos:
+//  - por usuario + IP: 5 intentos (frena adivinar la contraseña de una cuenta
+//    sin bloquear a ese usuario desde otros equipos);
+//  - por IP: 30 intentos con cualquier usuario (frena probar muchas cuentas).
+const VENTANA_MS = 15 * 60 * 1000;
+const LIMITES = { usuario: 5, ip: 30 };
+
+const clavesDe = (userId, ip) => ({ usuario: `usuario:${userId}|${ip}`, ip: `ip:${ip}` });
+
+async function minutosDeBloqueo(claves) {
+  const registros = await IntentoLogin.find({ clave: { $in: [claves.usuario, claves.ip] } }).lean();
+  const bloqueado = registros.find((r) =>
+    (r.clave === claves.usuario && r.intentos >= LIMITES.usuario) || (r.clave === claves.ip && r.intentos >= LIMITES.ip));
+  return bloqueado ? Math.max(1, Math.ceil((bloqueado.expiraEn - Date.now()) / 60000)) : 0;
+}
+
+async function registrarFallo(claves) {
+  const expiraEn = new Date(Date.now() + VENTANA_MS);
+  await Promise.all([claves.usuario, claves.ip].map((clave) =>
+    IntentoLogin.updateOne({ clave }, { $inc: { intentos: 1 }, $setOnInsert: { expiraEn } }, { upsert: true })));
+}
+
 router.post('/login', async (req, res, next) => {
   try {
     const { userId, password } = req.body;
-    if (!userId || !password) {
+    if (typeof userId !== 'string' || typeof password !== 'string' || !userId || !password) {
       return res.status(400).json({ error: 'Usuario y contraseña son obligatorios' });
     }
 
-    const agente = await Agente.findOne({ userId: userId.trim().toLowerCase() }).select('+password');
+    const usuario = userId.trim().toLowerCase();
+    const claves = clavesDe(usuario, req.ip);
+    const minutos = await minutosDeBloqueo(claves);
+    if (minutos) {
+      res.set('Retry-After', String(minutos * 60));
+      return res.status(429).json({ error: `Demasiados intentos fallidos. Intenta de nuevo en ${minutos} minuto(s).` });
+    }
+
+    const agente = await Agente.findOne({ userId: usuario }).select('+password');
 
     // Mismo mensaje genérico si el usuario no existe o si la contraseña es incorrecta,
     // para no revelar cuáles usuarios existen en el sistema.
     if (!agente || !(await agente.compararPassword(password))) {
+      await registrarFallo(claves);
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
 
     if (agente.estatus !== 'Activo') {
       return res.status(403).json({ error: 'Este usuario está inactivo. Contacta a un administrador.' });
     }
+    if (agente.rol !== 'superAdmin') {
+      const empresa = await Empresa.findById(agente.empresa).select('estatus');
+      if (!empresa || empresa.estatus !== 'Activo') {
+        return res.status(403).json({ error: 'La empresa de este usuario no está activa. Contacta al administrador de la plataforma.' });
+      }
+    }
+
+    // Inicio de sesión correcto: se limpian los intentos de este usuario en este equipo.
+    await IntentoLogin.deleteOne({ clave: claves.usuario });
 
     const token = signToken(agente);
     res.json({
