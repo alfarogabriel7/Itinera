@@ -136,7 +136,7 @@ export default function Reservaciones() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <form onSubmit={guardarTodo} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <div className="md:col-span-3 font-semibold text-brand-tealDark text-sm">Datos del viaje</div>
+            <div className="md:col-span-3 font-semibold text-brand-noche text-sm">Datos del viaje</div>
             <div>
               <label className="block text-xs font-bold text-slate-600">Cliente Activo *</label>
               <div className="mt-1">
@@ -149,34 +149,34 @@ export default function Reservaciones() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600">Fecha de Entrada *</label>
-              <input type="date" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" value={maestro.fechaEntrada} onChange={e => setMaestro({ ...maestro, fechaEntrada: e.target.value })} />
+              <input type="date" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" value={maestro.fechaEntrada} onChange={e => setMaestro({ ...maestro, fechaEntrada: e.target.value })} />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600">Fecha de Salida *</label>
-              <input type="date" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" value={maestro.fechaSalida} onChange={e => setMaestro({ ...maestro, fechaSalida: e.target.value })} />
+              <input type="date" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" value={maestro.fechaSalida} onChange={e => setMaestro({ ...maestro, fechaSalida: e.target.value })} />
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Destino Turístico *</label>
-              <input type="text" maxLength={100} required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" placeholder="Ej. Cancún, México" value={maestro.destino} onChange={e => setMaestro({ ...maestro, destino: e.target.value })} />
+              <input type="text" maxLength={100} required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="Ej. Cancún, México" value={maestro.destino} onChange={e => setMaestro({ ...maestro, destino: e.target.value })} />
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Descripción del viaje</label>
-              <textarea rows={2} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" placeholder="Ej. Viaje familiar todo incluido, vuelo redondo + hotel" value={maestro.descripcion} onChange={e => setMaestro({ ...maestro, descripcion: e.target.value })} />
+              <textarea rows={2} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="Ej. Viaje familiar todo incluido, vuelo redondo + hotel" value={maestro.descripcion} onChange={e => setMaestro({ ...maestro, descripcion: e.target.value })} />
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Monto Total de la Reservación ($) *</label>
-              <input type="number" required step="0.01" min="0" className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" placeholder="0.00" value={maestro.montoTotal} onChange={e => setMaestro({ ...maestro, montoTotal: e.target.value })} />
+              <input type="number" required step="0.01" min="0" className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="0.00" value={maestro.montoTotal} onChange={e => setMaestro({ ...maestro, montoTotal: e.target.value })} />
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Notas / Pendientes del agente</label>
-              <textarea rows={2} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" placeholder="Ej. Confirmar tarifa con el proveedor antes del 10 de diciembre" value={maestro.notas} onChange={e => setMaestro({ ...maestro, notas: e.target.value })} />
+              <textarea rows={2} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="Ej. Confirmar tarifa con el proveedor antes del 10 de diciembre" value={maestro.notas} onChange={e => setMaestro({ ...maestro, notas: e.target.value })} />
             </div>
           </div>
 
           <div className="border border-slate-100 rounded-xl p-4">
             <div className="flex justify-between items-center mb-4">
               <span className="font-semibold text-slate-700 text-sm">Detalle de servicios / proveedores</span>
-              <button type="button" onClick={agregarFilaDetalle} className="inline-flex items-center gap-1.5 bg-brand-purple text-white px-3 py-1.5 text-xs font-semibold rounded-lg hover:brightness-90 disabled:opacity-60">
+              <button type="button" onClick={agregarFilaDetalle} className="inline-flex items-center gap-1.5 bg-brand-coral text-white px-3 py-1.5 text-xs font-semibold rounded-lg hover:brightness-90 disabled:opacity-60">
                 <Plus size={14} /> Añadir Proveedor/Servicio
               </button>
             </div>
@@ -186,12 +186,12 @@ export default function Reservaciones() {
             ) : (
               <div className="space-y-3">
                 {detalles.map((d, index) => (
-                  <div key={d.key} className="p-3 bg-brand-teal/10 rounded-lg border border-brand-teal/20">
+                  <div key={d.key} className="p-3 bg-brand-petroleo/10 rounded-lg border border-brand-petroleo/20">
                     <div className="flex items-center justify-between mb-2">
                       <label className="flex items-center gap-1.5 text-2xs uppercase text-slate-600 font-bold cursor-pointer">
                         <input type="checkbox" checked={d.manual}
                           onChange={e => handleDetalleChange(index, 'manual', e.target.checked)}
-                          className="rounded border-slate-300 text-brand-teal focus:ring-brand-teal" />
+                          className="rounded border-slate-300 text-brand-petroleo focus:ring-brand-petroleo" />
                         Manual
                       </label>
                       <button type="button" onClick={() => eliminarFilaDetalle(index)} title="Quitar este servicio"
@@ -229,7 +229,7 @@ export default function Reservaciones() {
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Total Calculado ($)</label>
-                        <input type="text" disabled className="w-full p-1.5 border border-slate-200 rounded bg-slate-100 font-bold text-xs text-brand-tealDark" value={`$${d.totalReservacion.toFixed(2)}`} />
+                        <input type="text" disabled className="w-full p-1.5 border border-slate-200 rounded bg-slate-100 font-bold text-xs text-brand-noche" value={`$${d.totalReservacion.toFixed(2)}`} />
                       </div>
                     </div>
                   </div>
@@ -239,7 +239,7 @@ export default function Reservaciones() {
           </div>
 
           <div className="flex justify-end">
-            <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-teal text-white px-6 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-brand-tealDark disabled:opacity-60">
+            <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-petroleo text-white px-6 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-brand-noche disabled:opacity-60">
               <Send size={16} /> {guardando ? 'Guardando...' : 'Procesar y Guardar Reservación'}
             </button>
           </div>
@@ -249,23 +249,23 @@ export default function Reservaciones() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <Compass size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">Listado de Reservaciones</h2>
+            <Compass size={18} className="text-brand-petroleo" />
+            <h2 className="text-base font-bold text-brand-noche">Listado de Reservaciones</h2>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
               <input type="text" placeholder="Buscar destino, cliente o teléfono..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
-                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
+                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
             <select value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)} title="Agente que vendió"
-              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
               <option value="">Todos los agentes</option>
               <option value="mios">Mis reservaciones</option>
               {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
             </select>
             <select value={filtroEstatus} onChange={e => setFiltroEstatus(e.target.value)} title="Estatus"
-              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
               <option value="">Todos los estatus</option>
               <option value="Activa">Activas</option>
               <option value="Completada">Completadas</option>
@@ -278,7 +278,7 @@ export default function Reservaciones() {
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-brand-tealDark text-white text-sm">
+              <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Cliente</th>
                 <th className="p-3 font-semibold">Destino</th>
                 <th className="p-3 font-semibold">Entrada</th>
@@ -306,7 +306,7 @@ export default function Reservaciones() {
                   </td>
                   <td className="p-3">
                     <div className="flex items-center justify-center">
-                      <button onClick={() => handleVer(r)} title="Ver" className="w-8 h-8 rounded-full bg-brand-teal hover:bg-brand-tealDark text-white flex items-center justify-center">
+                      <button onClick={() => handleVer(r)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
                     </div>

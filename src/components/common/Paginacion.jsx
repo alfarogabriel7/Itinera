@@ -9,7 +9,7 @@ export function SelectorPorPagina({ listado }) {
     <label className="flex items-center gap-2 text-sm text-slate-600 shrink-0">
       Mostrar
       <select value={listado.porPagina} onChange={e => listado.setPorPagina(Number(e.target.value))}
-        className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+        className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
         {OPCIONES_POR_PAGINA.map(n => <option key={n} value={n}>{n}</option>)}
       </select>
     </label>

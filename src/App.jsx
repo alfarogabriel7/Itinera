@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Clientes from './components/Clientes';
 import Proveedores from './components/Proveedores';
 import Reservaciones from './components/Reservaciones';
@@ -12,10 +12,11 @@ import MiPanel from './components/MiPanel';
 import Login from './components/Login';
 import { authApi, dashboardApi, empresasApi, setUnauthorizedHandler } from './api';
 import { obtenerSesion } from './utils/sesion';
-import logo from './assets/logo.png';
+import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
+import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
-  Users, Truck, Compass, DollarSign, Plane, Bell, ChevronDown,
-  Menu, X, LogOut, TreePalm, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home,
+  Users, Truck, Compass, DollarSign, Bell, ChevronDown,
+  Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -68,6 +69,60 @@ function iniciales(nombre) {
     .join('');
 }
 
+const ETIQUETA_ROL = { superAdmin: 'Super Administrador', Administrador: 'Administrador', Agente: 'Agente' };
+
+// Nombre del usuario en la cabecera; al hacer clic despliega el menú con "Cerrar sesión".
+function MenuUsuario({ auth, onLogout }) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!abierto) return undefined;
+    const alClicFuera = (e) => { if (!ref.current?.contains(e.target)) setAbierto(false); };
+    const alEscape = (e) => { if (e.key === 'Escape') setAbierto(false); };
+    document.addEventListener('mousedown', alClicFuera);
+    document.addEventListener('keydown', alEscape);
+    return () => {
+      document.removeEventListener('mousedown', alClicFuera);
+      document.removeEventListener('keydown', alEscape);
+    };
+  }, [abierto]);
+
+  return (
+    <div ref={ref} className="relative pl-4 border-l border-slate-200">
+      <button
+        onClick={() => setAbierto(a => !a)}
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-slate-50"
+      >
+        <div className="w-9 h-9 rounded-full bg-brand-petroleo text-white flex items-center justify-center text-xs font-bold">
+          {iniciales(auth.nombre)}
+        </div>
+        <span className="hidden sm:block text-sm font-medium text-slate-700">{auth.nombre}</span>
+        <ChevronDown size={16} className={`text-slate-400 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+      </button>
+
+      {abierto && (
+        <div role="menu" className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-lg border border-slate-100 py-2 z-30">
+          <div className="px-4 py-2 border-b border-slate-100">
+            <div className="text-sm font-semibold text-slate-700 truncate">{auth.nombre}</div>
+            <div className="text-xs text-slate-500">{ETIQUETA_ROL[auth.rol] || auth.rol}</div>
+          </div>
+          <button
+            role="menuitem"
+            onClick={() => { setAbierto(false); onLogout(); }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+          >
+            <LogOut size={16} />
+            Cerrar sesión
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [auth, setAuth] = useState(obtenerSesion);
   const [activeTab, setActiveTab] = useState(() => tabInicial(obtenerSesion()?.rol));
@@ -117,10 +172,13 @@ export default function App() {
   }, [activeTab, auth]);
 
   // Logo de la empresa del usuario para la barra lateral. El superAdmin y las
-  // empresas sin logo ven el de la plataforma (Feliz Viaje).
-  const [logoEmpresa, setLogoEmpresa] = useState(null);
+  // empresas sin logo ven el de la plataforma (Itinera). Los colores no cambian
+  // por empresa: son siempre los de Itinera.
+  // undefined = descargando (no se muestra nada para que no parpadee el de Itinera).
+  const [logoEmpresa, setLogoEmpresa] = useState(undefined);
   useEffect(() => {
     if (!auth?.empresa) { setLogoEmpresa(null); return undefined; }
+    setLogoEmpresa(undefined);
     let url = null;
     let cancelado = false;
     empresasApi.descargarLogo(auth.empresa)
@@ -157,22 +215,24 @@ export default function App() {
   const navItemsVisibles = NAV_ITEMS.filter(item => !item.visible || item.visible(auth.rol));
 
   return (
-    <div className="min-h-screen bg-slate-100 md:flex">
+    <div className="min-h-screen bg-brand-arena md:flex">
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-64 shrink-0 flex flex-col text-white bg-gradient-to-b from-brand-tealDark to-brand-teal transition-transform duration-200 overflow-y-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-64 shrink-0 flex flex-col text-white bg-gradient-to-b from-brand-noche to-brand-petroleo transition-transform duration-200 overflow-y-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex items-center justify-between gap-3 px-6 py-6">
-          {logoEmpresa ? (
+          {logoEmpresa === undefined ? (
+            <div className="flex-1 h-24" />
+          ) : logoEmpresa ? (
             // Los logos de empresa suelen ser horizontales: recuadro en vez de círculo para no recortarlos.
             <div className="flex-1 min-w-0 h-24 rounded-2xl bg-white shadow-sm flex items-center justify-center overflow-hidden p-2">
               <img src={logoEmpresa} alt="Logo de la empresa" className="max-w-full max-h-full object-contain" />
             </div>
           ) : (
-            <div className="w-28 h-28 rounded-full bg-white shadow-sm shrink-0 flex items-center justify-center overflow-hidden p-1.5">
-              <img src={logo} alt="Feliz Viaje" className="w-full h-full object-contain" />
+            <div className="flex-1 min-w-0 h-24 flex items-center">
+              <img src={logoItineraBlanco} alt="Itinera" className="h-10 w-auto" />
             </div>
           )}
           <button className="md:hidden text-white/80" onClick={() => setSidebarOpen(false)}>
@@ -187,19 +247,23 @@ export default function App() {
               onClick={() => goTo(key)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${
                 activeTab === key
-                  ? 'bg-white text-brand-tealDark shadow-sm'
+                  ? 'bg-white text-brand-noche shadow-sm'
                   : 'text-white/75 hover:bg-white/10 hover:text-white'
               }`}
             >
-              <Icon size={18} />
+              <Icon size={18} className={activeTab === key ? 'text-brand-coral' : ''} />
               {label}
             </button>
           ))}
         </nav>
 
-        <div className="relative px-6 py-6 min-h-[64px] overflow-hidden shrink-0">
-          <TreePalm size={90} className="absolute -bottom-4 -left-4 text-white/10" />
-          <Plane size={36} className="absolute top-2 right-4 -rotate-12 text-white/10" />
+        {/* Con el logo de la empresa arriba, la marca de la plataforma queda como firma. */}
+        <div className="px-6 py-5 min-h-[64px] shrink-0 flex items-end">
+          {logoEmpresa && (
+            <div className="flex items-center gap-2 text-2xs uppercase tracking-wider text-white/50">
+              con tecnología de <img src={logoItineraBlanco} alt="Itinera" className="h-4 w-auto opacity-80" />
+            </div>
+          )}
         </div>
 
         <button onClick={handleLogout} className="shrink-0 flex items-center gap-3 px-6 py-5 text-sm font-medium text-white/75 hover:text-white hover:bg-white/10 border-t border-white/10">
@@ -223,13 +287,7 @@ export default function App() {
               <Bell size={20} />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" />
             </button>
-            <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-teal to-brand-purple text-white flex items-center justify-center text-xs font-bold">
-                {iniciales(auth.nombre)}
-              </div>
-              <span className="hidden sm:block text-sm font-medium text-slate-700">{auth.nombre}</span>
-              <ChevronDown size={16} className="text-slate-400" />
-            </div>
+            <MenuUsuario auth={auth} onLogout={handleLogout} />
           </div>
         </header>
 
@@ -249,9 +307,8 @@ export default function App() {
 
           {/* Right panel: promo + resumen */}
           <aside className={`w-full xl:w-72 shrink-0 flex-col gap-6 ${PANTALLA_COMPLETA.has(activeTab) ? 'hidden' : 'flex'}`}>
-            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-brand-teal to-brand-purple p-6 min-h-[220px] flex flex-col justify-between shadow-sm">
-              <TreePalm size={90} className="absolute -bottom-3 -left-3 text-white/15" />
-              <Plane size={36} className="absolute top-4 right-4 rotate-45 text-white/25" />
+            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-brand-noche to-brand-petroleo p-6 min-h-[220px] flex flex-col justify-between shadow-sm">
+              <img src={simboloItinera} alt="" aria-hidden="true" className="absolute -bottom-6 -left-6 w-36 opacity-20 pointer-events-none select-none" />
               <div />
               <p className="relative text-white text-center italic font-medium leading-snug">
                 "Viajar es la única cosa que compras y te hace más rico."
@@ -262,7 +319,7 @@ export default function App() {
               <h3 className="text-sm font-bold text-slate-700 mb-4">Resumen</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-brand-teal text-white flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-brand-petroleo text-white flex items-center justify-center shrink-0">
                     <Users2 size={18} />
                   </div>
                   <div>
@@ -272,7 +329,7 @@ export default function App() {
                 </div>
                 {auth.rol !== 'superAdmin' && (<>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-brand-purple text-white flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-brand-coral text-white flex items-center justify-center shrink-0">
                     <Compass size={18} />
                   </div>
                   <div>
@@ -281,7 +338,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-brand-yellow text-brand-tealDark flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-brand-coralClaro text-brand-noche flex items-center justify-center shrink-0">
                     <DollarSign size={18} />
                   </div>
                   <div>

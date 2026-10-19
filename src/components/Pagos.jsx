@@ -178,11 +178,11 @@ export default function Pagos({ reservaInicial = '' }) {
         {resumen && (
           <div className="mt-6 inline-flex rounded-lg border border-slate-200 p-0.5 text-sm">
             <button type="button" onClick={() => setPestana('cobros')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold ${pestana === 'cobros' ? 'bg-brand-tealDark text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold ${pestana === 'cobros' ? 'bg-brand-noche text-white' : 'text-slate-500 hover:text-slate-700'}`}>
               <Users size={15} /> Cobros al cliente
             </button>
             <button type="button" onClick={() => setPestana('proveedores')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold ${pestana === 'proveedores' ? 'bg-brand-tealDark text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold ${pestana === 'proveedores' ? 'bg-brand-noche text-white' : 'text-slate-500 hover:text-slate-700'}`}>
               <Truck size={15} /> Pagos a proveedores
             </button>
           </div>
@@ -229,11 +229,11 @@ export default function Pagos({ reservaInicial = '' }) {
                 <div className="md:col-span-2 font-semibold text-slate-700 text-xs uppercase tracking-wider">Captura de Pago</div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600">Monto a Abonar ($) *</label>
-                  <input type="number" step="0.01" min="0.01" max={resumen.saldo} required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-teal" placeholder="0.00" value={montoPago} onChange={e => setMontoPago(e.target.value)} />
+                  <input type="number" step="0.01" min="0.01" max={resumen.saldo} required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="0.00" value={montoPago} onChange={e => setMontoPago(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600">Método de Cobro *</label>
-                  <select className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" value={formaPago} onChange={e => setFormaPago(e.target.value)}>
+                  <select className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" value={formaPago} onChange={e => setFormaPago(e.target.value)}>
                     <option value="Efectivo">Efectivo</option>
                     <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
                     <option value="Tarjeta de Débito">Tarjeta de Débito</option>
@@ -242,14 +242,14 @@ export default function Pagos({ reservaInicial = '' }) {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600">No. de Autorización / Folio SPEI <span className="font-normal text-slate-400">(opcional)</span></label>
-                  <input type="text" maxLength={60} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-teal" placeholder="Ej. 482913 o clave de rastreo" value={referencia} onChange={e => setReferencia(e.target.value)} />
+                  <input type="text" maxLength={60} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="Ej. 482913 o clave de rastreo" value={referencia} onChange={e => setReferencia(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600">Comprobante del Cliente <span className="font-normal text-slate-400">(opcional · PDF o imagen, máx. 4 MB)</span></label>
-                  <input ref={inputArchivoForm} type="file" accept={TIPOS_COMPROBANTE} onChange={handleArchivoForm} className="mt-1 w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-teal file:text-white hover:file:bg-brand-tealDark" />
+                  <input ref={inputArchivoForm} type="file" accept={TIPOS_COMPROBANTE} onChange={handleArchivoForm} className="mt-1 w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-petroleo file:text-white hover:file:bg-brand-noche" />
                 </div>
                 <div className="md:col-span-2 flex justify-end mt-2">
-                  <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-purple text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:brightness-90 disabled:opacity-60 shadow-sm">
+                  <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-coral text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:brightness-90 disabled:opacity-60 shadow-sm">
                     <CreditCard size={16} /> {guardando ? 'Procesando...' : 'Aplicar Pago'}
                   </button>
                 </div>
@@ -261,7 +261,7 @@ export default function Pagos({ reservaInicial = '' }) {
               <div className="overflow-x-auto rounded-xl border border-slate-100">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-brand-tealDark text-white text-sm">
+                    <tr className="bg-brand-noche text-white text-sm">
                       <th className="p-3 font-semibold">Fecha / Folio</th>
                       <th className="p-3 font-semibold">Monto</th>
                       <th className="p-3 font-semibold">Forma de Pago</th>
@@ -305,7 +305,7 @@ export default function Pagos({ reservaInicial = '' }) {
                           <td className="p-3">
                             <div className="flex flex-wrap items-center justify-center gap-1.5">
                               {p.comprobante?.id && (
-                                <button onClick={() => verComprobante(p)} title={`Ver comprobante: ${p.comprobante.nombreArchivo}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-tealDark border border-teal-200 hover:bg-teal-50">
+                                <button onClick={() => verComprobante(p)} title={`Ver comprobante: ${p.comprobante.nombreArchivo}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-noche border border-brand-petroleo/20 hover:bg-brand-petroleo/5">
                                   <FileCheck size={14} /> Comprobante
                                 </button>
                               )}
@@ -316,7 +316,7 @@ export default function Pagos({ reservaInicial = '' }) {
                                 </button>
                               )}
                               {!cancelado && (
-                                <button onClick={() => imprimirRecibo(resumen, p)} title="Imprimir recibo" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-purple border border-purple-200 hover:bg-purple-50">
+                                <button onClick={() => imprimirRecibo(resumen, p)} title="Imprimir recibo" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-coral border border-brand-coral/30 hover:bg-brand-coral/5">
                                   <Printer size={14} /> Recibo
                                 </button>
                               )}

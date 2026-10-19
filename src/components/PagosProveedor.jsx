@@ -152,7 +152,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
           </thead>
           <tbody className="divide-y divide-slate-100" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {estado.detalles.map(d => (
-              <tr key={d.idDetalle} className={form.idDetalle === d.idDetalle ? 'bg-teal-50' : 'hover:bg-slate-50'}>
+              <tr key={d.idDetalle} className={form.idDetalle === d.idDetalle ? 'bg-brand-petroleo/5' : 'hover:bg-slate-50'}>
                 <td className="p-3 font-medium text-slate-700">{d.proveedor?.nombre || '—'}</td>
                 <td className="p-3 font-mono text-xs text-slate-500">{d.claveReservacion}</td>
                 <td className="p-3 text-right text-slate-600">{dinero(d.total)}</td>
@@ -160,7 +160,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
                 <td className="p-3 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}</td>
                 <td className="p-3 text-right">
                   {admitePagos && d.saldo > 0 && (
-                    <button type="button" onClick={() => elegirServicio(d)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-purple hover:brightness-90">
+                    <button type="button" onClick={() => elegirServicio(d)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
                       <Send size={13} /> Pagar
                     </button>
                   )}
@@ -183,7 +183,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
           <div className="md:col-span-2 font-semibold text-slate-700 text-xs uppercase tracking-wider">Registrar pago a proveedor</div>
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-slate-600">Servicio / proveedor *</label>
-            <select required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
+            <select required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
               value={form.idDetalle} onChange={e => { const d = pendientes.find(x => x.idDetalle === e.target.value); d ? elegirServicio(d) : setForm({ ...form, idDetalle: '' }); }}>
               <option value="">-- Selecciona el servicio --</option>
               {pendientes.map(d => <option key={d.idDetalle} value={d.idDetalle}>{d.proveedor?.nombre} · {d.claveReservacion} · saldo {dinero(d.saldo)}</option>)}
@@ -191,12 +191,12 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Monto ($) *</label>
-            <input type="number" step="0.01" min="0.01" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-teal"
+            <input type="number" step="0.01" min="0.01" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
               value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })} placeholder="0.00" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Forma de pago *</label>
-            <select className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
+            <select className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
               value={form.formaPago} onChange={e => setForm({ ...form, formaPago: e.target.value })}>
               <option value="Transferencia">Transferencia SPEI</option>
               <option value="Efectivo">Efectivo</option>
@@ -206,16 +206,16 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Folio / clave de rastreo <span className="font-normal text-slate-400">(opcional)</span></label>
-            <input type="text" maxLength={60} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-teal"
+            <input type="text" maxLength={60} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
               value={form.referencia} onChange={e => setForm({ ...form, referencia: e.target.value })} placeholder="Ej. clave de rastreo SPEI" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Comprobante <span className="font-normal text-slate-400">(opcional · PDF o imagen, máx. 4 MB)</span></label>
             <input ref={inputArchivoForm} type="file" accept={TIPOS_COMPROBANTE} onChange={handleArchivoForm}
-              className="mt-1 w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-teal file:text-white hover:file:bg-brand-tealDark" />
+              className="mt-1 w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-petroleo file:text-white hover:file:bg-brand-noche" />
           </div>
           <div className="md:col-span-2 flex justify-end">
-            <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-purple text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:brightness-90 disabled:opacity-60 shadow-sm">
+            <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-coral text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:brightness-90 disabled:opacity-60 shadow-sm">
               <Truck size={16} /> {guardando ? 'Procesando...' : 'Registrar pago'}
             </button>
           </div>
@@ -227,7 +227,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-brand-tealDark text-white text-sm">
+              <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Fecha</th>
                 <th className="p-3 font-semibold">Proveedor</th>
                 <th className="p-3 font-semibold">Monto</th>
@@ -268,7 +268,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
                         {p.comprobante?.id && (
                           <button onClick={() => abrirComprobante(() => pagosProveedorApi.descargarComprobante(p._id))} title={`Ver comprobante: ${p.comprobante.nombreArchivo}`}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-tealDark border border-teal-200 hover:bg-teal-50">
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-noche border border-brand-petroleo/20 hover:bg-brand-petroleo/5">
                             <FileCheck size={14} /> Comprobante
                           </button>
                         )}
