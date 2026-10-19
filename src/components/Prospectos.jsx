@@ -15,7 +15,7 @@ const EMPTY_FORM = {
   direccion: '', fechaNacimiento: '', ciudad: '', pais: 'México',
 };
 
-const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal';
+const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
 
 let contadorKey = 0;
@@ -205,7 +205,7 @@ export default function Prospectos() {
         action={
           <button
             onClick={resetForm}
-            className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
+            className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
           >
             <Plus size={16} /> Nuevo Prospecto
           </button>
@@ -219,8 +219,8 @@ export default function Prospectos() {
       {esAdministrador && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">Prospectos de este mes</h2>
+            <TrendingUp size={18} className="text-brand-petroleo" />
+            <h2 className="text-base font-bold text-brand-noche">Prospectos de este mes</h2>
           </div>
           {loadingEstadisticas && <p className="text-sm text-slate-400">Cargando estadísticas...</p>}
           {!loadingEstadisticas && estadisticas && (
@@ -230,8 +230,8 @@ export default function Prospectos() {
                   <div className="text-2xl font-bold text-slate-800">{estadisticas.totalMes}</div>
                   <div className="text-xs text-slate-500">Registrados este mes</div>
                 </div>
-                <div className="bg-brand-purple/10 rounded-xl p-4 text-center">
-                  <div className="text-2xl font-bold text-brand-purple">{estadisticas.prospectosMes}</div>
+                <div className="bg-brand-coral/10 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-brand-coral">{estadisticas.prospectosMes}</div>
                   <div className="text-xs text-slate-500">Aún como prospecto</div>
                 </div>
                 <div className="bg-emerald-50 rounded-xl p-4 text-center">
@@ -243,7 +243,7 @@ export default function Prospectos() {
                 <div className="space-y-2">
                   <div className="w-full h-4 rounded-full bg-slate-100 overflow-hidden flex">
                     <div
-                      className="h-full bg-brand-purple"
+                      className="h-full bg-brand-coral"
                       style={{ width: `${(estadisticas.prospectosMes / estadisticas.totalMes) * 100}%` }}
                       title={`Prospectos: ${estadisticas.prospectosMes}`}
                     />
@@ -254,7 +254,7 @@ export default function Prospectos() {
                     />
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-brand-purple inline-block" /> Prospecto</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-brand-coral inline-block" /> Prospecto</span>
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Cliente</span>
                   </div>
                 </div>
@@ -266,8 +266,8 @@ export default function Prospectos() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center gap-2 mb-6">
-          <UserPlus size={18} className="text-brand-teal" />
-          <h2 className="text-base font-bold text-brand-tealDark">Información del Prospecto</h2>
+          <UserPlus size={18} className="text-brand-petroleo" />
+          <h2 className="text-base font-bold text-brand-noche">Información del Prospecto</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -327,7 +327,7 @@ export default function Prospectos() {
           <div className="border border-slate-100 rounded-xl p-4">
             <div className="flex justify-between items-center mb-4">
               <span className="font-semibold text-slate-700 text-sm">Notas de seguimiento</span>
-              <button type="button" onClick={agregarNota} className="inline-flex items-center gap-1.5 bg-brand-purple text-white px-3 py-1.5 text-xs font-semibold rounded-lg hover:brightness-90">
+              <button type="button" onClick={agregarNota} className="inline-flex items-center gap-1.5 bg-brand-coral text-white px-3 py-1.5 text-xs font-semibold rounded-lg hover:brightness-90">
                 <Plus size={14} /> Añadir Nota
               </button>
             </div>
@@ -337,20 +337,20 @@ export default function Prospectos() {
             ) : (
               <div className="space-y-3">
                 {notas.map((n, ni) => (
-                  <div key={n.key} className="p-3 bg-brand-teal/10 rounded-lg border border-brand-teal/20">
+                  <div key={n.key} className="p-3 bg-brand-petroleo/10 rounded-lg border border-brand-petroleo/20">
                     <div className="flex items-start gap-2 mb-3">
                       <textarea rows={2} required placeholder="Escribe la nota de seguimiento..."
-                        className="flex-1 p-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal"
+                        className="flex-1 p-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
                         value={n.texto} onChange={e => cambiarTextoNota(ni, e.target.value)} />
                       <button type="button" onClick={() => eliminarNota(ni)} title="Quitar esta nota" className="text-slate-400 hover:text-red-600 shrink-0">
                         <X size={16} />
                       </button>
                     </div>
 
-                    <div className="pl-3 border-l-2 border-brand-teal/30 space-y-2">
+                    <div className="pl-3 border-l-2 border-brand-petroleo/30 space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-2xs uppercase text-slate-500 font-bold">Acciones / actividades</span>
-                        <button type="button" onClick={() => agregarAccion(ni)} className="inline-flex items-center gap-1 text-2xs font-semibold text-brand-tealDark hover:underline">
+                        <button type="button" onClick={() => agregarAccion(ni)} className="inline-flex items-center gap-1 text-2xs font-semibold text-brand-noche hover:underline">
                           <Plus size={12} /> Añadir acción
                         </button>
                       </div>
@@ -389,7 +389,7 @@ export default function Prospectos() {
               <X size={16} /> Cancelar
             </button>
             <button type="submit" disabled={guardando}
-              className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
+              className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
               <Save size={16} /> {guardando ? 'Guardando...' : 'Guardar Prospecto'}
             </button>
           </div>
@@ -399,17 +399,17 @@ export default function Prospectos() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <UserPlus size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">Listado de Prospectos</h2>
+            <UserPlus size={18} className="text-brand-petroleo" />
+            <h2 className="text-base font-bold text-brand-noche">Listado de Prospectos</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
               <input type="text" placeholder="Buscar nombre, correo, teléfono..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
-                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
+                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
             <select value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)} title="Agente responsable"
-              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
               <option value="">Todos los agentes</option>
               <option value="mios">Mis prospectos</option>
               {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
@@ -421,7 +421,7 @@ export default function Prospectos() {
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-brand-tealDark text-white text-sm">
+              <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Nombre</th>
                 <th className="p-3 font-semibold">Correo</th>
                 <th className="p-3 font-semibold">Teléfono</th>
@@ -447,7 +447,7 @@ export default function Prospectos() {
                     <div className="flex items-center justify-center gap-2">
                       {puedeGestionar(p) ? (
                         <>
-                          <button onClick={() => handleEditar(p)} title="Editar" className="w-8 h-8 rounded-full bg-brand-yellow hover:brightness-95 text-brand-tealDark flex items-center justify-center">
+                          <button onClick={() => handleEditar(p)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                             <Pencil size={14} />
                           </button>
                           <button onClick={() => handleConvertir(p)} title="Convertir a Cliente" className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center">
@@ -455,7 +455,7 @@ export default function Prospectos() {
                           </button>
                         </>
                       ) : (
-                        <button onClick={() => handleVer(p)} title="Ver seguimiento" className="w-8 h-8 rounded-full bg-brand-teal hover:bg-brand-tealDark text-white flex items-center justify-center">
+                        <button onClick={() => handleVer(p)} title="Ver seguimiento" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                           <Eye size={14} />
                         </button>
                       )}

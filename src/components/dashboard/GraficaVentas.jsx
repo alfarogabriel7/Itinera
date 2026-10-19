@@ -8,11 +8,11 @@ import { dinero, dineroCompacto, variacion, nombreMes } from '../../utils/format
 //  - el mes en curso en tono claro (va a medias) y comparado contra los mismos
 //    días del mes anterior,
 //  - tooltip por columna (mouse y teclado).
-// Colores validados con el script de dataviz: barras #2f8f95 (>= 3:1 sobre
-// blanco), estado #059669 / #dc2626.
+// Colores de la paleta Itinera: barras petróleo medio #3E7A88 (4.8:1 sobre
+// blanco), activa petróleo #0F4C5C; estado #059669 / #dc2626.
 
-const COLOR_BARRA = '#2f8f95';
-const COLOR_BARRA_ACTIVA = '#00636a';
+const COLOR_BARRA = '#3E7A88';
+const COLOR_BARRA_ACTIVA = '#0F4C5C';
 const COLOR_SUBE = '#059669';
 const COLOR_BAJA = '#dc2626';
 const COLOR_GRID = '#e2e8f0';

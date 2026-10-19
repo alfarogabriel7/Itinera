@@ -11,7 +11,7 @@ const EMPTY_FORM = {
   numeroCuenta1: '', numeroCuenta2: '', estatus: 'Activo',
 };
 
-const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal';
+const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
 
 export default function Proveedores() {
@@ -73,7 +73,7 @@ export default function Proveedores() {
         action={
           <button
             onClick={() => setForm(EMPTY_FORM)}
-            className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
+            className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
           >
             <Plus size={16} /> Nuevo Proveedor
           </button>
@@ -86,8 +86,8 @@ export default function Proveedores() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center gap-2 mb-6">
-          <Truck size={18} className="text-brand-teal" />
-          <h2 className="text-base font-bold text-brand-tealDark">Información del Proveedor</h2>
+          <Truck size={18} className="text-brand-petroleo" />
+          <h2 className="text-base font-bold text-brand-noche">Información del Proveedor</h2>
         </div>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div className="md:col-span-2">
@@ -124,7 +124,7 @@ export default function Proveedores() {
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
               <X size={16} /> Cancelar
             </button>
-            <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
+            <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
               <Save size={16} /> {guardando ? 'Guardando...' : 'Guardar Proveedor'}
             </button>
           </div>
@@ -134,13 +134,13 @@ export default function Proveedores() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <Truck size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">Listado de Proveedores</h2>
+            <Truck size={18} className="text-brand-petroleo" />
+            <h2 className="text-base font-bold text-brand-noche">Listado de Proveedores</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
               <input type="text" placeholder="Buscar proveedor..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
-                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
+                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
             <SelectorPorPagina listado={listado} />
@@ -149,7 +149,7 @@ export default function Proveedores() {
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-brand-tealDark text-white text-sm">
+              <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Proveedor</th>
                 <th className="p-3 font-semibold">Teléfono</th>
                 <th className="p-3 font-semibold">CLABE Principal</th>
@@ -173,10 +173,10 @@ export default function Proveedores() {
                   </td>
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => handleVer(p)} title="Ver" className="w-8 h-8 rounded-full bg-brand-teal hover:bg-brand-tealDark text-white flex items-center justify-center">
+                      <button onClick={() => handleVer(p)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
-                      <button onClick={() => handleEditar(p)} title="Editar" className="w-8 h-8 rounded-full bg-brand-yellow hover:brightness-95 text-brand-tealDark flex items-center justify-center">
+                      <button onClick={() => handleEditar(p)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                         <Pencil size={14} />
                       </button>
                       {puedeDarDeBaja && (

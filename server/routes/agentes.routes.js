@@ -24,9 +24,17 @@ async function validarEmpresa(id) {
 router.get('/', async (req, res, next) => {
   try {
     const regex = regexBusqueda(req.query.q);
-    const filtroBase = regex ? { $or: [{ nombre: regex }, { userId: regex }] } : {};
+    const filtroBase = {};
+    if (regex) {
+      // La búsqueda también cubre la columna Empresa (por su nombre).
+      const empresas = await Empresa.find({ nombreEmpresa: regex }).select('_id').lean();
+      filtroBase.$or = [{ nombre: regex }, { userId: regex }, { empresa: { $in: empresas.map((e) => e._id) } }];
+    }
     if (req.query.estatus) filtroBase.estatus = String(req.query.estatus);
     if (req.query.rol) filtroBase.rol = String(req.query.rol);
+    // El superAdmin solo gestiona a los Administradores de cada empresa; los
+    // agentes los da de alta y administra cada empresa.
+    if (req.agente.rol === 'superAdmin') filtroBase.rol = 'Administrador';
     const orden = ordenDe(req, { nombre: { nombre: 1 } }, { createdAt: -1 });
     res.json(await paginar(Agente, alcanceEmpresa(req, filtroBase), req, { orden, populate: [['empresa', 'nombreEmpresa']] }));
   } catch (err) {
@@ -38,7 +46,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const agente = await Agente.findById(req.params.id).populate('empresa', 'nombreEmpresa');
     if (!agente) return res.status(404).json({ error: 'Agente no encontrado' });
-    if (!perteneceAlAlcance(agente, req)) {
+    if (!perteneceAlAlcance(agente, req) || (req.agente.rol === 'superAdmin' && agente.rol === 'Agente')) {
       return res.status(403).json({ error: 'No tienes permiso para ver este agente.' });
     }
     res.json(agente);

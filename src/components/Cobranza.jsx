@@ -145,24 +145,24 @@ export default function Cobranza({ onAbonar }) {
         <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center gap-3 mb-4">
           <div className="relative lg:w-64">
             <input type="text" placeholder="Buscar cliente, destino o teléfono..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
-              className="w-full pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
+              className="w-full pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" />
             <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
           </div>
-          <select value={urgencia} onChange={e => setUrgencia(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+          <select value={urgencia} onChange={e => setUrgencia(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
             {URGENCIAS.map(u => <option key={u.key} value={u.key}>{u.label}</option>)}
           </select>
-          <select value={agente} onChange={e => setAgente(e.target.value)} title="Agente que vendió" className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+          <select value={agente} onChange={e => setAgente(e.target.value)} title="Agente que vendió" className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
             <option value="">Todos los agentes</option>
             <option value="mios">Mis reservaciones</option>
             {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
           </select>
-          <select value={orden} onChange={e => setOrden(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+          <select value={orden} onChange={e => setOrden(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
             <option value="fecha">Ordenar: viaje más próximo</option>
             <option value="saldo">Ordenar: saldo mayor</option>
             <option value="avance">Ordenar: menor avance de pago</option>
           </select>
           <label className="flex items-center gap-2 text-sm text-slate-600 lg:ml-auto">
-            <input type="checkbox" checked={incluirLiquidadas} onChange={e => setIncluirLiquidadas(e.target.checked)} className="rounded border-slate-300 text-brand-teal focus:ring-brand-teal" />
+            <input type="checkbox" checked={incluirLiquidadas} onChange={e => setIncluirLiquidadas(e.target.checked)} className="rounded border-slate-300 text-brand-petroleo focus:ring-brand-petroleo" />
             Incluir liquidadas
           </label>
           <SelectorPorPagina listado={listado} />
@@ -171,7 +171,7 @@ export default function Cobranza({ onAbonar }) {
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-brand-tealDark text-white text-sm">
+              <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Cliente</th>
                 <th className="p-3 font-semibold">Viaje</th>
                 <th className="p-3 font-semibold">Inicio</th>
@@ -220,7 +220,7 @@ export default function Cobranza({ onAbonar }) {
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-1.5">
                         {f.saldo > 0 && (
-                          <button onClick={() => onAbonar(f.idReservacion)} title="Registrar abono" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-purple hover:brightness-90">
+                          <button onClick={() => onAbonar(f.idReservacion)} title="Registrar abono" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
                             <CreditCard size={14} /> Abonar
                           </button>
                         )}

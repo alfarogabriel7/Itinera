@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Títulos con la tipografía del logotipo de Itinera (Sora); el resto, Manrope. */
+@layer base {
+  h1, h2, h3 {
+    font-family: 'Sora', 'Manrope', system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+}

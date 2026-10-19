@@ -10,9 +10,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node --watch server/index.js",
+    "server": "node --watch-path=server --watch-path=database server/index.js",
     "seed": "node server/seed.js",
-    "migrar": "node server/migrar.js"
+    "migrar": "node server/migrar.js",
+    "copiar-a-atlas": "node server/copiar-a-atlas.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

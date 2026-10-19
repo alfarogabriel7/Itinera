@@ -18,7 +18,7 @@ function saludo() {
 const diasDesde = (f) => Math.max(0, Math.floor((Date.now() - new Date(f).getTime()) / 86_400_000));
 const haceTexto = (dias) => (dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`);
 
-function Tarjeta({ icono: Icono, titulo, valor, children, acento = 'text-brand-teal' }) {
+function Tarjeta({ icono: Icono, titulo, valor, children, acento = 'text-brand-petroleo' }) {
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -84,7 +84,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Saludo */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-tealDark to-brand-teal p-6 text-white shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-noche to-brand-petroleo p-6 text-white shadow-sm">
         <Plane size={120} className="absolute -right-4 -top-6 rotate-12 text-white/10" />
         <div className="relative">
           <div className="flex items-center gap-2 text-sm text-white/80"><IconoSaludo size={16} /> {textoSaludo}</div>
@@ -112,7 +112,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
                 {varMes >= 0 ? '▲ +' : '▼ −'}{Math.abs(varMes).toFixed(1)}% <span className="font-normal text-slate-500">vs. mismos días del mes anterior</span>
               </span>)}
         </Tarjeta>
-        <Tarjeta icono={Trophy} titulo="Mi lugar este mes" valor={resumen?.lugarEnElMes ? `#${resumen.lugarEnElMes}` : '—'} acento="text-brand-yellow">
+        <Tarjeta icono={Trophy} titulo="Mi lugar este mes" valor={resumen?.lugarEnElMes ? `#${resumen.lugarEnElMes}` : '—'} acento="text-brand-coralClaro">
           {resumen?.lugarEnElMes
             ? `de ${resumen.agentesConVentas} vendedor(es) con ventas en el mes`
             : 'Registra tu primera venta del mes para entrar al ranking'}
@@ -120,7 +120,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
         <Tarjeta icono={Wallet} titulo="Por cobrar a mis clientes" valor={dinero(porCobrar)}>
           {totalesCobranza.reservaciones} reservación(es) · {proximos30} viajan en 30 días o menos
         </Tarjeta>
-        <Tarjeta icono={ListTodo} titulo="Seguimientos pendientes" valor={acciones.pendientes.length} acento="text-brand-purple">
+        <Tarjeta icono={ListTodo} titulo="Seguimientos pendientes" valor={acciones.pendientes.length} acento="text-brand-coral">
           {masAntigua ? `El más antiguo es de ${haceTexto(diasDesde(masAntigua.fecha))}` : 'Estás al día'}
         </Tarjeta>
       </div>
@@ -129,8 +129,8 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
         {/* Seguimientos a prospectos */}
         <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm xl:col-span-2">
           <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><ListTodo size={18} className="text-brand-purple" /> Seguimientos a prospectos</h2>
-            <button onClick={() => onIr('prospectos')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-tealDark hover:underline">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><ListTodo size={18} className="text-brand-coral" /> Seguimientos a prospectos</h2>
+            <button onClick={() => onIr('prospectos')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-noche hover:underline">
               Prospectos <ArrowRight size={14} />
             </button>
           </div>
@@ -153,13 +153,13 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-slate-700">{a.descripcion}</div>
                     <div className="mt-0.5 text-xs text-slate-500">
-                      {a.prospecto}{a.esCliente && <span className="ml-1 rounded bg-teal-50 px-1 text-2xs font-semibold text-brand-tealDark">ya es cliente</span>}
+                      {a.prospecto}{a.esCliente && <span className="ml-1 rounded bg-brand-petroleo/5 px-1 text-2xs font-semibold text-brand-noche">ya es cliente</span>}
                       {' · '}<span className={dias > 5 ? 'font-semibold text-red-600' : ''}>{haceTexto(dias)}</span>
                     </div>
                     <div className="mt-1 truncate text-xs italic text-slate-400" title={a.nota}>"{a.nota}"</div>
                   </div>
                   {a.telefono && (
-                    <a href={`tel:${a.telefono.replace(/\s/g, '')}`} title={`Llamar a ${a.prospecto}`} className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-white hover:text-brand-tealDark">
+                    <a href={`tel:${a.telefono.replace(/\s/g, '')}`} title={`Llamar a ${a.prospecto}`} className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-white hover:text-brand-noche">
                       <Phone size={14} />
                     </a>
                   )}
@@ -190,8 +190,8 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
         {/* Cobranza de mis clientes */}
         <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm xl:col-span-3">
           <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><Wallet size={18} className="text-brand-teal" /> Cobranza de mis clientes</h2>
-            <button onClick={() => onIr('cobranza')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-tealDark hover:underline">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><Wallet size={18} className="text-brand-petroleo" /> Cobranza de mis clientes</h2>
+            <button onClick={() => onIr('cobranza')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-noche hover:underline">
               Ver cobranza completa <ArrowRight size={14} />
             </button>
           </div>
@@ -227,7 +227,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
                   </div>
                   <div className="flex shrink-0 gap-1.5">
                     <button onClick={() => onAbonar(f.idReservacion)} title="Registrar abono"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-purple px-2.5 py-1.5 text-xs font-semibold text-white hover:brightness-90">
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-coral px-2.5 py-1.5 text-xs font-semibold text-white hover:brightness-90">
                       <CreditCard size={14} /> Abonar
                     </button>
                     {whatsapp && (

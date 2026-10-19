@@ -12,7 +12,7 @@ const EMPTY_FORM = {
   direccion: '', fechaNacimiento: '', ciudad: '', notas: '', pais: 'México', estatus: 'Activo', agente: '',
 };
 
-const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal';
+const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
 
 export default function Clientes() {
@@ -98,7 +98,7 @@ export default function Clientes() {
         action={
           <button
             onClick={() => setForm(EMPTY_FORM)}
-            className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
+            className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
           >
             <Plus size={16} /> Nuevo Cliente
           </button>
@@ -111,8 +111,8 @@ export default function Clientes() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center gap-2 mb-6">
-          <Users size={18} className="text-brand-teal" />
-          <h2 className="text-base font-bold text-brand-tealDark">Información del Cliente</h2>
+          <Users size={18} className="text-brand-petroleo" />
+          <h2 className="text-base font-bold text-brand-noche">Información del Cliente</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -199,7 +199,7 @@ export default function Clientes() {
               <X size={16} /> Cancelar
             </button>
             <button type="submit" disabled={guardando}
-              className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
+              className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
               <Save size={16} /> {guardando ? 'Guardando...' : 'Guardar Cliente'}
             </button>
           </div>
@@ -209,17 +209,17 @@ export default function Clientes() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <Users size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">Listado de Clientes</h2>
+            <Users size={18} className="text-brand-petroleo" />
+            <h2 className="text-base font-bold text-brand-noche">Listado de Clientes</h2>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
               <input type="text" placeholder="Buscar nombre, correo, teléfono..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
-                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
+                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
             <select value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)} title="Agente responsable"
-              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal">
+              className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
               <option value="">Todos los agentes</option>
               <option value="mios">Mis clientes</option>
               {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
@@ -231,7 +231,7 @@ export default function Clientes() {
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-brand-tealDark text-white text-sm">
+              <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Nombre</th>
                 <th className="p-3 font-semibold">Correo electrónico</th>
                 <th className="p-3 font-semibold">Teléfono</th>
@@ -259,10 +259,10 @@ export default function Clientes() {
                   </td>
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => handleVer(c)} title="Ver" className="w-8 h-8 rounded-full bg-brand-teal hover:bg-brand-tealDark text-white flex items-center justify-center">
+                      <button onClick={() => handleVer(c)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
-                      <button onClick={() => handleEditar(c)} title="Editar" className="w-8 h-8 rounded-full bg-brand-yellow hover:brightness-95 text-brand-tealDark flex items-center justify-center">
+                      <button onClick={() => handleEditar(c)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                         <Pencil size={14} />
                       </button>
                       {puedeDarDeBaja && (

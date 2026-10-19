@@ -13,7 +13,7 @@ const EMPTY_FORM = { _id: null, nombre: '', userId: '', rol: 'Agente', empresa: 
 // mínimo 8 caracteres, al menos una mayúscula, un número y un carácter especial.
 const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
-const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal';
+const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
 
 export default function Agentes() {
@@ -126,7 +126,7 @@ export default function Agentes() {
           puedeCrear ? (
             <button
               onClick={resetForm}
-              className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
+              className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
             >
               <Plus size={16} /> Nuevo Agente
             </button>
@@ -141,8 +141,8 @@ export default function Agentes() {
       {puedeCrear && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
           <div className="flex items-center gap-2 mb-6">
-            <UserCog size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">Información del Agente</h2>
+            <UserCog size={18} className="text-brand-petroleo" />
+            <h2 className="text-base font-bold text-brand-noche">Información del Agente</h2>
           </div>
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -226,7 +226,7 @@ export default function Agentes() {
                 <X size={16} /> Cancelar
               </button>
               <button type="submit" disabled={guardando}
-                className="inline-flex items-center gap-2 bg-brand-teal hover:bg-brand-tealDark disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
+                className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche disabled:opacity-60 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition">
                 <Save size={16} /> {guardando ? 'Guardando...' : 'Guardar Agente'}
               </button>
             </div>
@@ -237,13 +237,13 @@ export default function Agentes() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <UserCog size={18} className="text-brand-teal" />
-            <h2 className="text-base font-bold text-brand-tealDark">Listado de Agentes</h2>
+            <UserCog size={18} className="text-brand-petroleo" />
+            <h2 className="text-base font-bold text-brand-noche">Listado de Agentes</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <input type="text" placeholder="Buscar por nombre o usuario..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
-                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal" />
+              <input type="text" placeholder="Buscar por nombre, usuario o empresa..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
+                className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
             <SelectorPorPagina listado={listado} />
@@ -253,7 +253,7 @@ export default function Agentes() {
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-brand-tealDark text-white text-sm">
+              <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Nombre</th>
                 <th className="p-3 font-semibold">Usuario</th>
                 <th className="p-3 font-semibold">Rol</th>
@@ -280,7 +280,7 @@ export default function Agentes() {
                   <td className="p-3">
                     {puedeCrear ? (
                       <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => handleEditar(a)} title="Editar" className="w-8 h-8 rounded-full bg-brand-yellow hover:brightness-95 text-brand-tealDark flex items-center justify-center">
+                        <button onClick={() => handleEditar(a)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                           <Pencil size={14} />
                         </button>
                         <button onClick={() => handleEliminar(a._id)} title="Eliminar" className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center">
