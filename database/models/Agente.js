@@ -28,7 +28,8 @@ const AgenteSchema = new mongoose.Schema(
       ref: 'Empresa',
       required: function () { return this.rol !== 'superAdmin'; },
     },
-    estatus: { type: String, enum: ['Activo', 'Inactivo'], default: 'Activo' },
+    // Mismos valores que Empresa. "Baja" = sin acceso, pero conserva su historial.
+    estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
     // select: false -> nunca se incluye en find()/findById() salvo que se pida explícitamente con .select('+password')
     password: {
       type: String,
