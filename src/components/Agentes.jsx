@@ -107,10 +107,12 @@ export default function Agentes() {
     confirmPassword: '',
   });
 
-  const handleEliminar = async (id) => {
-    if (!confirm('¿Eliminar este agente?')) return;
+  // Baja lógica: el servidor solo cambia el estatus a "Baja" (no borra el registro)
+  // y lo deja en la bitácora. Se reactiva editándolo.
+  const handleBaja = async (agente) => {
+    if (!confirm(`¿Deseas dar de baja a ${agente.nombre}?\n\nYa no podrá iniciar sesión, pero se conserva su historial. Puedes reactivarlo editándolo.`)) return;
     try {
-      await agentesApi.remove(id);
+      await agentesApi.remove(agente._id);
       await cargarAgentes();
     } catch (err) {
       alert(err.message);
@@ -194,7 +196,7 @@ export default function Agentes() {
             <div>
               <label className={labelClass}>Contraseña {esEdicion ? '' : '*'}</label>
               <div className="relative">
-                <input type={verPassword ? 'text' : 'password'} required={!esEdicion} minLength={8}
+                <input type={verPassword ? 'text' : 'password'} required={!esEdicion} minLength={8} autoComplete="new-password"
                   placeholder={esEdicion ? 'Dejar en blanco para no cambiarla' : 'Mínimo 8 caracteres'}
                   className={`${inputClass} pr-9`}
                   value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
@@ -211,7 +213,7 @@ export default function Agentes() {
             <div>
               <label className={labelClass}>Confirmar contraseña {esEdicion ? '' : '*'}</label>
               <div className="relative">
-                <input type={verConfirmPassword ? 'text' : 'password'} required={!esEdicion} minLength={8}
+                <input type={verConfirmPassword ? 'text' : 'password'} required={!esEdicion} minLength={8} autoComplete="new-password"
                   placeholder={esEdicion ? 'Dejar en blanco para no cambiarla' : 'Repite la contraseña'}
                   className={`${inputClass} pr-9`}
                   value={form.confirmPassword} onChange={e => setForm({ ...form, confirmPassword: e.target.value })} />
@@ -287,7 +289,9 @@ export default function Agentes() {
                         <button onClick={() => handleEditar(a)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                           <Pencil size={14} />
                         </button>
-                        <button onClick={() => handleEliminar(a._id)} title="Eliminar" className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center">
+                        <button onClick={() => handleBaja(a)} disabled={a.estatus === 'Baja'}
+                          title={a.estatus === 'Baja' ? 'Ya está dado de baja' : 'Dar de baja'}
+                          className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-500">
                           <Trash2 size={14} />
                         </button>
                       </div>

@@ -168,24 +168,24 @@ async function tieneHistorial(idAgente) {
   return consultas.some(Boolean);
 }
 
-// Solo se puede borrar un usuario sin historial (p.ej. dado de alta por error).
-// Si ya trabajó, se desactiva: su nombre debe seguir en ventas, cobros y bitácora.
+// Baja lógica (igual que Empresas): nunca se borra el registro, solo se cambia
+// el estatus a "Baja". Pierde el acceso al sistema pero su nombre sigue en
+// ventas, cobros y bitácora. Se reactiva editándolo y poniendo estatus Activo.
 router.delete('/:id', async (req, res, next) => {
   try {
     const agente = await Agente.findById(req.params.id);
     if (!agente) return res.status(404).json({ error: 'Agente no encontrado' });
-    if (!perteneceAlAlcance(agente, req)) {
-      return res.status(403).json({ error: 'No tienes permiso para eliminar agentes de otra empresa.' });
+    // El superAdmin solo gestiona Administradores; los agentes son de cada empresa.
+    if (!perteneceAlAlcance(agente, req) || (req.agente.rol === 'superAdmin' && agente.rol === 'Agente')) {
+      return res.status(403).json({ error: 'No tienes permiso para dar de baja agentes de otra empresa.' });
     }
-    if (String(agente._id) === req.agente.id) throw errorHttp(400, 'No puedes eliminar tu propio usuario.');
-    if (await tieneHistorial(agente._id)) {
-      throw errorHttp(409, 'Este agente tiene clientes, prospectos o ventas registradas; no se puede eliminar. Cámbialo a estatus Baja.');
-    }
+    if (String(agente._id) === req.agente.id) throw errorHttp(400, 'No puedes dar de baja tu propio usuario.');
+    if (agente.estatus === 'Baja') throw errorHttp(409, 'Este agente ya está dado de baja.');
 
-    await agente.deleteOne();
-    await registrarEvento({
+    await agente.updateOne({ estatus: 'Baja' });
+    await registrarCambios({
       entidad: 'Agente', entidadId: agente._id, empresa: agente.empresa,
-      evento: 'eliminado', detalle: agente.nombre, usuario: usuarioDeLaSesion(req),
+      anterior: { estatus: agente.estatus }, nuevo: { estatus: 'Baja' }, usuario: usuarioDeLaSesion(req),
     });
     res.status(204).end();
   } catch (err) {
