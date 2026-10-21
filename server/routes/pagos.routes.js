@@ -189,7 +189,7 @@ router.get('/resumen/:idReservacion', async (req, res, next) => {
       .populate('agente', 'nombre userId')
       .sort({ fecha: -1 });
     const empresa = await Empresa.findById(reservacion.empresa).select(
-      'nombreEmpresa rfc telefonoPrincipal correo direccion ciudad pais logo.tipo'
+      'nombreEmpresa rfc telefonoPrincipal correo codigoPostal direccion colonia ciudad estado pais logo.tipo'
     );
 
     res.json({

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { NOMBRES_ESTADOS } from '../catalogos/estados.js';
 
 const EmpresaSchema = new mongoose.Schema(
   {
@@ -17,6 +18,12 @@ const EmpresaSchema = new mongoose.Schema(
     telefonoSecundario: { type: String, trim: true },
     rfc: { type: String, required: true, trim: true, uppercase: true, maxlength: 13 },
     ciudad: { type: String, trim: true },
+    // Entidad federativa (catálogo en database/catalogos/estados.js). Opcional.
+    estado: {
+      type: String,
+      trim: true,
+      validate: { validator: (v) => !v || NOMBRES_ESTADOS.includes(v), message: 'Estado inválido' },
+    },
     pais: { type: String, required: true, default: 'México', trim: true },
     estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
     // Logo que se imprime en los recibos al cliente. Se guarda en Mongo (en Vercel
