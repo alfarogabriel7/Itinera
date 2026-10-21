@@ -24,10 +24,11 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'Tablero de Ventas', icon: LayoutDashboard, visible: (rol) => rol === 'Administrador' },
   // Panel inicial con los pendientes del agente.
   { key: 'inicio', label: 'Mi Panel', icon: Home, visible: (rol) => rol === 'Agente' },
-  // Clientes y proveedores son datos de negocio de cada empresa: el superAdmin no los ve.
-  { key: 'clientes', label: 'Clientes', icon: Users, visible: (rol) => rol !== 'superAdmin' },
+  // Prospectos antes que Clientes: sigue el orden del embudo (prospecto → cliente).
   // superAdmin no consulta ni gestiona prospectos de ninguna empresa.
   { key: 'prospectos', label: 'Prospectos', icon: UserPlus, visible: (rol) => rol !== 'superAdmin' },
+  // Clientes y proveedores son datos de negocio de cada empresa: el superAdmin no los ve.
+  { key: 'clientes', label: 'Clientes', icon: Users, visible: (rol) => rol !== 'superAdmin' },
   // Empresas solo lo administra el superAdmin.
   { key: 'empresas', label: 'Empresas', icon: Building2, visible: (rol) => rol === 'superAdmin' },
   { key: 'proveedores', label: 'Proveedores', icon: Truck, visible: (rol) => rol !== 'superAdmin' },
