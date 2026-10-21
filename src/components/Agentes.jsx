@@ -4,6 +4,7 @@ import { obtenerSesion } from '../utils/sesion';
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import SelectorRemoto from './common/SelectorRemoto';
+import IndicadorPassword, { CoincidenciaPassword } from './common/IndicadorPassword';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { UserCog, Plus, X, Save, Search, Pencil, Trash2, Lock, Eye, EyeOff, AtSign } from 'lucide-react';
 
@@ -203,7 +204,9 @@ export default function Agentes() {
                   {verPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              <p className="mt-1 text-2xs text-slate-500">Mín. 8 caracteres, una mayúscula, un número y un carácter especial.</p>
+              {form.password
+                ? <IndicadorPassword password={form.password} datosPersonales={[form.nombre, form.userId]} />
+                : <p className="mt-1 text-2xs text-slate-500">Mín. 8 caracteres, una mayúscula, un número y un carácter especial.</p>}
             </div>
             <div>
               <label className={labelClass}>Confirmar contraseña {esEdicion ? '' : '*'}</label>
@@ -218,6 +221,7 @@ export default function Agentes() {
                   {verConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              <CoincidenciaPassword password={form.password} confirmacion={form.confirmPassword} />
             </div>
 
             <div className="md:col-span-2 flex justify-end gap-3 mt-4">
