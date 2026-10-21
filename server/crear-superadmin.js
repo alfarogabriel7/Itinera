@@ -10,6 +10,7 @@
 // La base destino es MONGODB_URI. Si el usuario ya existe no hace nada; con
 // --cambiar-password le asigna la contraseña de SUPERADMIN_PASSWORD.
 import 'dotenv/config';
+import { existsSync, readFileSync } from 'node:fs';
 import mongoose from 'mongoose';
 import { connectDB, Agente } from '../database/index.js';
 
@@ -21,6 +22,19 @@ const cambiarPassword = process.argv.includes('--cambiar-password');
 if (!password) {
   console.error('Falta SUPERADMIN_PASSWORD (en el archivo .env o como variable de entorno).');
   process.exit(1);
+}
+
+// En .env un "#" sin comillas inicia un comentario: "Clave#2026" se leería
+// como "Clave" y el usuario quedaría con una contraseña distinta a la escrita.
+const lineaEnv = existsSync('.env')
+  ? readFileSync('.env', 'utf8').split(/\r?\n/).find((l) => /^\s*SUPERADMIN_PASSWORD\s*=/.test(l))
+  : null;
+if (lineaEnv) {
+  const escrita = lineaEnv.slice(lineaEnv.indexOf('=') + 1).trim();
+  if (!/^["'`]/.test(escrita) && escrita.includes('#')) {
+    console.error('SUPERADMIN_PASSWORD contiene "#": escríbela entre comillas en el .env, p.ej. SUPERADMIN_PASSWORD="Clave#2026".');
+    process.exit(1);
+  }
 }
 
 try {
