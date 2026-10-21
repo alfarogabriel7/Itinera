@@ -98,7 +98,7 @@ export async function imprimirRecibo(resumen, pago) {
   const saldoDespues = Math.round((resumen.total - pagadoAlMomento) * 100) / 100;
 
   const e = resumen.empresa || {};
-  const contactoEmpresa = [e.direccion, e.ciudad, e.telefonoPrincipal && `Tel. ${e.telefonoPrincipal}`, e.correo]
+  const contactoEmpresa = [e.direccion, e.colonia && `Col. ${e.colonia}`, e.codigoPostal && `C.P. ${e.codigoPostal}`, e.ciudad, e.telefonoPrincipal && `Tel. ${e.telefonoPrincipal}`, e.correo]
     .filter(Boolean)
     .map(escapar)
     .join(' · ');

@@ -4,11 +4,11 @@ import PageHeader from './common/PageHeader';
 import { Building2, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, ImagePlus } from 'lucide-react';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
-import { soloLetras, soloTelefono, soloCorreo, soloDireccion, soloRFC } from '../utils/validadores';
+import { soloLetras, soloLetrasYNumeros, soloTelefono, soloCorreo, soloDireccion, soloCodigoPostal, soloRFC } from '../utils/validadores';
 
 
 const EMPTY_FORM = {
-  _id: null, nombreEmpresa: '', correo: '', nombreTitular: '', direccion: '',
+  _id: null, nombreEmpresa: '', correo: '', nombreTitular: '', codigoPostal: '', direccion: '', colonia: '',
   telefonoPrincipal: '', telefonoSecundario: '', rfc: '', ciudad: '', pais: 'México', estatus: 'Activo',
 };
 
@@ -128,7 +128,7 @@ export default function Empresas() {
   };
 
   const handleVer = (empresa) => {
-    alert(`${empresa.nombreEmpresa} (${empresa.estatus})\nTitular: ${empresa.nombreTitular || ''}\nRFC: ${empresa.rfc}\n${empresa.correo || ''}\n${empresa.telefonoPrincipal}\n${empresa.direccion || ''}, ${empresa.ciudad || ''}, ${empresa.pais}`);
+    alert(`${empresa.nombreEmpresa} (${empresa.estatus})\nTitular: ${empresa.nombreTitular || ''}\nRFC: ${empresa.rfc}\n${empresa.correo || ''}\n${empresa.telefonoPrincipal}\n${[empresa.direccion, empresa.colonia && `Col. ${empresa.colonia}`, empresa.codigoPostal && `C.P. ${empresa.codigoPostal}`, empresa.ciudad, empresa.pais].filter(Boolean).join(', ')}`);
   };
 
   return (
@@ -201,9 +201,21 @@ export default function Empresas() {
           </div>
 
           <div>
+            <label className={labelClass}>Código postal</label>
+            <input type="text" inputMode="numeric" maxLength={5} pattern="\d{5}" title="El código postal debe tener 5 dígitos"
+              placeholder="Ej. 37000" className={inputClass}
+              value={form.codigoPostal} onChange={e => setForm({ ...form, codigoPostal: soloCodigoPostal(e.target.value) })} />
+          </div>
+          <div>
             <label className={labelClass}>Dirección</label>
-            <input type="text" placeholder="Ej. Av Principal 123 Col Centro" className={inputClass}
+            <input type="text" placeholder="Ej. Av. Principal #123" className={inputClass}
               value={form.direccion} onChange={e => setForm({ ...form, direccion: soloDireccion(e.target.value) })} />
+          </div>
+
+          <div>
+            <label className={labelClass}>Colonia</label>
+            <input type="text" placeholder="Ej. Jardines del Moral" className={inputClass}
+              value={form.colonia} onChange={e => setForm({ ...form, colonia: soloLetrasYNumeros(e.target.value) })} />
           </div>
           <div>
             <label className={labelClass}>Ciudad</label>
