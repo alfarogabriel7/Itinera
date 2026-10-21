@@ -56,7 +56,7 @@ export async function requireAuth(req, res, next) {
     ]);
     if (revocado) return res.status(401).json({ error: 'Sesión cerrada' });
     if (!agente || agente.estatus !== 'Activo') {
-      return res.status(401).json({ error: 'Tu usuario está inactivo. Contacta a un administrador.' });
+      return res.status(401).json({ error: 'Tu usuario está dado de baja. Contacta a un administrador.' });
     }
     if (agente.rol !== 'superAdmin') {
       const empresa = agente.empresa && (await Empresa.findById(agente.empresa).select('estatus').lean());

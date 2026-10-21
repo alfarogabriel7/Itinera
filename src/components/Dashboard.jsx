@@ -226,7 +226,7 @@ export default function Dashboard() {
                           <div className="font-semibold text-slate-700">{a.nombre}</div>
                           <div className="text-xs text-slate-400">
                             {a.rol === 'Administrador' ? 'Administrador' : 'Agente'}
-                            {a.estatus !== 'Activo' && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-2xs font-semibold text-slate-500">Inactivo</span>}
+                            {a.estatus !== 'Activo' && <span className="ml-1.5 rounded bg-red-100 px-1.5 py-0.5 text-2xs font-semibold text-red-700">Baja</span>}
                           </div>
                         </div>
                       </div>

@@ -7,6 +7,7 @@
 //    (que después puede reasignarlos desde Clientes).
 // 2. Índices: crea los nuevos índices compuestos por empresa y elimina los que
 //    ya no están declarados en los modelos (syncIndexes).
+// 0. Estatus de agentes: "Inactivo" → "Baja" (homologado con Empresas).
 // 3. Saldos: recalcula en cada reservación el acumulado abonado por el cliente
 //    y lo pagado a cada proveedor, a partir de los pagos aplicados (necesario
 //    para la aplicación atómica de pagos; también sirve para reconciliar).
@@ -46,6 +47,12 @@ async function asignarAgenteAClientes() {
   }
 }
 
+// Estatus de agentes homologado con Empresas: "Inactivo" pasó a llamarse "Baja".
+async function homologarEstatusAgentes() {
+  const r = await Agente.collection.updateMany({ estatus: 'Inactivo' }, { $set: { estatus: 'Baja' } });
+  console.log(`Agentes con estatus "Inactivo" cambiados a "Baja": ${r.modifiedCount}.`);
+}
+
 async function sincronizarIndices() {
   for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin]) {
     const eliminados = await Modelo.syncIndexes();
@@ -55,6 +62,7 @@ async function sincronizarIndices() {
 
 try {
   await connectDB();
+  await homologarEstatusAgentes();
   await asignarAgenteAClientes();
   await sincronizarIndices();
   console.log(`Saldos recalculados en ${await recalcularSaldos()} reservación(es).`);

@@ -45,7 +45,7 @@ async function sembrarHistorico({ empresa, agentes, clientes, proveedores }) {
       const creado = inicio.getTime() + Math.floor(entre(0, diasMes)) * DIA + Math.floor(entre(0, 9)) * 60 * 60 * 1000;
       if (creado >= ahora - 60 * 60 * 1000) continue; // nada en el futuro
 
-      // Ricardo (hoy inactivo) solo vendió hasta hace 8 meses; el Admin vende poco.
+      // Ricardo (hoy dado de baja) solo vendió hasta hace 8 meses; el Admin vende poco.
       const candidatos = agentes.filter((a) => (a.userId !== 'ricardo.torres' || k >= 8) && (a.rol !== 'Administrador' || azar() < 0.25));
       const agente = elegir(candidatos.length ? candidatos : agentes);
       // Cada venta es a un cliente de la cartera de ese agente.
@@ -150,7 +150,7 @@ async function seed() {
     { nombre: 'Super Admin', userId: 'superadmin', rol: 'superAdmin', estatus: 'Activo', password: 'SuperAdmin#1' },
     { nombre: 'Admin General', userId: 'admin', rol: 'Administrador', estatus: 'Activo', password: 'Admin!234', empresa: empresas[0]._id },
     { nombre: 'Laura Gómez', userId: 'laura.gomez', rol: 'Agente', estatus: 'Activo', password: 'Laura#2024', empresa: empresas[0]._id },
-    { nombre: 'Ricardo Torres', userId: 'ricardo.torres', rol: 'Agente', estatus: 'Inactivo', password: 'Ricardo$99', empresa: empresas[0]._id },
+    { nombre: 'Ricardo Torres', userId: 'ricardo.torres', rol: 'Agente', estatus: 'Baja', password: 'Ricardo$99', empresa: empresas[0]._id },
     { nombre: 'Sofía Méndez', userId: 'sofia.mendez', rol: 'Agente', estatus: 'Activo', password: 'Sofia#2025', empresa: empresas[0]._id },
     // Segunda empresa con su propio Administrador: sirve para probar el aislamiento entre empresas.
     { nombre: 'Marco Vidal', userId: 'admin.bajio', rol: 'Administrador', estatus: 'Activo', password: 'Bajio#2026', empresa: empresas[1]._id },

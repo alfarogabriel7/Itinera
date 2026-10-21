@@ -51,7 +51,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     if (agente.estatus !== 'Activo') {
-      return res.status(403).json({ error: 'Este usuario está inactivo. Contacta a un administrador.' });
+      return res.status(403).json({ error: 'Este usuario está dado de baja. Contacta a un administrador.' });
     }
     if (agente.rol !== 'superAdmin') {
       const empresa = await Empresa.findById(agente.empresa).select('estatus');

@@ -109,7 +109,7 @@ router.put('/:id', async (req, res, next) => {
     const { nombre, userId, rol, estatus, password, empresa } = req.body;
     const esUnoMismo = String(agente._id) === req.agente.id;
     if (esUnoMismo && estatus !== undefined && estatus !== 'Activo') {
-      throw errorHttp(400, 'No puedes desactivar tu propio usuario.');
+      throw errorHttp(400, 'No puedes dar de baja tu propio usuario.');
     }
 
     const anterior = agente.toObject();
@@ -179,7 +179,7 @@ router.delete('/:id', async (req, res, next) => {
     }
     if (String(agente._id) === req.agente.id) throw errorHttp(400, 'No puedes eliminar tu propio usuario.');
     if (await tieneHistorial(agente._id)) {
-      throw errorHttp(409, 'Este agente tiene clientes, prospectos o ventas registradas; no se puede eliminar. Cámbialo a estatus Inactivo.');
+      throw errorHttp(409, 'Este agente tiene clientes, prospectos o ventas registradas; no se puede eliminar. Cámbialo a estatus Baja.');
     }
 
     await agente.deleteOne();

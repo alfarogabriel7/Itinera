@@ -171,7 +171,7 @@ router.get('/admin', async (req, res, next) => {
           ventasPrevio: r.previo ? aCentavos(previo.get(String(a._id))?.ventas) : null,
         };
       })
-      // Los inactivos solo aparecen si vendieron algo en el periodo.
+      // Los dados de baja solo aparecen si vendieron algo en el periodo.
       .filter((a) => a.estatus === 'Activo' || a.ventas > 0)
       .sort((a, b) => b.ventas - a.ventas || a.nombre.localeCompare(b.nombre, 'es'));
 
