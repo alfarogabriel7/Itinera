@@ -13,7 +13,8 @@
     "server": "node --watch-path=server --watch-path=database server/index.js",
     "seed": "node server/seed.js",
     "migrar": "node server/migrar.js",
-    "copiar-a-atlas": "node server/copiar-a-atlas.js"
+    "copiar-a-atlas": "node server/copiar-a-atlas.js",
+    "crear-superadmin": "node server/crear-superadmin.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

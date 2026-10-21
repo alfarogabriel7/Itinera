@@ -1,21 +1,25 @@
 // Copia la base local a MongoDB Atlas (u otro servidor), colección por
 // colección y conservando los _id:
 //   npm run copiar-a-atlas -- "mongodb+srv://USUARIO:CONTRASEÑA@cluster.xxxxx.mongodb.net/agencia_viajes"
+// o, sin escribir la contraseña en la terminal, con ATLAS_URI en el archivo .env:
+//   npm run copiar-a-atlas
 //
 // Origen: ORIGEN_URI o mongodb://localhost:27017/agencia_viajes.
 // Por seguridad se detiene si alguna colección del destino ya tiene datos;
 // con --reemplazar las vacía antes de copiar.
 // Después conviene correr `npm run migrar` contra Atlas para crear los índices.
+import 'dotenv/config';
 import mongoose from 'mongoose';
 
 const { MongoClient } = mongoose.mongo;
 const ORIGEN = process.env.ORIGEN_URI || 'mongodb://localhost:27017/agencia_viajes';
-const DESTINO = process.argv.slice(2).find((a) => !a.startsWith('--'));
+const DESTINO = process.argv.slice(2).find((a) => !a.startsWith('--')) || process.env.ATLAS_URI;
 const reemplazar = process.argv.includes('--reemplazar');
 const LOTE = 1000;
 
 if (!DESTINO) {
   console.error('Uso: npm run copiar-a-atlas -- "<URI de Atlas con /agencia_viajes>" [--reemplazar]');
+  console.error('     (o define ATLAS_URI en el archivo .env)');
   process.exit(1);
 }
 
