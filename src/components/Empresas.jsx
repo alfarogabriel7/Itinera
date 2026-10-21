@@ -5,12 +5,22 @@ import { Building2, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, Ima
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloLetrasYNumeros, soloTelefono, soloCorreo, soloDireccion, soloCodigoPostal, soloRFC } from '../utils/validadores';
+import SelectorRemoto from './common/SelectorRemoto';
+import { ESTADOS_MEXICO } from '../../database/catalogos/estados.js';
 
 
 const EMPTY_FORM = {
   _id: null, nombreEmpresa: '', correo: '', nombreTitular: '', codigoPostal: '', direccion: '', colonia: '',
-  telefonoPrincipal: '', telefonoSecundario: '', rfc: '', ciudad: '', pais: 'México', estatus: 'Activo',
+  telefonoPrincipal: '', telefonoSecundario: '', rfc: '', ciudad: '', estado: '', pais: 'México', estatus: 'Activo',
 };
+
+// Catálogo de estados en orden alfabético, con el nombre como id (es lo que se guarda).
+const OPCIONES_ESTADOS = ESTADOS_MEXICO
+  .map(e => ({ _id: e.nombre, nombre: e.nombre }))
+  .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+const sinAcentos = (t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// Búsqueda local (sin servidor) e insensible a acentos: "queretaro" encuentra "Querétaro".
+const buscarEstados = async (q) => OPCIONES_ESTADOS.filter(e => sinAcentos(e.nombre).includes(sinAcentos(q)));
 
 // Mismo límite y tipos que valida el servidor (allá se revisa el contenido real).
 const LIMITE_LOGO = 1024 * 1024;
@@ -128,7 +138,7 @@ export default function Empresas() {
   };
 
   const handleVer = (empresa) => {
-    alert(`${empresa.nombreEmpresa} (${empresa.estatus})\nTitular: ${empresa.nombreTitular || ''}\nRFC: ${empresa.rfc}\n${empresa.correo || ''}\n${empresa.telefonoPrincipal}\n${[empresa.direccion, empresa.colonia && `Col. ${empresa.colonia}`, empresa.codigoPostal && `C.P. ${empresa.codigoPostal}`, empresa.ciudad, empresa.pais].filter(Boolean).join(', ')}`);
+    alert(`${empresa.nombreEmpresa} (${empresa.estatus})\nTitular: ${empresa.nombreTitular || ''}\nRFC: ${empresa.rfc}\n${empresa.correo || ''}\n${empresa.telefonoPrincipal}\n${[empresa.direccion, empresa.colonia && `Col. ${empresa.colonia}`, empresa.codigoPostal && `C.P. ${empresa.codigoPostal}`, empresa.ciudad, empresa.estado, empresa.pais].filter(Boolean).join(', ')}`);
   };
 
   return (
@@ -224,9 +234,19 @@ export default function Empresas() {
           </div>
 
           <div>
+            <label className={labelClass}>Estado</label>
+            <div className="mt-1">
+              <SelectorRemoto buscar={buscarEstados} disabled={form.pais !== 'México'}
+                placeholder={form.pais === 'México' ? 'Busca y selecciona un estado' : 'Solo aplica para México'}
+                valor={form.estado} etiquetaValor={form.estado}
+                etiqueta={e => e.nombre}
+                onCambio={id => setForm({ ...form, estado: id })} />
+            </div>
+          </div>
+          <div>
             <label className={labelClass}>País *</label>
             <select required className={`${inputClass} bg-white`}
-              value={form.pais} onChange={e => setForm({ ...form, pais: e.target.value })}>
+              value={form.pais} onChange={e => setForm({ ...form, pais: e.target.value, estado: e.target.value === 'México' ? form.estado : '' })}>
               <option value="">Selecciona un país</option>
               <option value="México">México</option>
               <option value="Estados Unidos">Estados Unidos</option>
@@ -234,6 +254,7 @@ export default function Empresas() {
               <option value="Colombia">Colombia</option>
             </select>
           </div>
+
           <div>
             <label className={labelClass}>Estatus *</label>
             <select required className={`${inputClass} bg-white`}
