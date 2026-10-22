@@ -7,8 +7,9 @@ const ProveedorSchema = new mongoose.Schema(
     nombreProveedor: { type: String, required: true, trim: true, maxlength: 100 },
     telefono1: { type: String, required: true, trim: true },
     telefono2: { type: String, trim: true },
-    numeroCuenta1: { type: String, required: true, trim: true, maxlength: 18 },
-    numeroCuenta2: { type: String, trim: true, maxlength: 18 },
+    // Cuenta bancaria o CLABE: solo dígitos (la CLABE tiene 18).
+    numeroCuenta1: { type: String, required: true, trim: true, maxlength: 18, match: [/^\d+$/, 'La cuenta bancaria solo puede contener números'] },
+    numeroCuenta2: { type: String, trim: true, maxlength: 18, match: [/^\d+$/, 'La cuenta bancaria solo puede contener números'] },
     estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
   },
   { timestamps: true }
