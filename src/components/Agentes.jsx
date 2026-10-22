@@ -151,7 +151,7 @@ export default function Agentes() {
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <label className={labelClass}>Nombre del agente *</label>
-              <input type="text" required placeholder="Ej. Gabriel Alfaro" className={inputClass}
+              <input type="text" required placeholder="Ej. Juan Pérez López" className={inputClass}
                 value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
             </div>
             <div>
@@ -159,7 +159,7 @@ export default function Agentes() {
               <div className="relative">
                 <input type="text" required minLength={3} pattern="[a-z0-9._-]+"
                   title="Solo minúsculas, números, puntos, guiones y guiones bajos"
-                  placeholder="Ej. gabriel.alfaro" className={`${inputClass} pr-9`}
+                  placeholder="Ej. juan.perez" className={`${inputClass} pr-9`}
                   value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value.toLowerCase() })} />
                 <AtSign size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
               </div>
