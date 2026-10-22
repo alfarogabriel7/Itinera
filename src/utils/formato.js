@@ -36,6 +36,18 @@ export const fechaViaje = (f) => new Date(f).toLocaleDateString('es-MX', { timeZ
 export const fechaViajeLarga = (f) =>
   new Date(f).toLocaleDateString('es-MX', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' });
 
+// Teléfono de México (10 dígitos) agrupado para leerlo mejor, respetando la
+// lada: 2 dígitos en CDMX, Guadalajara y Monterrey ("33 3726 7047") y 3 en el
+// resto del país ("477 136 1173"). Cualquier otro largo se muestra tal cual.
+const LADAS_DE_DOS = new Set(['33', '55', '56', '81']);
+export function telefono(t) {
+  const d = String(t ?? '').replace(/\D/g, '');
+  if (d.length !== 10) return t ?? '';
+  return LADAS_DE_DOS.has(d.slice(0, 2))
+    ? `${d.slice(0, 2)} ${d.slice(2, 6)} ${d.slice(6)}`
+    : `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
+}
+
 // Días de calendario entre hoy (local) y una fecha de viaje. Negativo si ya pasó.
 export function diasHasta(f) {
   const d = new Date(f);
