@@ -1,3 +1,14 @@
+import plugin from 'tailwindcss/plugin';
+import { TEMAS, TEMA_PREDETERMINADO } from './database/catalogos/temas.js';
+
+// Los colores `brand-*` son variables CSS para poder cambiar de tema al iniciar
+// sesión sin recompilar: Itinera en :root (login, superAdmin y empresas sin
+// grupo) y cada grupo bajo <html data-tema="...">. Las paletas viven en
+// database/catalogos/temas.js; aquí solo se convierten a variables.
+const TOKENS = Object.keys(TEMAS[TEMA_PREDETERMINADO].colores);
+const aRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(' ');
+const variablesDe = (colores) => Object.fromEntries(TOKENS.map((t) => [`--brand-${t}`, aRgb(colores[t])]));
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -6,19 +17,8 @@ export default {
   ],
   theme: {
     extend: {
-      // Paleta de Itinera (ver LEEME del logo). Es fija para toda la plataforma:
-      // cada empresa solo personaliza su logo, nunca los colores.
       colors: {
-        brand: {
-          petroleo: '#0F4C5C',
-          // Petróleo aclarado para barras de gráficas (4.8:1 sobre blanco).
-          petroleoMedio: '#3E7A88',
-          noche: '#0B2A33',
-          coral: '#E36414',
-          // Solo sobre fondos oscuros o como relleno con texto oscuro.
-          coralClaro: '#F28B44',
-          arena: '#F4F1EA',
-        },
+        brand: Object.fromEntries(TOKENS.map((t) => [t, `rgb(var(--brand-${t}) / <alpha-value>)`])),
       },
       fontFamily: {
         sans: ['Manrope', 'system-ui', 'sans-serif'],
@@ -38,5 +38,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    plugin(({ addBase }) => {
+      addBase({ ':root': variablesDe(TEMAS[TEMA_PREDETERMINADO].colores) });
+      for (const [clave, tema] of Object.entries(TEMAS)) {
+        if (clave !== TEMA_PREDETERMINADO) addBase({ [`[data-tema="${clave}"]`]: variablesDe(tema.colores) });
+      }
+    }),
+  ],
 }

@@ -8,11 +8,9 @@ import { dinero, dineroCompacto, variacion, nombreMes } from '../../utils/format
 //  - el mes en curso en tono claro (va a medias) y comparado contra los mismos
 //    días del mes anterior,
 //  - tooltip por columna (mouse y teclado).
-// Colores de la paleta Itinera: barras petróleo medio #3E7A88 (4.8:1 sobre
-// blanco), activa petróleo #0F4C5C; estado #059669 / #dc2626.
+// Las barras usan los colores del tema de la empresa (clases fill-brand-*,
+// ver database/catalogos/temas.js); los de estado son fijos: #059669 / #dc2626.
 
-const COLOR_BARRA = '#3E7A88';
-const COLOR_BARRA_ACTIVA = '#0F4C5C';
 const COLOR_SUBE = '#059669';
 const COLOR_BAJA = '#dc2626';
 const COLOR_GRID = '#e2e8f0';
@@ -131,7 +129,7 @@ export default function GraficaVentas({ meses, variacionEnCurso, diaDelMes }) {
               {alto > 0 && (
                 <path
                   d={barra(x, y(m.ventas), anchoBarra, alto)}
-                  fill={esActivo ? COLOR_BARRA_ACTIVA : COLOR_BARRA}
+                  className={esActivo ? 'fill-brand-petroleo' : 'fill-brand-petroleoMedio'}
                   fillOpacity={m.enCurso && !esActivo ? 0.4 : 1}
                 />
               )}

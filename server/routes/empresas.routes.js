@@ -4,7 +4,7 @@ import { detectarTipo, leerArchivo, enviarArchivo, JPEG, PNG, WEBP } from '../ut
 import { soloCampos, regexBusqueda, usuarioDeLaSesion, idDe } from '../middleware/tenant.js';
 import { paginar, ordenDe } from '../utils/paginacion.js';
 
-const CAMPOS = ['nombreEmpresa', 'correo', 'nombreTitular', 'codigoPostal', 'direccion', 'colonia', 'telefonoPrincipal', 'telefonoSecundario', 'rfc', 'ciudad', 'estado', 'pais', 'estatus'];
+const CAMPOS = ['nombreEmpresa', 'correo', 'nombreTitular', 'codigoPostal', 'direccion', 'colonia', 'telefonoPrincipal', 'telefonoSecundario', 'rfc', 'ciudad', 'estado', 'pais', 'estatus', 'tema'];
 
 const router = Router();
 
