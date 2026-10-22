@@ -7,11 +7,13 @@ import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloLetrasYNumeros, soloTelefono, soloCorreo, soloDireccion, soloCodigoPostal, soloRFC } from '../utils/validadores';
 import SelectorRemoto from './common/SelectorRemoto';
 import { ESTADOS_MEXICO } from '../../database/catalogos/estados.js';
+import { TEMAS, TEMA_PREDETERMINADO } from '../../database/catalogos/temas.js';
 
 
 const EMPTY_FORM = {
   _id: null, nombreEmpresa: '', correo: '', nombreTitular: '', codigoPostal: '', direccion: '', colonia: '',
   telefonoPrincipal: '', telefonoSecundario: '', rfc: '', ciudad: '', estado: '', pais: 'México', estatus: 'Activo',
+  tema: TEMA_PREDETERMINADO,
 };
 
 // Catálogo de estados en orden alfabético, con el nombre como id (es lo que se guarda).
@@ -263,6 +265,19 @@ export default function Empresas() {
               <option value="Baja">Baja</option>
             </select>
           </div>
+          <div>
+            <label className={labelClass}>Grupo <span className="font-normal text-slate-400">(colores de la app para sus usuarios)</span></label>
+            <select className={`${inputClass} bg-white`}
+              value={form.tema} onChange={e => setForm({ ...form, tema: e.target.value })}>
+              {Object.entries(TEMAS).map(([clave, t]) => <option key={clave} value={clave}>{t.nombre}</option>)}
+            </select>
+            <div className="mt-2 flex items-center gap-1.5" aria-hidden="true">
+              {Object.values((TEMAS[form.tema] || TEMAS[TEMA_PREDETERMINADO]).colores).map(color => (
+                <span key={color} className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: color }} />
+              ))}
+              <span className="ml-1 text-2xs text-slate-400">Se aplica la próxima vez que sus usuarios inicien sesión.</span>
+            </div>
+          </div>
 
           <div className="md:col-span-2">
             <label className={labelClass}>Logo de la empresa <span className="font-normal text-slate-400">(opcional · se imprime en los recibos al cliente)</span></label>
@@ -343,6 +358,9 @@ export default function Empresas() {
                   <td className="p-3 font-medium text-slate-700">
                     {e.nombreEmpresa}
                     {e.logo?.tipo && <span className="ml-2 px-1.5 py-0.5 rounded text-2xs font-semibold bg-brand-petroleo/5 text-brand-noche">Con logo</span>}
+                    {e.tema && e.tema !== TEMA_PREDETERMINADO && TEMAS[e.tema] && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-2xs font-semibold text-white" style={{ backgroundColor: TEMAS[e.tema].colores.noche }}>{TEMAS[e.tema].nombre}</span>
+                    )}
                   </td>
                   <td className="p-3 text-slate-600 font-mono text-xs">{e.rfc}</td>
                   <td className="p-3 text-slate-600">{e.nombreTitular}</td>

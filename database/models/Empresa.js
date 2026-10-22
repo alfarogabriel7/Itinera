@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { NOMBRES_ESTADOS } from '../catalogos/estados.js';
+import { CLAVES_TEMAS, TEMA_PREDETERMINADO } from '../catalogos/temas.js';
 
 const EmpresaSchema = new mongoose.Schema(
   {
@@ -26,6 +27,9 @@ const EmpresaSchema = new mongoose.Schema(
     },
     pais: { type: String, required: true, default: 'México', trim: true },
     estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
+    // Grupo al que pertenece la empresa: define los colores de la app para sus
+    // usuarios (catálogo en database/catalogos/temas.js).
+    tema: { type: String, enum: { values: CLAVES_TEMAS, message: 'Grupo inválido' }, default: TEMA_PREDETERMINADO },
     // Logo que se imprime en los recibos al cliente. Se guarda en Mongo (en Vercel
     // no hay disco persistente); los bytes no se cargan salvo que se pidan con
     // .select('+logo.datos'), así listar empresas no arrastra las imágenes.

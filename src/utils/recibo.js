@@ -3,6 +3,7 @@
 
 import { dinero, fechaViajeLarga } from './formato';
 import { empresasApi } from '../api';
+import { TEMAS, TEMA_PREDETERMINADO } from '../../database/catalogos/temas.js';
 
 // El logo se incrusta como data URL para que la ventana del recibo no dependa
 // de la sesión (la ruta del logo pide token) y salga también al guardar en PDF.
@@ -98,6 +99,8 @@ export async function imprimirRecibo(resumen, pago) {
   const saldoDespues = Math.round((resumen.total - pagadoAlMomento) * 100) / 100;
 
   const e = resumen.empresa || {};
+  // Colores del recibo: los del grupo de la empresa (Itinera si no tiene).
+  const paleta = (TEMAS[e.tema] || TEMAS[TEMA_PREDETERMINADO]).colores;
   const contactoEmpresa = [e.direccion, e.colonia && `Col. ${e.colonia}`, e.codigoPostal && `C.P. ${e.codigoPostal}`, e.ciudad, e.estado, e.telefonoPrincipal && `Tel. ${e.telefonoPrincipal}`, e.correo]
     .filter(Boolean)
     .map(escapar)
@@ -110,10 +113,10 @@ export async function imprimirRecibo(resumen, pago) {
   * { box-sizing: border-box; }
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1e293b; margin: 0; padding: 32px; }
   .recibo { max-width: 720px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 12px; padding: 32px; }
-  header { display: flex; justify-content: space-between; align-items: center; gap: 24px; border-bottom: 2px solid #0F4C5C; padding-bottom: 16px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 24px; border-bottom: 2px solid ${paleta.noche}; padding-bottom: 16px; }
   .marca { display: flex; align-items: center; gap: 16px; }
   .logo { max-width: 160px; max-height: 72px; object-fit: contain; }
-  h1 { margin: 0; font-size: 20px; color: #0F4C5C; }
+  h1 { margin: 0; font-size: 20px; color: ${paleta.noche}; }
   .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
   .folio { text-align: right; font-size: 12px; color: #64748b; }
   .folio strong { display: block; font-size: 18px; color: #1e293b; letter-spacing: 1px; }
@@ -121,8 +124,8 @@ export async function imprimirRecibo(resumen, pago) {
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   td { padding: 6px 0; vertical-align: top; }
   td:first-child { color: #64748b; width: 40%; }
-  .monto { margin-top: 20px; background: #F4F1EA; border: 1px solid #E36414; border-radius: 10px; padding: 16px; }
-  .monto .cifra { font-size: 28px; font-weight: 700; color: #0F4C5C; }
+  .monto { margin-top: 20px; background: ${paleta.arena}; border: 1px solid ${paleta.coral}; border-radius: 10px; padding: 16px; }
+  .monto .cifra { font-size: 28px; font-weight: 700; color: ${paleta.noche}; }
   .monto .letra { font-size: 13px; color: #334155; margin-top: 4px; }
   .totales td { border-top: 1px solid #e2e8f0; }
   .saldo { font-weight: 700; }

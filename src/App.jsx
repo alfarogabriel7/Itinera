@@ -12,6 +12,7 @@ import MiPanel from './components/MiPanel';
 import Login from './components/Login';
 import { authApi, dashboardApi, empresasApi, setUnauthorizedHandler } from './api';
 import { obtenerSesion } from './utils/sesion';
+import { TEMA_PREDETERMINADO } from '../database/catalogos/temas.js';
 import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
@@ -155,6 +156,15 @@ export default function App() {
   useEffect(() => {
     setUnauthorizedHandler(handleLogout);
   }, []);
+
+  // Colores del grupo de la empresa (database/catalogos/temas.js). Sin sesión
+  // (login) o con superAdmin se queda Itinera, que es el tema de :root.
+  useEffect(() => {
+    const raiz = document.documentElement;
+    const tema = auth && auth.rol !== 'superAdmin' ? auth.tema : null;
+    if (tema && tema !== TEMA_PREDETERMINADO) raiz.dataset.tema = tema;
+    else delete raiz.dataset.tema;
+  }, [auth]);
 
   useEffect(() => {
     // superAdmin no tiene acceso a los datos de negocio de las empresas (el backend responde 403).

@@ -141,7 +141,7 @@ async function seed() {
   ]);
 
   const empresas = await Empresa.insertMany([
-    { nombreEmpresa: 'Feliz Viaje Villa Insurgentes', correo: 'contacto@felizviaje.mx', nombreTitular: 'Ana Torres', telefonoPrincipal: '4775551234', rfc: 'FVI850101AB1', ciudad: 'León', pais: 'México', estatus: 'Activo' },
+    { nombreEmpresa: 'Feliz Viaje Villa Insurgentes', correo: 'contacto@felizviaje.mx', nombreTitular: 'Ana Torres', telefonoPrincipal: '4775551234', rfc: 'FVI850101AB1', ciudad: 'León', pais: 'México', estatus: 'Activo', tema: 'felizviaje' },
     { nombreEmpresa: 'Rutas del Bajío', correo: 'contacto@rutasdelbajio.mx', nombreTitular: 'Marco Vidal', telefonoPrincipal: '4775559876', rfc: 'RBA900202CD2', ciudad: 'León', pais: 'México', estatus: 'Activo' },
   ]);
 
