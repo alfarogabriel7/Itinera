@@ -6,6 +6,7 @@ import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Users, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone } from 'lucide-react';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion, soloLetrasYNumeros } from '../utils/validadores';
 import { obtenerSesion } from '../utils/sesion';
+import { telefono } from '../utils/formato';
 
 const EMPTY_FORM = {
   _id: null, nombreCompleto: '', correo: '', telefono: '',
@@ -249,7 +250,7 @@ export default function Clientes() {
                 <tr key={c._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{c.nombreCompleto}</td>
                   <td className="p-3 text-slate-600">{c.correo}</td>
-                  <td className="p-3 text-slate-600">{c.telefono}</td>
+                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(c.telefono)}</td>
                   <td className="p-3 text-slate-600">{c.ciudad}</td>
                   <td className="p-3 text-slate-600">{c.agente?.nombre || '—'}</td>
                   <td className="p-3">
