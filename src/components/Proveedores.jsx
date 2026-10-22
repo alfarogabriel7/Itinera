@@ -5,6 +5,8 @@ import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Truck, Plus, X, Save, Search, Eye, Pencil, Trash2 } from 'lucide-react';
 import { obtenerSesion } from '../utils/sesion';
+import { telefono } from '../utils/formato';
+import { soloTelefono } from '../utils/validadores';
 
 const EMPTY_FORM = {
   _id: null, nombreProveedor: '', telefono1: '', telefono2: '',
@@ -96,11 +98,11 @@ export default function Proveedores() {
           </div>
           <div>
             <label className={labelClass}>Teléfono Principal *</label>
-            <input type="text" required maxLength={10} className={inputClass} value={form.telefono1} onChange={e => setForm({ ...form, telefono1: e.target.value.slice(0, 10) })} />
+            <input type="tel" inputMode="numeric" required maxLength={10} placeholder="Ej. 4771234567" className={inputClass} value={form.telefono1} onChange={e => setForm({ ...form, telefono1: soloTelefono(e.target.value).slice(0, 10) })} />
           </div>
           <div>
             <label className={labelClass}>Teléfono Secundario</label>
-            <input type="text" maxLength={10} className={inputClass} value={form.telefono2} onChange={e => setForm({ ...form, telefono2: e.target.value.slice(0, 10) })} />
+            <input type="tel" inputMode="numeric" maxLength={10} placeholder="Ej. 4777654321" className={inputClass} value={form.telefono2} onChange={e => setForm({ ...form, telefono2: soloTelefono(e.target.value).slice(0, 10) })} />
           </div>
           <div>
             <label className={labelClass}>Cuenta Bancaria / CLABE 1 * (18 dígitos)</label>
@@ -164,7 +166,7 @@ export default function Proveedores() {
               {listado.datos.map(p => (
                 <tr key={p._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{p.nombreProveedor}</td>
-                  <td className="p-3 text-slate-600">{p.telefono1}</td>
+                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(p.telefono1)}</td>
                   <td className="p-3 text-slate-600 font-mono text-xs">{p.numeroCuenta1}</td>
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
