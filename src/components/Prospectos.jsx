@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { prospectosApi, agentesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
+import { telefono } from '../utils/formato';
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
@@ -439,7 +440,7 @@ export default function Prospectos() {
                 <tr key={p._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{p.nombreCompleto}</td>
                   <td className="p-3 text-slate-600">{p.correo}</td>
-                  <td className="p-3 text-slate-600">{p.telefono}</td>
+                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(p.telefono)}</td>
                   <td className="p-3 text-slate-600">{p.ciudad}</td>
                   <td className="p-3 text-slate-600">{p.agente?.nombre || '—'}</td>
                   <td className="p-3 text-slate-600">{new Date(p.fechaRegistro).toLocaleDateString('es-MX')}</td>
