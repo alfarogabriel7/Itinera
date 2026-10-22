@@ -6,7 +6,7 @@ import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Truck, Plus, X, Save, Search, Eye, Pencil, Trash2 } from 'lucide-react';
 import { obtenerSesion } from '../utils/sesion';
 import { telefono } from '../utils/formato';
-import { soloTelefono } from '../utils/validadores';
+import { soloTelefono, soloNumeros } from '../utils/validadores';
 
 const EMPTY_FORM = {
   _id: null, nombreProveedor: '', telefono1: '', telefono2: '',
@@ -106,11 +106,11 @@ export default function Proveedores() {
           </div>
           <div>
             <label className={labelClass}>Cuenta Bancaria / CLABE 1 * (18 dígitos)</label>
-            <input type="text" required maxLength={18} className={inputClass} value={form.numeroCuenta1} onChange={e => setForm({ ...form, numeroCuenta1: e.target.value.slice(0, 18) })} />
+            <input type="text" inputMode="numeric" required maxLength={18} placeholder="Ej. 012180001234567891" className={inputClass} value={form.numeroCuenta1} onChange={e => setForm({ ...form, numeroCuenta1: soloNumeros(e.target.value).slice(0, 18) })} />
           </div>
           <div>
             <label className={labelClass}>Cuenta Bancaria / CLABE 2</label>
-            <input type="text" maxLength={18} className={inputClass} value={form.numeroCuenta2} onChange={e => setForm({ ...form, numeroCuenta2: e.target.value.slice(0, 18) })} />
+            <input type="text" inputMode="numeric" maxLength={18} placeholder="Ej. 012180001234567891" className={inputClass} value={form.numeroCuenta2} onChange={e => setForm({ ...form, numeroCuenta2: soloNumeros(e.target.value).slice(0, 18) })} />
           </div>
           <div>
             <label className={labelClass}>Estatus *</label>

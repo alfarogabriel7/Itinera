@@ -2,6 +2,8 @@
 // capturar caracteres no permitidos (cubre también texto pegado con Ctrl+V).
 export const soloLetras = (v) => v.replace(/[^A-Za-zÁÉÍÓÚÑÜáéíóúñü\s]/g, '');
 export const soloTelefono = (v) => v.replace(/[^0-9]/g, '');
+// Solo dígitos (cuentas bancarias, CLABE).
+export const soloNumeros = (v) => v.replace(/[^0-9]/g, '');
 export const soloCorreo = (v) => v.replace(/[^A-Za-z0-9@.]/g, '');
 // Dirección: letras (con acentos), números, espacios, punto y "#" (p.ej. "Av. Juárez #123").
 export const soloDireccion = (v) => v.replace(/[^A-Za-zÁÉÍÓÚÑÜáéíóúñü0-9\s.#]/g, '');
