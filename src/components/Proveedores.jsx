@@ -38,7 +38,7 @@ export default function Proveedores() {
       } else {
         await proveedoresApi.create(payload);
       }
-      setForm(EMPTY_FORM);
+      resetForm();
       await cargarProveedores();
       alert('Se guardaron correctamente los datos.');
     } catch (err) {
@@ -48,7 +48,18 @@ export default function Proveedores() {
     }
   };
 
-  const handleEditar = (proveedor) => setForm({ ...EMPTY_FORM, ...proveedor });
+  // Estatus con el que se abrió el registro (decide si un Agente puede elegir "Baja").
+  const [estatusOriginal, setEstatusOriginal] = useState('Activo');
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setEstatusOriginal('Activo');
+  };
+
+  const handleEditar = (proveedor) => {
+    setForm({ ...EMPTY_FORM, ...proveedor });
+    setEstatusOriginal(proveedor.estatus);
+  };
 
   // No se elimina el registro de la BD: se da de baja lógicamente (estatus = Baja)
   // para conservar el historial del proveedor.
@@ -74,7 +85,7 @@ export default function Proveedores() {
         subtitle="Administra hoteles, aerolíneas y demás proveedores de servicios."
         action={
           <button
-            onClick={() => setForm(EMPTY_FORM)}
+            onClick={resetForm}
             className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
           >
             <Plus size={16} /> Nuevo Proveedor
@@ -117,12 +128,16 @@ export default function Proveedores() {
             <select required className={`${inputClass} bg-white`}
               value={form.estatus} onChange={e => setForm({ ...form, estatus: e.target.value })}>
               <option value="Activo">Activo</option>
-              {puedeDarDeBaja && <option value="Baja">Baja</option>}
+              {/* Siempre se muestra para que se vea el estatus real del proveedor. Un
+                  Agente no puede dar de baja, pero sí reactivar uno que ya lo estaba. */}
+              <option value="Baja" disabled={!puedeDarDeBaja && estatusOriginal !== 'Baja'}>
+                Baja{!puedeDarDeBaja && estatusOriginal !== 'Baja' ? ' (solo Administrador)' : ''}
+              </option>
             </select>
           </div>
 
           <div className="md:col-span-2 flex justify-end gap-3 mt-4">
-            <button type="button" onClick={() => setForm(EMPTY_FORM)}
+            <button type="button" onClick={resetForm}
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
               <X size={16} /> Cancelar
             </button>
