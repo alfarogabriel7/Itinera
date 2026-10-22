@@ -46,7 +46,7 @@ export default function Login({ onSuccess }) {
           <div>
             <label className="block text-sm font-semibold text-slate-700">Usuario</label>
             <div className="relative">
-              <input type="text" required autoFocus placeholder="Ej. gabriel.alfaro"
+              <input type="text" required autoFocus placeholder="Ej. juan.perez"
                 className="mt-1 w-full p-2.5 pr-9 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo"
                 value={userId} onChange={e => setUserId(e.target.value)} />
               <AtSign size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
