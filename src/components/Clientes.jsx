@@ -57,7 +57,7 @@ export default function Clientes() {
       } else {
         await clientesApi.create(payload);
       }
-      setForm(EMPTY_FORM);
+      resetForm();
       await cargarClientes();
       alert('Se guardaron correctamente los datos.');
     } catch (err) {
@@ -67,12 +67,23 @@ export default function Clientes() {
     }
   };
 
-  const handleEditar = (cliente) => setForm({
-    ...EMPTY_FORM,
-    ...cliente,
-    fechaNacimiento: cliente.fechaNacimiento ? cliente.fechaNacimiento.slice(0, 10) : '',
-    agente: cliente.agente?._id || cliente.agente || '',
-  });
+  // Estatus con el que se abrió el registro (decide si un Agente puede elegir "Baja").
+  const [estatusOriginal, setEstatusOriginal] = useState('Activo');
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setEstatusOriginal('Activo');
+  };
+
+  const handleEditar = (cliente) => {
+    setForm({
+      ...EMPTY_FORM,
+      ...cliente,
+      fechaNacimiento: cliente.fechaNacimiento ? cliente.fechaNacimiento.slice(0, 10) : '',
+      agente: cliente.agente?._id || cliente.agente || '',
+    });
+    setEstatusOriginal(cliente.estatus);
+  };
 
   // No se elimina el registro de la BD: se da de baja lógicamente (estatus = Baja)
   // para conservar el historial del cliente.
@@ -98,7 +109,7 @@ export default function Clientes() {
         subtitle="Administra la información de tus clientes."
         action={
           <button
-            onClick={() => setForm(EMPTY_FORM)}
+            onClick={resetForm}
             className="inline-flex items-center gap-2 bg-brand-petroleo hover:bg-brand-noche text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition"
           >
             <Plus size={16} /> Nuevo Cliente
@@ -172,7 +183,11 @@ export default function Clientes() {
             <select required className={`${inputClass} bg-white`}
               value={form.estatus} onChange={e => setForm({ ...form, estatus: e.target.value })}>
               <option value="Activo">Activo</option>
-              {puedeDarDeBaja && <option value="Baja">Baja</option>}
+              {/* Siempre se muestra para que se vea el estatus real del cliente. Un
+                  Agente no puede dar de baja, pero sí reactivar uno que ya lo estaba. */}
+              <option value="Baja" disabled={!puedeDarDeBaja && estatusOriginal !== 'Baja'}>
+                Baja{!puedeDarDeBaja && estatusOriginal !== 'Baja' ? ' (solo Administrador)' : ''}
+              </option>
             </select>
           </div>
 
@@ -195,7 +210,7 @@ export default function Clientes() {
           </div>
 
           <div className="md:col-span-2 flex justify-end gap-3 mt-4">
-            <button type="button" onClick={() => setForm(EMPTY_FORM)}
+            <button type="button" onClick={resetForm}
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
               <X size={16} /> Cancelar
             </button>
