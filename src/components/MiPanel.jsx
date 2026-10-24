@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { dashboardApi, pagosApi, prospectosApi } from '../api';
+import { dashboardApi, pagosApi, prospectosApi, clientesApi } from '../api';
 import { dinero, fechaViaje, variacion } from '../utils/formato';
 import { EtiquetaViaje, ligaWhatsApp } from './Cobranza';
 import {
@@ -30,6 +30,14 @@ function Tarjeta({ icono: Icono, titulo, valor, children, acento = 'text-brand-p
   );
 }
 
+// De quién es el seguimiento: un prospecto (o uno que ya se convirtió) o un cliente.
+function EtiquetaTipo({ accion }) {
+  const [texto, clase] = accion.tipo === 'cliente'
+    ? ['cliente', 'bg-brand-petroleo/10 text-brand-noche']
+    : accion.esCliente ? ['ya es cliente', 'bg-brand-petroleo/5 text-brand-noche'] : ['prospecto', 'bg-brand-coral/10 text-brand-coral'];
+  return <span className={`ml-1 rounded px-1 text-2xs font-semibold ${clase}`}>{texto}</span>;
+}
+
 export default function MiPanel({ nombre, onAbonar, onIr }) {
   const [resumen, setResumen] = useState(null);
   // Mi cobranza: las 10 más próximas a viajar + totales de toda mi cartera (calculados en el servidor).
@@ -40,7 +48,15 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
   const [errores, setErrores] = useState([]);
   const [procesando, setProcesando] = useState('');
 
-  const cargarAcciones = async () => setAcciones(await prospectosApi.acciones({ mios: 1 }));
+  // Seguimientos de mis prospectos y de mis clientes en una sola lista.
+  const obtenerAcciones = async () => {
+    const [p, c] = await Promise.all([prospectosApi.acciones({ mios: 1 }), clientesApi.acciones({ mios: 1 })]);
+    return {
+      pendientes: [...p.pendientes, ...c.pendientes].sort((a, b) => new Date(a.fecha) - new Date(b.fecha)),
+      completadas: [...p.completadas, ...c.completadas].sort((a, b) => new Date(b.fechaCompletada) - new Date(a.fechaCompletada)),
+    };
+  };
+  const cargarAcciones = async () => setAcciones(await obtenerAcciones());
 
   useEffect(() => {
     (async () => {
@@ -48,7 +64,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
       const [r, c, a] = await Promise.allSettled([
         dashboardApi.agente(),
         pagosApi.cobranza({ mios: 1, porPagina: 10 }),
-        prospectosApi.acciones({ mios: 1 }),
+        obtenerAcciones(),
       ]);
       if (r.status === 'fulfilled') setResumen(r.value);
       if (c.status === 'fulfilled') {
@@ -64,7 +80,8 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
   const cambiarEstatus = async (accion, estatus) => {
     setProcesando(accion.idAccion);
     try {
-      await prospectosApi.cambiarEstatusAccion(accion.idProspecto, accion.idNota, accion.idAccion, estatus);
+      const api = accion.tipo === 'cliente' ? clientesApi : prospectosApi;
+      await api.cambiarEstatusAccion(accion.idRegistro, accion.idNota, accion.idAccion, estatus);
       await cargarAcciones();
     } catch (err) {
       alert(err.message);
@@ -129,10 +146,15 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
         {/* Seguimientos a prospectos */}
         <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm xl:col-span-2">
           <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><ListTodo size={18} className="text-brand-coral" /> Seguimientos a prospectos</h2>
-            <button onClick={() => onIr('prospectos')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-noche hover:underline">
-              Prospectos <ArrowRight size={14} />
-            </button>
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><ListTodo size={18} className="text-brand-coral" /> Seguimientos</h2>
+            <div className="flex items-center gap-3">
+              <button onClick={() => onIr('prospectos')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-noche hover:underline">
+                Prospectos <ArrowRight size={14} />
+              </button>
+              <button onClick={() => onIr('clientes')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-noche hover:underline">
+                Clientes <ArrowRight size={14} />
+              </button>
+            </div>
           </div>
 
           {!cargando && acciones.pendientes.length === 0 && (
@@ -153,13 +175,13 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-slate-700">{a.descripcion}</div>
                     <div className="mt-0.5 text-xs text-slate-500">
-                      {a.prospecto}{a.esCliente && <span className="ml-1 rounded bg-brand-petroleo/5 px-1 text-2xs font-semibold text-brand-noche">ya es cliente</span>}
+                      {a.nombre}<EtiquetaTipo accion={a} />
                       {' · '}<span className={dias > 5 ? 'font-semibold text-red-600' : ''}>{haceTexto(dias)}</span>
                     </div>
                     <div className="mt-1 truncate text-xs italic text-slate-400" title={a.nota}>"{a.nota}"</div>
                   </div>
                   {a.telefono && (
-                    <a href={`tel:${a.telefono.replace(/\s/g, '')}`} title={`Llamar a ${a.prospecto}`} className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-white hover:text-brand-noche">
+                    <a href={`tel:${a.telefono.replace(/\s/g, '')}`} title={`Llamar a ${a.nombre}`} className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-white hover:text-brand-noche">
                       <Phone size={14} />
                     </a>
                   )}
@@ -175,7 +197,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
                 {acciones.completadas.map((a) => (
                   <li key={a.idAccion} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400">
                     <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
-                    <span className="min-w-0 flex-1 truncate line-through">{a.descripcion} · {a.prospecto}</span>
+                    <span className="min-w-0 flex-1 truncate line-through">{a.descripcion} · {a.nombre}</span>
                     <button onClick={() => cambiarEstatus(a, 'En seguimiento')} disabled={procesando === a.idAccion} title="Volver a pendiente"
                       className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-50">
                       <Undo2 size={13} /> Deshacer

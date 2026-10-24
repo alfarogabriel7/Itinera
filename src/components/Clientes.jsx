@@ -3,20 +3,22 @@ import { clientesApi, agentesApi } from '../api';
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
-import { Users, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone } from 'lucide-react';
-import { soloLetras, soloTelefono, soloCorreo, soloDireccion, soloLetrasYNumeros } from '../utils/validadores';
+import { Users, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, Compass } from 'lucide-react';
+import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
 import { obtenerSesion } from '../utils/sesion';
 import { telefono } from '../utils/formato';
+import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas } from './common/NotasSeguimiento';
 
 const EMPTY_FORM = {
   _id: null, nombreCompleto: '', correo: '', telefono: '',
-  direccion: '', fechaNacimiento: '', ciudad: '', notas: '', pais: 'México', estatus: 'Activo', agente: '',
+  direccion: '', fechaNacimiento: '', ciudad: '', pais: 'México', estatus: 'Activo', agente: '',
 };
 
 const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
 
-export default function Clientes() {
+// onGenerarReservacion({ id, nombre }): abre Reservaciones con el cliente ya elegido.
+export default function Clientes({ onGenerarReservacion }) {
   const sesion = obtenerSesion();
   // Un Agente puede editar clientes de su empresa, pero no darlos de baja.
   const puedeDarDeBaja = sesion?.rol !== 'Agente';
@@ -36,6 +38,8 @@ export default function Clientes() {
 
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  // Notas de seguimiento con acciones (mismo editor que Prospectos).
+  const [notas, setNotas] = useState([]);
   // Filtro por agente responsable: '' = todos, 'mios' = mis clientes, o el id de un agente.
   const [filtroAgente, setFiltroAgente] = useState('');
 
@@ -50,6 +54,7 @@ export default function Clientes() {
     const { _id, agente, ...payload } = form;
     // Solo el Administrador asigna agente; si no elige, el servidor lo deja a nombre de quien da de alta.
     if (esAdministrador && agente) payload.agente = agente;
+    payload.notas = notasParaServidor(notas);
     setGuardando(true);
     try {
       if (_id) {
@@ -72,6 +77,7 @@ export default function Clientes() {
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
+    setNotas([]);
     setEstatusOriginal('Activo');
   };
 
@@ -82,6 +88,7 @@ export default function Clientes() {
       fechaNacimiento: cliente.fechaNacimiento ? cliente.fechaNacimiento.slice(0, 10) : '',
       agente: cliente.agente?._id || cliente.agente || '',
     });
+    setNotas(notasDesdeServidor(cliente.notas));
     setEstatusOriginal(cliente.estatus);
   };
 
@@ -98,7 +105,10 @@ export default function Clientes() {
   };
 
   const handleVer = (cliente) => {
-    alert(`${cliente.nombreCompleto} (${cliente.estatus})\n${cliente.correo || ''}\n${cliente.telefono}\n${cliente.direccion || ''}, ${cliente.ciudad || ''}, ${cliente.pais}`);
+    alert(
+      `${cliente.nombreCompleto} (${cliente.estatus})\n${cliente.correo || ''}\n${cliente.telefono}\n${cliente.direccion || ''}, ${cliente.ciudad || ''}, ${cliente.pais}\n\n` +
+      `Seguimiento:\n${resumenNotas(cliente.notas) || 'Sin notas registradas.'}`
+    );
   };
 
   return (
@@ -204,9 +214,7 @@ export default function Clientes() {
           )}
 
           <div className="md:col-span-2">
-            <label className={labelClass}>Notas</label>
-            <textarea rows={3} placeholder="Información adicional del cliente" className={inputClass}
-              value={form.notas} onChange={e => setForm({ ...form, notas: soloLetrasYNumeros(e.target.value) })} />
+            <NotasSeguimiento notas={notas} onChange={setNotas} vacio="No hay notas agregadas a este cliente." />
           </div>
 
           <div className="md:col-span-2 flex justify-end gap-3 mt-4">
@@ -280,6 +288,12 @@ export default function Clientes() {
                       </button>
                       <button onClick={() => handleEditar(c)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                         <Pencil size={14} />
+                      </button>
+                      {/* Solo clientes activos: Reservaciones no permite elegir clientes dados de baja. */}
+                      <button onClick={() => onGenerarReservacion({ id: c._id, nombre: c.nombreCompleto })} disabled={c.estatus !== 'Activo'}
+                        title={c.estatus === 'Activo' ? 'Generar reservación' : 'El cliente está dado de baja'}
+                        className="w-8 h-8 rounded-full bg-brand-coral hover:brightness-90 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100">
+                        <Compass size={14} />
                       </button>
                       {puedeDarDeBaja && (
                         <button onClick={() => handleEliminar(c)} title="Dar de baja" className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center">

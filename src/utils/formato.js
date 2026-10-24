@@ -48,6 +48,15 @@ export function telefono(t) {
     : `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
 }
 
+// Cuenta bancaria agrupada de 4 en 4 para leerla mejor (solo vista): tarjeta de
+// 16 dígitos "0121 8000 1234 5678" y CLABE de 18 "0121 8000 1234 5678 91".
+// Cualquier otro largo se muestra tal cual.
+export function cuentaBancaria(c) {
+  const d = String(c ?? '').replace(/\D/g, '');
+  if (d.length !== 16 && d.length !== 18) return c ?? '';
+  return d.match(/.{1,4}/g).join(' ');
+}
+
 // Días de calendario entre hoy (local) y una fecha de viaje. Negativo si ya pasó.
 export function diasHasta(f) {
   const d = new Date(f);

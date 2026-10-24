@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { NotaSeguimientoSchema } from './notas.js';
 
 const ClienteSchema = new mongoose.Schema(
   {
@@ -22,7 +23,9 @@ const ClienteSchema = new mongoose.Schema(
     direccion: { type: String, trim: true },
     fechaNacimiento: { type: Date },
     ciudad: { type: String, trim: true },
-    notas: { type: String, trim: true },
+    // Notas de seguimiento con acciones (mismo esquema que Prospecto). Antes era
+    // un texto libre; `npm run migrar` convierte ese texto en la primera nota.
+    notas: { type: [NotaSeguimientoSchema], default: [] },
     pais: { type: String, required: true, default: 'México', trim: true },
     estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
   },

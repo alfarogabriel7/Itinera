@@ -8,6 +8,7 @@
 // 2. Índices: crea los nuevos índices compuestos por empresa y elimina los que
 //    ya no están declarados en los modelos (syncIndexes).
 // 0. Estatus de agentes: "Inactivo" → "Baja" (homologado con Empresas).
+//    Notas de clientes: de texto libre a lista de notas con acciones.
 // 3. Saldos: recalcula en cada reservación el acumulado abonado por el cliente
 //    y lo pagado a cada proveedor, a partir de los pagos aplicados (necesario
 //    para la aplicación atómica de pagos; también sirve para reconciliar).
@@ -53,6 +54,21 @@ async function homologarEstatusAgentes() {
   console.log(`Agentes con estatus "Inactivo" cambiados a "Baja": ${r.modifiedCount}.`);
 }
 
+// Las notas de Cliente pasaron de texto libre a una lista de notas con acciones
+// (como Prospecto). El texto anterior se conserva como la primera nota, con la
+// fecha de alta del cliente; si estaba vacío, queda la lista vacía.
+async function convertirNotasDeClientes() {
+  const conTexto = await Cliente.collection.find({ notas: { $type: 'string' } }, { projection: { notas: 1, createdAt: 1 } }).toArray();
+  for (const c of conTexto) {
+    const texto = c.notas.trim().slice(0, 1000);
+    const notas = texto
+      ? [{ _id: new mongoose.Types.ObjectId(), texto, fecha: c.createdAt || new Date(), accionesNotas: [] }]
+      : [];
+    await Cliente.collection.updateOne({ _id: c._id }, { $set: { notas } });
+  }
+  console.log(`Notas de clientes convertidas al nuevo formato: ${conTexto.length}.`);
+}
+
 async function sincronizarIndices() {
   for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin]) {
     const eliminados = await Modelo.syncIndexes();
@@ -63,6 +79,7 @@ async function sincronizarIndices() {
 try {
   await connectDB();
   await homologarEstatusAgentes();
+  await convertirNotasDeClientes();
   await asignarAgenteAClientes();
   await sincronizarIndices();
   console.log(`Saldos recalculados en ${await recalcularSaldos()} reservación(es).`);

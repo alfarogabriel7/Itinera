@@ -13,10 +13,17 @@ const MAESTRO_VACIO = { idCliente: '', clienteNombre: '', fechaEntrada: '', fech
 const buscarClientes = (q) => clientesApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
 const buscarProveedores = (q) => proveedoresApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
 
-export default function Reservaciones() {
+// clienteInicial ({ id, nombre }): cliente precargado al llegar desde Clientes ("Generar reservación").
+export default function Reservaciones({ clienteInicial = null }) {
   const [guardando, setGuardando] = useState(false);
 
   const [maestro, setMaestro] = useState(MAESTRO_VACIO);
+
+  useEffect(() => {
+    if (!clienteInicial) return;
+    setMaestro(m => ({ ...m, idCliente: clienteInicial.id, clienteNombre: clienteInicial.nombre }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [clienteInicial]);
   const [detalles, setDetalles] = useState([]);
 
   const [agentes, setAgentes] = useState([]);

@@ -5,6 +5,7 @@ import {
   soloCampos, regexBusqueda, usuarioDeLaSesion, errorHttp, filtroPorAgente,
 } from '../middleware/tenant.js';
 import { paginar, ordenDe } from '../utils/paginacion.js';
+import { aplanarAcciones, cambiarEstatusAccion } from '../utils/seguimiento.js';
 
 const router = Router();
 
@@ -35,6 +36,36 @@ router.get('/', async (req, res, next) => {
     if (req.query.estatus) filtroBase.estatus = String(req.query.estatus);
     const orden = ordenDe(req, { nombre: { nombreCompleto: 1 } }, { createdAt: -1 });
     res.json(await paginar(Cliente, alcanceEmpresa(req, filtroBase), req, { orden, populate: [POPULATE_AGENTE] }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Acciones de seguimiento de los clientes (una fila por acción) para el panel
+// del agente. Con ?mios=1 solo las de los clientes del usuario.
+router.get('/acciones', async (req, res, next) => {
+  try {
+    const clientes = await Cliente.find(
+      alcanceEmpresa(req, { 'notas.accionesNotas.0': { $exists: true }, ...filtroPorAgente(req) })
+    ).populate('agente', 'nombre');
+    res.json(aplanarAcciones(clientes, 'cliente'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Cambia solo el estatus de una acción sin reenviar el cliente completo. Igual
+// que editar al cliente: cualquier usuario de su empresa.
+router.patch('/:id/notas/:idNota/acciones/:idAccion', async (req, res, next) => {
+  try {
+    const cliente = await Cliente.findById(req.params.id);
+    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!perteneceAlAlcance(cliente, req)) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar este cliente.' });
+    }
+    const accion = cambiarEstatusAccion(cliente, req.params.idNota, req.params.idAccion, req.body.estatus);
+    await cliente.save();
+    res.json({ idAccion: accion._id, estatus: accion.estatus, fechaCompletada: accion.fechaCompletada || null });
   } catch (err) {
     next(err);
   }
@@ -93,9 +124,11 @@ router.put('/:id', async (req, res, next) => {
     cliente.set(cambios);
     await cliente.save();
 
+    // Las notas son una lista con acciones: no se registran como cambio de campo.
+    const { notas, ...cambiosSimples } = cambios;
     await registrarCambios({
       entidad: 'Cliente', entidadId: cliente._id, empresa: cliente.empresa,
-      anterior, nuevo: cambios, usuario: usuarioDeLaSesion(req),
+      anterior, nuevo: cambiosSimples, usuario: usuarioDeLaSesion(req),
     });
     res.json(await cliente.populate(...POPULATE_AGENTE));
   } catch (err) {
