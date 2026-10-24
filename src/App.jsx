@@ -207,16 +207,24 @@ export default function App() {
 
   // Reservación que Cobranza manda preseleccionada al abrir Registro de Pagos.
   const [reservaParaAbonar, setReservaParaAbonar] = useState('');
+  // Cliente ({ id, nombre }) que Clientes manda preseleccionado al abrir Reservaciones.
+  const [clienteParaReservar, setClienteParaReservar] = useState(null);
 
   const goTo = (key) => {
     setActiveTab(key);
     setReservaParaAbonar('');
+    setClienteParaReservar(null);
     setSidebarOpen(false);
   };
 
   const abonarDesdeCobranza = (idReservacion) => {
     setReservaParaAbonar(idReservacion);
     setActiveTab('pagos');
+  };
+
+  const reservarDesdeClientes = (cliente) => {
+    setClienteParaReservar(cliente);
+    setActiveTab('reservaciones');
   };
 
   if (!auth) {
@@ -306,11 +314,11 @@ export default function App() {
           <main className="flex-1 min-w-0">
             {activeTab === 'dashboard' && auth.rol === 'Administrador' && <Dashboard />}
             {activeTab === 'inicio' && auth.rol === 'Agente' && <MiPanel nombre={auth.nombre} onAbonar={abonarDesdeCobranza} onIr={goTo} />}
-            {activeTab === 'clientes' && auth.rol !== 'superAdmin' && <Clientes />}
+            {activeTab === 'clientes' && auth.rol !== 'superAdmin' && <Clientes onGenerarReservacion={reservarDesdeClientes} />}
             {activeTab === 'prospectos' && auth.rol !== 'superAdmin' && <Prospectos />}
             {activeTab === 'empresas' && auth.rol === 'superAdmin' && <Empresas />}
             {activeTab === 'proveedores' && auth.rol !== 'superAdmin' && <Proveedores />}
-            {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones />}
+            {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones clienteInicial={clienteParaReservar} />}
             {activeTab === 'pagos' && auth.rol !== 'superAdmin' && <Pagos reservaInicial={reservaParaAbonar} />}
             {activeTab === 'cobranza' && auth.rol !== 'superAdmin' && <Cobranza onAbonar={abonarDesdeCobranza} />}
             {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}

@@ -5,6 +5,7 @@ import {
   soloCampos, regexBusqueda, usuarioDeLaSesion, filtroPorAgente,
 } from '../middleware/tenant.js';
 import { paginar } from '../utils/paginacion.js';
+import { aplanarAcciones, cambiarEstatusAccion } from '../utils/seguimiento.js';
 
 const router = Router();
 
@@ -61,39 +62,10 @@ router.get('/estadisticas', async (req, res, next) => {
 // las de los prospectos del usuario; sin él, las de toda la empresa.
 router.get('/acciones', async (req, res, next) => {
   try {
-    const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const prospectos = await Prospecto.find(
       alcanceEmpresa(req, { 'notas.accionesNotas.0': { $exists: true }, ...filtroPorAgente(req) })
     ).populate('agente', 'nombre');
-
-    const pendientes = [];
-    const completadas = [];
-    for (const p of prospectos) {
-      for (const n of p.notas) {
-        for (const a of n.accionesNotas) {
-          const fila = {
-            idProspecto: p._id,
-            idNota: n._id,
-            idAccion: a._id,
-            prospecto: p.nombreCompleto,
-            telefono: p.telefono,
-            esCliente: p.estatus === 'cliente',
-            agente: p.agente?.nombre || null,
-            nota: n.texto,
-            descripcion: a.descripcion,
-            estatus: a.estatus,
-            fecha: a.fecha,
-            fechaCompletada: a.fechaCompletada || null,
-          };
-          if (a.estatus !== 'Completada') pendientes.push(fila);
-          else if (a.fechaCompletada && a.fechaCompletada >= hace7Dias) completadas.push(fila);
-        }
-      }
-    }
-    pendientes.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-    completadas.sort((a, b) => new Date(b.fechaCompletada) - new Date(a.fechaCompletada));
-
-    res.json({ pendientes, completadas });
+    res.json(aplanarAcciones(prospectos, 'prospecto'));
   } catch (err) {
     next(err);
   }
@@ -105,20 +77,12 @@ router.patch('/:id/notas/:idNota/acciones/:idAccion', async (req, res, next) => 
   try {
     if (bloquearSuperAdmin(req, res, MSG_SUPERADMIN)) return;
 
-    const { estatus } = req.body;
-    if (!['Completada', 'En seguimiento'].includes(estatus)) {
-      return res.status(400).json({ error: 'Estatus inválido: usa "Completada" o "En seguimiento".' });
-    }
-
     const prospecto = await Prospecto.findById(req.params.id);
     if (!prospecto) return res.status(404).json({ error: 'Prospecto no encontrado' });
     if (!perteneceAlAlcance(prospecto, req, { porAgente: true })) {
       return res.status(403).json({ error: 'No tienes permiso para modificar este prospecto.' });
     }
-    const accion = prospecto.notas.id(req.params.idNota)?.accionesNotas.id(req.params.idAccion);
-    if (!accion) return res.status(404).json({ error: 'Acción no encontrada' });
-
-    accion.estatus = estatus;
+    const accion = cambiarEstatusAccion(prospecto, req.params.idNota, req.params.idAccion, req.body.estatus);
     await prospecto.save();
     res.json({ idAccion: accion._id, estatus: accion.estatus, fechaCompletada: accion.fechaCompletada || null });
   } catch (err) {
@@ -202,6 +166,18 @@ router.post('/:id/convertir', async (req, res, next) => {
       return res.status(409).json({ error: 'Este prospecto ya fue convertido a cliente.' });
     }
 
+    // Seguimiento que pasa al cliente: solo las notas con acciones "En seguimiento",
+    // con su texto y fecha originales y únicamente esas acciones pendientes. Las
+    // notas sin pendientes se quedan como historial del prospecto.
+    const notasParaCliente = prospecto.notas
+      .map((n) => ({ n, pendientes: n.accionesNotas.filter((a) => a.estatus === 'En seguimiento') }))
+      .filter(({ pendientes }) => pendientes.length > 0)
+      .map(({ n, pendientes }) => ({
+        texto: n.texto,
+        fecha: n.fecha,
+        accionesNotas: pendientes.map((a) => ({ descripcion: a.descripcion, estatus: 'En seguimiento', fecha: a.fecha })),
+      }));
+
     // El cliente queda ligado a la misma empresa y al mismo agente que el prospecto.
     const cliente = await Cliente.create({
       empresa: prospecto.empresa,
@@ -214,14 +190,34 @@ router.post('/:id/convertir', async (req, res, next) => {
       ciudad: prospecto.ciudad,
       pais: prospecto.pais,
       estatus: 'Activo',
+      notas: notasParaCliente,
     });
 
+    // En el prospecto, las acciones que pasaron al cliente se cierran: el
+    // seguimiento ahora se da sobre el cliente.
+    let migradas = 0;
+    for (const n of prospecto.notas) {
+      for (const a of n.accionesNotas) {
+        if (a.estatus !== 'En seguimiento') continue;
+        a.estatus = 'Completada';
+        a.migradaACliente = true;
+        migradas++;
+      }
+    }
     prospecto.estatus = 'cliente';
     await prospecto.save();
+
+    const usuario = usuarioDeLaSesion(req);
     await registrarEvento({
       entidad: 'Prospecto', entidadId: prospecto._id, empresa: prospecto.empresa,
-      evento: 'convertido a cliente', detalle: String(cliente._id), usuario: usuarioDeLaSesion(req),
+      evento: 'convertido a cliente', detalle: String(cliente._id), usuario,
     });
+    if (migradas > 0) {
+      await registrarEvento({
+        entidad: 'Cliente', entidadId: cliente._id, empresa: cliente.empresa,
+        evento: 'seguimientos recibidos del prospecto', detalle: `${migradas} acción(es) en seguimiento`, usuario,
+      });
+    }
 
     res.json({ prospecto, cliente });
   } catch (err) {

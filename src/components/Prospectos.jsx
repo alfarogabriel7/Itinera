@@ -6,9 +6,10 @@ import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
+import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas } from './common/NotasSeguimiento';
 import {
   UserPlus, Plus, X, Save, Search, Pencil, UserCheck, Eye,
-  Mail, Phone, CheckCircle2, Circle, TrendingUp,
+  Mail, Phone, TrendingUp,
 } from 'lucide-react';
 
 const EMPTY_FORM = {
@@ -18,9 +19,6 @@ const EMPTY_FORM = {
 
 const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
-
-let contadorKey = 0;
-const nuevaKey = () => `k${Date.now()}_${contadorKey++}`;
 
 export default function Prospectos() {
   const sesion = obtenerSesion();
@@ -75,62 +73,10 @@ export default function Prospectos() {
     setNotas([]);
   };
 
-  // --- Notas y acciones anidadas ---
-  const agregarNota = () => {
-    setNotas([...notas, { key: nuevaKey(), texto: '', accionesNotas: [] }]);
-  };
-
-  const eliminarNota = (index) => {
-    setNotas(notas.filter((_, i) => i !== index));
-  };
-
-  const cambiarTextoNota = (index, texto) => {
-    const nuevas = [...notas];
-    nuevas[index] = { ...nuevas[index], texto };
-    setNotas(nuevas);
-  };
-
-  const agregarAccion = (notaIndex) => {
-    const nuevas = [...notas];
-    const acciones = [...nuevas[notaIndex].accionesNotas, { key: nuevaKey(), descripcion: '', estatus: 'En seguimiento' }];
-    nuevas[notaIndex] = { ...nuevas[notaIndex], accionesNotas: acciones };
-    setNotas(nuevas);
-  };
-
-  const eliminarAccion = (notaIndex, accionIndex) => {
-    const nuevas = [...notas];
-    nuevas[notaIndex] = {
-      ...nuevas[notaIndex],
-      accionesNotas: nuevas[notaIndex].accionesNotas.filter((_, i) => i !== accionIndex),
-    };
-    setNotas(nuevas);
-  };
-
-  const cambiarDescripcionAccion = (notaIndex, accionIndex, descripcion) => {
-    const nuevas = [...notas];
-    const acciones = [...nuevas[notaIndex].accionesNotas];
-    acciones[accionIndex] = { ...acciones[accionIndex], descripcion };
-    nuevas[notaIndex] = { ...nuevas[notaIndex], accionesNotas: acciones };
-    setNotas(nuevas);
-  };
-
-  const alternarEstatusAccion = (notaIndex, accionIndex) => {
-    const nuevas = [...notas];
-    const acciones = [...nuevas[notaIndex].accionesNotas];
-    const actual = acciones[accionIndex];
-    acciones[accionIndex] = { ...actual, estatus: actual.estatus === 'Completada' ? 'En seguimiento' : 'Completada' };
-    nuevas[notaIndex] = { ...nuevas[notaIndex], accionesNotas: acciones };
-    setNotas(nuevas);
-  };
-
-  // --- CRUD principal ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { _id, ...payload } = form;
-    payload.notas = notas.map(({ key, accionesNotas, ...n }) => ({
-      ...n,
-      accionesNotas: accionesNotas.map(({ key, ...a }) => a),
-    }));
+    payload.notas = notasParaServidor(notas);
 
     setGuardando(true);
     try {
@@ -155,30 +101,13 @@ export default function Prospectos() {
       ...prospecto,
       fechaNacimiento: prospecto.fechaNacimiento ? prospecto.fechaNacimiento.slice(0, 10) : '',
     });
-    // Se conservan _id y fechas para que al guardar no se recreen las notas y
-    // acciones con la fecha de hoy (el panel del agente las ordena por fecha).
-    setNotas((prospecto.notas || []).map(n => ({
-      key: n._id || nuevaKey(),
-      _id: n._id,
-      fecha: n.fecha,
-      texto: n.texto,
-      accionesNotas: (n.accionesNotas || []).map(a => ({
-        key: a._id || nuevaKey(),
-        _id: a._id,
-        fecha: a.fecha,
-        fechaCompletada: a.fechaCompletada,
-        descripcion: a.descripcion,
-        estatus: a.estatus,
-      })),
-    })));
+    setNotas(notasDesdeServidor(prospecto.notas));
   };
 
   // Consulta de solo lectura para quien no es el responsable (p.ej. para atender
   // al prospecto si su agente no está disponible).
   const handleVer = (p) => {
-    const seguimiento = (p.notas || []).map(n =>
-      `• ${n.texto}\n${(n.accionesNotas || []).map(a => `   - [${a.estatus}] ${a.descripcion}`).join('\n')}`
-    ).join('\n');
+    const seguimiento = resumenNotas(p.notas);
     alert(
       `${p.nombreCompleto}\nTel. ${p.telefono}${p.correo ? ` · ${p.correo}` : ''}\nAgente responsable: ${p.agente?.nombre || '—'}\n\n` +
       `Seguimiento:\n${seguimiento || 'Sin notas registradas.'}`
@@ -325,64 +254,7 @@ export default function Prospectos() {
             </div>
           </div>
 
-          <div className="border border-slate-100 rounded-xl p-4">
-            <div className="flex justify-between items-center mb-4">
-              <span className="font-semibold text-slate-700 text-sm">Notas de seguimiento</span>
-              <button type="button" onClick={agregarNota} className="inline-flex items-center gap-1.5 bg-brand-coral text-white px-3 py-1.5 text-xs font-semibold rounded-lg hover:brightness-90">
-                <Plus size={14} /> Añadir Nota
-              </button>
-            </div>
-
-            {notas.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-4">No hay notas agregadas a este prospecto.</p>
-            ) : (
-              <div className="space-y-3">
-                {notas.map((n, ni) => (
-                  <div key={n.key} className="p-3 bg-brand-petroleo/10 rounded-lg border border-brand-petroleo/20">
-                    <div className="flex items-start gap-2 mb-3">
-                      <textarea rows={2} required placeholder="Escribe la nota de seguimiento..."
-                        className="flex-1 p-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
-                        value={n.texto} onChange={e => cambiarTextoNota(ni, e.target.value)} />
-                      <button type="button" onClick={() => eliminarNota(ni)} title="Quitar esta nota" className="text-slate-400 hover:text-red-600 shrink-0">
-                        <X size={16} />
-                      </button>
-                    </div>
-
-                    <div className="pl-3 border-l-2 border-brand-petroleo/30 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xs uppercase text-slate-500 font-bold">Acciones / actividades</span>
-                        <button type="button" onClick={() => agregarAccion(ni)} className="inline-flex items-center gap-1 text-2xs font-semibold text-brand-noche hover:underline">
-                          <Plus size={12} /> Añadir acción
-                        </button>
-                      </div>
-
-                      {n.accionesNotas.length === 0 ? (
-                        <p className="text-slate-400 text-xs">Sin actividades registradas.</p>
-                      ) : (
-                        n.accionesNotas.map((a, ai) => (
-                          <div key={a.key} className="flex items-center gap-2">
-                            <input type="text" required placeholder="Ej. Llamar para dar seguimiento"
-                              className="flex-1 p-1.5 border border-slate-300 rounded text-xs bg-white"
-                              value={a.descripcion} onChange={e => cambiarDescripcionAccion(ni, ai, e.target.value)} />
-                            <button type="button" onClick={() => alternarEstatusAccion(ni, ai)}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-2xs font-semibold whitespace-nowrap ${
-                                a.estatus === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                              }`}>
-                              {a.estatus === 'Completada' ? <CheckCircle2 size={12} /> : <Circle size={12} />}
-                              {a.estatus}
-                            </button>
-                            <button type="button" onClick={() => eliminarAccion(ni, ai)} title="Quitar actividad" className="text-slate-400 hover:text-red-600">
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <NotasSeguimiento notas={notas} onChange={setNotas} vacio="No hay notas agregadas a este prospecto." />
 
           <div className="flex justify-end gap-3">
             <button type="button" onClick={resetForm}

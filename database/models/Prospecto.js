@@ -1,35 +1,7 @@
 import mongoose from 'mongoose';
+import { NotaSeguimientoSchema } from './notas.js';
 
 const { Schema } = mongoose;
-
-const AccionNotaSchema = new Schema(
-  {
-    descripcion: { type: String, required: true, trim: true, maxlength: 300 },
-    // Nace "En seguimiento"; la única transición esperada es marcarla "Completada".
-    estatus: { type: String, enum: ['En seguimiento', 'Completada'], default: 'En seguimiento' },
-    fecha: { type: Date, default: Date.now },
-    // Cuándo se marcó como completada; lo mantiene el hook de abajo.
-    fechaCompletada: { type: Date },
-  },
-  { _id: true }
-);
-
-// La fecha de completado la fija siempre el servidor según el estatus, venga
-// el cambio del panel del agente o del formulario de Prospectos.
-AccionNotaSchema.pre('validate', function () {
-  if (this.estatus === 'Completada' && !this.fechaCompletada) this.fechaCompletada = new Date();
-  if (this.estatus !== 'Completada') this.fechaCompletada = undefined;
-});
-
-const NotaProspectoSchema = new Schema(
-  {
-    texto: { type: String, required: true, trim: true, maxlength: 1000 },
-    fecha: { type: Date, default: Date.now },
-    // Nivel anidado dentro de la nota: actividades de seguimiento sobre esa nota.
-    accionesNotas: { type: [AccionNotaSchema], default: [] },
-  },
-  { _id: true }
-);
 
 const ProspectoSchema = new Schema(
   {
@@ -56,7 +28,7 @@ const ProspectoSchema = new Schema(
     // Fecha del día en que se registró (la asigna siempre el servidor).
     fechaRegistro: { type: Date, default: Date.now },
 
-    notas: { type: [NotaProspectoSchema], default: [] },
+    notas: { type: [NotaSeguimientoSchema], default: [] },
   },
   { timestamps: true }
 );

@@ -66,6 +66,9 @@ export const clientesApi = {
   get: (id) => request(`/clientes/${id}`),
   create: (data) => request('/clientes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/clientes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  acciones: (params) => request(conParametros('/clientes/acciones', params)),
+  cambiarEstatusAccion: (idCliente, idNota, idAccion, estatus) =>
+    request(`/clientes/${idCliente}/notas/${idNota}/acciones/${idAccion}`, { method: 'PATCH', body: JSON.stringify({ estatus }) }),
 };
 
 export const proveedoresApi = {

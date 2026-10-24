@@ -5,7 +5,7 @@ import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Truck, Plus, X, Save, Search, Eye, Pencil, Trash2 } from 'lucide-react';
 import { obtenerSesion } from '../utils/sesion';
-import { telefono } from '../utils/formato';
+import { telefono, cuentaBancaria } from '../utils/formato';
 import { soloTelefono, soloNumeros } from '../utils/validadores';
 
 const EMPTY_FORM = {
@@ -74,7 +74,7 @@ export default function Proveedores() {
   };
 
   const handleVer = (proveedor) => {
-    alert(`${proveedor.nombreProveedor} (${proveedor.estatus})\nTeléfono: ${proveedor.telefono1}\nCLABE: ${proveedor.numeroCuenta1}`);
+    alert(`${proveedor.nombreProveedor} (${proveedor.estatus})\nTeléfono: ${telefono(proveedor.telefono1)}\nCuenta: ${cuentaBancaria(proveedor.numeroCuenta1)}`);
   };
 
   return (
@@ -169,7 +169,7 @@ export default function Proveedores() {
               <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Proveedor</th>
                 <th className="p-3 font-semibold">Teléfono</th>
-                <th className="p-3 font-semibold">CLABE Principal</th>
+                <th className="p-3 font-semibold">Cuenta Principal</th>
                 <th className="p-3 font-semibold">Estatus</th>
                 <th className="p-3 font-semibold text-center">Acciones</th>
               </tr>
@@ -182,7 +182,7 @@ export default function Proveedores() {
                 <tr key={p._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{p.nombreProveedor}</td>
                   <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(p.telefono1)}</td>
-                  <td className="p-3 text-slate-600 font-mono text-xs">{p.numeroCuenta1}</td>
+                  <td className="p-3 text-slate-600 font-mono text-xs whitespace-nowrap">{cuentaBancaria(p.numeroCuenta1)}</td>
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                       {p.estatus}
