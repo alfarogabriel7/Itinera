@@ -9,3 +9,54 @@
     letter-spacing: -0.025em;
   }
 }
+
+/* Calendario (react-day-picker): colores del tema de la empresa (variables
+   --brand-*, ver database/catalogos/temas.js) y tamaño compacto. */
+.rdp-root {
+  --rdp-accent-color: rgb(var(--brand-petroleo));
+  --rdp-accent-background-color: rgb(var(--brand-petroleo) / 0.12);
+  --rdp-today-color: rgb(var(--brand-coral));
+  --rdp-day-height: 38px;
+  --rdp-day-width: 38px;
+  --rdp-months-gap: 1.5rem;
+  --rdp-nav-height: 2.25rem;
+  font-size: 0.875rem;
+}
+.rdp-root .rdp-caption_label {
+  font-family: 'Sora', 'Manrope', system-ui, sans-serif;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: rgb(var(--brand-noche));
+}
+.rdp-root .rdp-weekday {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgb(100 116 139);
+}
+.rdp-root .rdp-day_button {
+  border-radius: 9999px;
+  transition: background-color 0.15s;
+}
+.rdp-root .rdp-day:not(.rdp-selected):not(.rdp-disabled) .rdp-day_button:hover {
+  background-color: rgb(var(--brand-petroleo) / 0.08);
+}
+.rdp-root .rdp-today:not(.rdp-selected) .rdp-day_button {
+  font-weight: 700;
+}
+.rdp-root .rdp-selected .rdp-day_button {
+  font-weight: 600;
+}
+/* Día seleccionado (una sola fecha): relleno en lugar de solo borde. */
+.rdp-root .rdp-selected:not(.rdp-range_start):not(.rdp-range_middle):not(.rdp-range_end) .rdp-day_button {
+  background-color: rgb(var(--brand-petroleo));
+  color: white;
+}
+.rdp-root .rdp-chevron {
+  fill: rgb(var(--brand-petroleo));
+}
+.rdp-root .rdp-dropdown_root {
+  border: 1px solid rgb(203 213 225);
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.5rem;
+}

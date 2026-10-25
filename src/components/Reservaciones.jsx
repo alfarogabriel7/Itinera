@@ -3,9 +3,11 @@ import { clientesApi, proveedoresApi, reservacionesApi, agentesApi } from '../ap
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import SelectorRemoto from './common/SelectorRemoto';
+import { SelectorRangoFechas } from './common/Calendario';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Compass, Plus, Send, Search, Eye, X } from 'lucide-react';
-import { fechaViaje } from '../utils/formato';
+import { fechaViaje, dinero } from '../utils/formato';
+import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
 
 const MAESTRO_VACIO = { idCliente: '', clienteNombre: '', fechaEntrada: '', fechaSalida: '', destino: '', descripcion: '', montoTotal: '', notas: '' };
 
@@ -66,7 +68,7 @@ export default function Reservaciones({ clienteInicial = null }) {
     } else if (field === 'manual') {
       fila.manual = value;
       if (value) {
-        // Modo manual: el % descuento se limpia y queda bloqueado.
+        // Modo manual: el % de comisión se limpia y queda bloqueado.
         fila.porcentajeReservacion = 0;
       } else {
         // Modo automático: el monto comisionable vuelve a calcularse solo.
@@ -82,7 +84,7 @@ export default function Reservaciones({ clienteInicial = null }) {
       const comisionable = parseFloat(fila.montoComisionable) || 0;
       fila.totalReservacion = monto - comisionable;
     } else {
-      // Automático: se sigue usando la fórmula existente (monto - % descuento),
+      // Automático: se sigue usando la fórmula existente (monto - % de comisión),
       // y el monto comisionable queda igual al calculado (no editable).
       const porcentaje = parseFloat(fila.porcentajeReservacion) || 0;
       const calculado = monto - (monto * porcentaje) / 100;
@@ -122,13 +124,13 @@ export default function Reservaciones({ clienteInicial = null }) {
 
   const handleVer = (r) => {
     const servicios = r.detalleReservacion
-      .map(d => `- ${d.idProveedor?.nombreProveedor || 'Proveedor'}: comisionable $${d.montoComisionable.toFixed(2)} · total $${d.totalReservacion.toFixed(2)}`)
+      .map(d => `- ${d.idProveedor?.nombreProveedor || 'Proveedor'}: comisionable ${dinero(d.montoComisionable)} · total ${dinero(d.totalReservacion)}`)
       .join('\n');
     alert(
       `Destino: ${r.destino}\nCliente: ${r.idCliente?.nombreCompleto || ''}\nAgente: ${r.agente?.nombre || ''}\n` +
       `Entrada: ${fechaViaje(r.fechaEntrada)}  Salida: ${fechaViaje(r.fechaSalida)}\n` +
       `Descripción: ${r.descripcion || '—'}\nNotas: ${r.notas || '—'}\n\nServicios:\n${servicios || '—'}\n\n` +
-      `Monto Total de la Reservación: $${r.montoTotal.toFixed(2)}\nCosto con Proveedores: $${r.totalViaje.toFixed(2)}`
+      `Monto Total de la Reservación: ${dinero(r.montoTotal)}\nCosto con Proveedores: ${dinero(r.totalViaje)}`
     );
   };
 
@@ -154,13 +156,10 @@ export default function Reservaciones({ clienteInicial = null }) {
                   onCambio={(id, c) => setMaestro({ ...maestro, idCliente: id, clienteNombre: c?.nombreCompleto || '' })} />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-600">Fecha de Entrada *</label>
-              <input type="date" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" value={maestro.fechaEntrada} onChange={e => setMaestro({ ...maestro, fechaEntrada: e.target.value })} />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-600">Fecha de Salida *</label>
-              <input type="date" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" value={maestro.fechaSalida} onChange={e => setMaestro({ ...maestro, fechaSalida: e.target.value })} />
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-600">Fechas del viaje (entrada → salida) *</label>
+              <SelectorRangoFechas required desde={maestro.fechaEntrada} hasta={maestro.fechaSalida}
+                onCambio={(fechaEntrada, fechaSalida) => setMaestro(m => ({ ...m, fechaEntrada, fechaSalida }))} />
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Destino Turístico *</label>
@@ -172,7 +171,8 @@ export default function Reservaciones({ clienteInicial = null }) {
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Monto Total de la Reservación ($) *</label>
-              <input type="number" required step="0.01" min="0" className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="0.00" value={maestro.montoTotal} onChange={e => setMaestro({ ...maestro, montoTotal: e.target.value })} />
+              <CampoMonto required min={0} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
+                valor={maestro.montoTotal} onCambio={montoTotal => setMaestro(m => ({ ...m, montoTotal }))} />
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Notas / Pendientes del agente</label>
@@ -220,23 +220,29 @@ export default function Reservaciones({ clienteInicial = null }) {
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Monto Base ($) *</label>
-                        <input type="number" required step="0.01" className="w-full p-1.5 border border-slate-300 rounded text-xs" value={d.montoReservacion} onChange={e => handleDetalleChange(index, 'montoReservacion', e.target.value)} />
+                        <CampoMonto required min={0} className="w-full p-1.5 border border-slate-300 rounded text-xs"
+                          valor={d.montoReservacion} onCambio={v => handleDetalleChange(index, 'montoReservacion', v)} />
                       </div>
                       <div>
-                        <label className="block text-2xs uppercase text-slate-500 font-bold">% Descuento {!d.manual && '*'}</label>
-                        <input type="number" required={!d.manual} disabled={d.manual} max={100}
-                          className="w-full p-1.5 border border-slate-300 rounded text-xs disabled:bg-slate-100 disabled:text-slate-400"
-                          value={d.porcentajeReservacion} onChange={e => handleDetalleChange(index, 'porcentajeReservacion', e.target.value)} />
+                        <label className="block text-2xs uppercase text-slate-500 font-bold">% Comisión {!d.manual && '*'}</label>
+                        {/* Solo de 0 a 100, sin negativos y con máximo 2 decimales. */}
+                        <input type="text" inputMode="decimal" autoComplete="off" required={!d.manual} disabled={d.manual} placeholder="0"
+                          className="w-full p-1.5 border border-slate-300 rounded text-xs text-right tabular-nums disabled:bg-slate-100 disabled:text-slate-400"
+                          value={d.porcentajeReservacion}
+                          onChange={e => {
+                            const v = limpiarMonto(e.target.value);
+                            handleDetalleChange(index, 'porcentajeReservacion', Number(v) > 100 ? '100' : v);
+                          }} />
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Monto Comisionable ($) {d.manual && '*'}</label>
-                        <input type="number" required={d.manual} disabled={!d.manual} step="0.01" min="0"
+                        <CampoMonto required={d.manual} disabled={!d.manual} min={0}
                           className="w-full p-1.5 border border-slate-300 rounded text-xs disabled:bg-slate-100 disabled:text-slate-400"
-                          value={d.montoComisionable} onChange={e => handleDetalleChange(index, 'montoComisionable', e.target.value)} />
+                          valor={d.montoComisionable} onCambio={v => handleDetalleChange(index, 'montoComisionable', v)} />
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Total Calculado ($)</label>
-                        <input type="text" disabled className="w-full p-1.5 border border-slate-200 rounded bg-slate-100 font-bold text-xs text-brand-noche" value={`$${d.totalReservacion.toFixed(2)}`} />
+                        <input type="text" disabled className="w-full p-1.5 border border-slate-200 rounded bg-slate-100 font-bold text-xs text-brand-noche text-right tabular-nums" value={dinero(d.totalReservacion)} />
                       </div>
                     </div>
                   </div>

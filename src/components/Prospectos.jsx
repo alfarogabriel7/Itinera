@@ -6,6 +6,7 @@ import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
+import { SelectorFecha } from './common/Calendario';
 import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas } from './common/NotasSeguimiento';
 import {
   UserPlus, Plus, X, Save, Search, Pencil, UserCheck, Eye,
@@ -232,8 +233,8 @@ export default function Prospectos() {
 
             <div>
               <label className={labelClass}>Fecha de nacimiento</label>
-              <input type="date" className={inputClass}
-                value={form.fechaNacimiento} onChange={e => setForm({ ...form, fechaNacimiento: e.target.value })} />
+              <SelectorFecha nacimiento placeholder="Ej. 15 de mayo de 1990"
+                valor={form.fechaNacimiento} onCambio={fechaNacimiento => setForm(f => ({ ...f, fechaNacimiento }))} />
             </div>
             <div>
               <label className={labelClass}>Ciudad</label>
