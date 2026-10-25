@@ -7,6 +7,7 @@ import { Users, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, Compass
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
 import { obtenerSesion } from '../utils/sesion';
 import { telefono } from '../utils/formato';
+import { SelectorFecha } from './common/Calendario';
 import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas } from './common/NotasSeguimiento';
 
 const EMPTY_FORM = {
@@ -168,8 +169,8 @@ export default function Clientes({ onGenerarReservacion }) {
 
           <div>
             <label className={labelClass}>Fecha de nacimiento</label>
-            <input type="date" className={inputClass}
-              value={form.fechaNacimiento} onChange={e => setForm({ ...form, fechaNacimiento: e.target.value })} />
+            <SelectorFecha nacimiento placeholder="Ej. 15 de mayo de 1990"
+              valor={form.fechaNacimiento} onCambio={fechaNacimiento => setForm(f => ({ ...f, fechaNacimiento }))} />
           </div>
           <div>
             <label className={labelClass}>Ciudad</label>

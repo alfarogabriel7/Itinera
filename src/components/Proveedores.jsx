@@ -182,7 +182,7 @@ export default function Proveedores() {
                 <tr key={p._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{p.nombreProveedor}</td>
                   <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(p.telefono1)}</td>
-                  <td className="p-3 text-slate-600 font-mono text-xs whitespace-nowrap">{cuentaBancaria(p.numeroCuenta1)}</td>
+                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{cuentaBancaria(p.numeroCuenta1)}</td>
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                       {p.estatus}
