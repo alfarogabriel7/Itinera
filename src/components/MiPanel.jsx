@@ -33,7 +33,7 @@ function Tarjeta({ icono: Icono, titulo, valor, children, acento = 'text-brand-p
 // De quién es el seguimiento: un prospecto (o uno que ya se convirtió) o un cliente.
 function EtiquetaTipo({ accion }) {
   const [texto, clase] = accion.tipo === 'cliente'
-    ? ['cliente', 'bg-brand-petroleo/10 text-brand-noche']
+    ? ['cliente', 'bg-emerald-100 text-emerald-700']
     : accion.esCliente ? ['ya es cliente', 'bg-brand-petroleo/5 text-brand-noche'] : ['prospecto', 'bg-brand-coral/10 text-brand-coral'];
   return <span className={`ml-1 rounded px-1 text-2xs font-semibold ${clase}`}>{texto}</span>;
 }
