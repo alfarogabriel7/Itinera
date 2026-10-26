@@ -123,7 +123,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
       <input ref={inputArchivoFila} type="file" accept={TIPOS_COMPROBANTE} className="hidden" onChange={handleArchivoFila} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-sky-50 border border-sky-200 p-4 rounded-xl text-sm">
-        <div><span className="text-slate-500">Total a pagar a proveedores:</span> <div className="font-bold text-slate-800">{dinero(estado.totales.total)} MXN</div></div>
+        <div><span className="text-slate-500">Total a pagar a proveedores:</span> <div className="font-bold text-slate-800">{dinero(estado.totales.total)} {estado.moneda || 'MXN'}</div></div>
         <div><span className="text-slate-500">Pagado a la fecha:</span> <div className="font-semibold text-emerald-700">{dinero(estado.totales.pagado)}</div></div>
         <div>
           <span className="text-slate-500">Saldo con proveedores:</span>

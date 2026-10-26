@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { Reservacion, Pago, Agente, Cliente } from '../../database/index.js';
 import { bloquearSuperAdmin } from '../middleware/tenant.js';
+import { MONEDAS, MONEDA_PREDETERMINADA, monedaDe, filtroMoneda } from '../../database/catalogos/monedas.js';
 
 const router = Router();
 
@@ -61,17 +62,18 @@ async function ventasEnRango(filtro, [desde, hasta]) {
   return { ventas: aCentavos(r?.ventas), reservaciones: r?.reservaciones || 0 };
 }
 
-async function ventasPorAgente(empresa, [desde, hasta]) {
+async function ventasPorAgente(empresa, [desde, hasta], moneda = MONEDA_PREDETERMINADA) {
   const filas = await Reservacion.aggregate([
-    { $match: { empresa, ...VENTA_VALIDA, createdAt: { $gte: desde, $lt: hasta } } },
+    { $match: { empresa, ...VENTA_VALIDA, ...filtroMoneda(moneda), createdAt: { $gte: desde, $lt: hasta } } },
     { $group: { _id: '$agente', ventas: { $sum: '$montoTotal' }, reservaciones: { $sum: 1 } } },
   ]);
   return new Map(filas.map((f) => [String(f._id), f]));
 }
 
-// GET /api/dashboard/admin?periodo=mes|12m|anio|24m
+// GET /api/dashboard/admin?periodo=mes|12m|anio|24m&moneda=MXN|USD
 // Tablero ejecutivo del Administrador: ventas mensuales de 24 meses, indicadores
-// y ranking de agentes del periodo elegido. Solo ve su propia empresa.
+// y ranking de agentes del periodo elegido. Solo ve su propia empresa. Todo se
+// calcula en la moneda elegida (por defecto MXN): pesos y dólares no se suman.
 router.get('/admin', async (req, res, next) => {
   try {
     if (req.agente.rol !== 'Administrador') {
@@ -80,11 +82,14 @@ router.get('/admin', async (req, res, next) => {
     const empresa = new mongoose.Types.ObjectId(String(req.agente.empresa));
     const cal = calendario();
     const desde24 = cal.inicioMes(23);
+    const moneda = monedaDe(req.query.moneda);
+    const otraMoneda = MONEDAS.find((m) => m !== moneda);
+    const fm = filtroMoneda(moneda);
 
     // --- Serie mensual de 24 meses (ventas, reservaciones y cobrado) ---
     const [ventasMes, cobradoMes] = await Promise.all([
       Reservacion.aggregate([
-        { $match: { empresa, ...VENTA_VALIDA, createdAt: { $gte: desde24 } } },
+        { $match: { empresa, ...VENTA_VALIDA, ...fm, createdAt: { $gte: desde24 } } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m', date: '$createdAt', timezone: ZONA } },
@@ -94,7 +99,7 @@ router.get('/admin', async (req, res, next) => {
         },
       ]),
       Pago.aggregate([
-        { $match: { empresa, ...PAGO_APLICADO, fecha: { $gte: desde24 } } },
+        { $match: { empresa, ...PAGO_APLICADO, ...fm, fecha: { $gte: desde24 } } },
         { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$fecha', timezone: ZONA } }, cobrado: { $sum: '$monto' } } },
       ]),
     ]);
@@ -113,7 +118,7 @@ router.get('/admin', async (req, res, next) => {
     }
 
     // --- Indicadores ---
-    const filtroEmpresa = { empresa };
+    const filtroEmpresa = { empresa, ...fm };
     const r12 = rangos('12m', cal);
     const rMes = rangos('mes', cal);
     const [mesActual, mesPrevio, doce, docePrevio] = await Promise.all([
@@ -125,7 +130,7 @@ router.get('/admin', async (req, res, next) => {
 
     // Saldo de las reservaciones activas, calculado en la base (sin cargarlas a memoria).
     const [cartera] = await Reservacion.aggregate([
-      { $match: { empresa, estatus: 'Activa' } },
+      { $match: { empresa, estatus: 'Activa', ...fm } },
       {
         $lookup: {
           from: Pago.collection.name,
@@ -148,10 +153,12 @@ router.get('/admin', async (req, res, next) => {
     // --- Ranking de agentes ---
     const periodo = ['mes', '12m', 'anio', '24m'].includes(req.query.periodo) ? req.query.periodo : 'mes';
     const r = rangos(periodo, cal);
-    const [actual, previo, agentes] = await Promise.all([
-      ventasPorAgente(empresa, r.actual),
-      r.previo ? ventasPorAgente(empresa, r.previo) : new Map(),
+    const [actual, previo, enOtraMoneda, agentes, ventasEnUSD] = await Promise.all([
+      ventasPorAgente(empresa, r.actual, moneda),
+      r.previo ? ventasPorAgente(empresa, r.previo, moneda) : new Map(),
+      ventasPorAgente(empresa, r.actual, otraMoneda),
       Agente.find({ empresa }).select('nombre rol estatus'),
+      Reservacion.exists({ empresa, ...VENTA_VALIDA, moneda: 'USD' }),
     ]);
     const totalPeriodo = [...actual.values()].reduce((acc, f) => acc + f.ventas, 0);
     const ranking = agentes
@@ -169,15 +176,21 @@ router.get('/admin', async (req, res, next) => {
           ticketPromedio: reservaciones ? aCentavos(ventas / reservaciones) : 0,
           participacion: totalPeriodo ? Math.round((ventas / totalPeriodo) * 1000) / 10 : 0,
           ventasPrevio: r.previo ? aCentavos(previo.get(String(a._id))?.ventas) : null,
+          // Informativo: lo que vendió en la otra moneda en el mismo periodo.
+          ventasOtraMoneda: aCentavos(enOtraMoneda.get(String(a._id))?.ventas),
         };
       })
       // Los dados de baja solo aparecen si vendieron algo en el periodo.
-      .filter((a) => a.estatus === 'Activo' || a.ventas > 0)
+      .filter((a) => a.estatus === 'Activo' || a.ventas > 0 || a.ventasOtraMoneda > 0)
       .sort((a, b) => b.ventas - a.ventas || a.nombre.localeCompare(b.nombre, 'es'));
 
     res.json({
       generado: cal.ahora,
       diaDelMes: cal.dia,
+      moneda,
+      otraMoneda,
+      // Monedas con ventas en la empresa: el selector solo se muestra si hay más de una.
+      monedas: ventasEnUSD ? MONEDAS : [MONEDA_PREDETERMINADA],
       meses,
       indicadores: {
         mesALaFecha: { ...mesActual, ventasPrevio: mesPrevio.ventas },
@@ -201,15 +214,17 @@ router.get('/resumen', async (req, res, next) => {
     if (bloquearSuperAdmin(req, res, 'El rol superAdmin no tiene resumen de empresa.')) return;
     const empresa = new mongoose.Types.ObjectId(String(req.agente.empresa));
     const cal = calendario();
-    const [clientesRegistrados, reservacionesActivas, [pagos]] = await Promise.all([
+    const [clientesRegistrados, reservacionesActivas, pagos] = await Promise.all([
       Cliente.countDocuments({ empresa, estatus: 'Activo' }),
       Reservacion.countDocuments({ empresa, estatus: 'Activa' }),
       Pago.aggregate([
         { $match: { empresa, ...PAGO_APLICADO, fecha: { $gte: cal.inicioMes(0) } } },
-        { $group: { _id: null, total: { $sum: '$monto' } } },
+        { $group: { _id: { $ifNull: ['$moneda', MONEDA_PREDETERMINADA] }, total: { $sum: '$monto' } } },
       ]),
     ]);
-    res.json({ clientesRegistrados, reservacionesActivas, pagosDelMes: aCentavos(pagos?.total) });
+    const porMoneda = Object.fromEntries(pagos.map((p) => [p._id, aCentavos(p.total)]));
+    // pagosDelMes en MXN (como siempre) y aparte lo cobrado en dólares.
+    res.json({ clientesRegistrados, reservacionesActivas, pagosDelMes: porMoneda.MXN || 0, pagosDelMesUSD: porMoneda.USD || 0 });
   } catch (err) {
     next(err);
   }
@@ -226,9 +241,12 @@ router.get('/agente', async (req, res, next) => {
     const cal = calendario();
     const r = rangos('mes', cal);
 
-    const [porAgente, previo] = await Promise.all([
+    // Ventas y lugar en el ranking en pesos; lo vendido en dólares, aparte.
+    const yoId = new mongoose.Types.ObjectId(yo);
+    const [porAgente, previo, enUSD] = await Promise.all([
       ventasPorAgente(empresa, r.actual),
-      ventasEnRango({ empresa, agente: new mongoose.Types.ObjectId(yo) }, r.previo),
+      ventasEnRango({ empresa, agente: yoId, ...filtroMoneda(MONEDA_PREDETERMINADA) }, r.previo),
+      ventasEnRango({ empresa, agente: yoId, ...filtroMoneda('USD') }, r.actual),
     ]);
     const mio = porAgente.get(yo);
     const ordenados = [...porAgente.entries()].sort((a, b) => b[1].ventas - a[1].ventas);
@@ -239,6 +257,8 @@ router.get('/agente', async (req, res, next) => {
         ventas: aCentavos(mio?.ventas),
         reservaciones: mio?.reservaciones || 0,
         ventasPrevio: previo.ventas,
+        ventasUSD: enUSD.ventas,
+        reservacionesUSD: enUSD.reservaciones,
       },
       lugarEnElMes: lugar,
       agentesConVentas: ordenados.length,

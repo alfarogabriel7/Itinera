@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { campoMoneda } from '../catalogos/monedas.js';
 
 const { Schema } = mongoose;
 
@@ -40,6 +41,9 @@ const ReservacionSchema = new Schema(
     descripcion: { type: String, trim: true, maxlength: 500 },
     // Monto total cobrado al cliente por la reservación (precio de venta, no el costo con proveedores).
     montoTotal: { type: Number, required: true, min: 0 },
+    // Moneda de la reservación: aplica al monto total, a los abonos del cliente y
+    // a los pagos a proveedores de esta reservación.
+    moneda: campoMoneda(),
     // Notas o pendientes que deja el agente sobre la reservación.
     notas: { type: String, trim: true, maxlength: 1000 },
     detalleReservacion: { type: [DetalleReservacionSchema], default: [] },

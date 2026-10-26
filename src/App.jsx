@@ -13,6 +13,7 @@ import Login from './components/Login';
 import { authApi, dashboardApi, empresasApi, setUnauthorizedHandler } from './api';
 import { obtenerSesion } from './utils/sesion';
 import { TEMA_PREDETERMINADO } from '../database/catalogos/temas.js';
+import MasUSD from './components/common/MasUSD';
 import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
@@ -365,6 +366,7 @@ export default function App() {
                     <div className="text-lg font-bold text-slate-800">
                       ${resumen.pagosDelMes.toLocaleString('es-MX', { maximumFractionDigits: 0 })} MXN
                     </div>
+                    <MasUSD monto={resumen.pagosDelMesUSD} />
                   </div>
                 </div>
                 </>)}

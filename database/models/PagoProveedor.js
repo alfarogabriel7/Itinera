@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { campoMoneda } from '../catalogos/monedas.js';
 
 const { Schema } = mongoose;
 
@@ -14,6 +15,8 @@ const PagoProveedorSchema = new Schema(
     idDetalle: { type: Schema.Types.ObjectId, required: true },
     idProveedor: { type: Schema.Types.ObjectId, ref: 'Proveedor', required: true },
     monto: { type: Number, required: true, min: 0.01 },
+    // Copiada de la reservación al registrar el pago (para totales por moneda).
+    moneda: campoMoneda(),
     formaPago: {
       type: String,
       enum: ['Efectivo', 'Tarjeta de Crédito', 'Tarjeta de Débito', 'Transferencia'],
