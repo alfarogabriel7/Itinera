@@ -9,7 +9,7 @@ import { Compass, Plus, Send, Search, Eye, X } from 'lucide-react';
 import { fechaViaje, dinero } from '../utils/formato';
 import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
 
-const MAESTRO_VACIO = { idCliente: '', clienteNombre: '', fechaEntrada: '', fechaSalida: '', destino: '', descripcion: '', montoTotal: '', notas: '' };
+const MAESTRO_VACIO = { idCliente: '', clienteNombre: '', fechaEntrada: '', fechaSalida: '', destino: '', descripcion: '', montoTotal: '', moneda: 'MXN', notas: '' };
 
 // Catálogos con búsqueda en el servidor (pueden tener miles de registros).
 const buscarClientes = (q) => clientesApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
@@ -130,7 +130,7 @@ export default function Reservaciones({ clienteInicial = null }) {
       `Destino: ${r.destino}\nCliente: ${r.idCliente?.nombreCompleto || ''}\nAgente: ${r.agente?.nombre || ''}\n` +
       `Entrada: ${fechaViaje(r.fechaEntrada)}  Salida: ${fechaViaje(r.fechaSalida)}\n` +
       `Descripción: ${r.descripcion || '—'}\nNotas: ${r.notas || '—'}\n\nServicios:\n${servicios || '—'}\n\n` +
-      `Monto Total de la Reservación: ${dinero(r.montoTotal)}\nCosto con Proveedores: ${dinero(r.totalViaje)}`
+      `Monto Total de la Reservación: ${dinero(r.montoTotal)} ${r.moneda || 'MXN'}\nCosto con Proveedores: ${dinero(r.totalViaje)} ${r.moneda || 'MXN'}`
     );
   };
 
@@ -161,18 +161,34 @@ export default function Reservaciones({ clienteInicial = null }) {
               <SelectorRangoFechas required desde={maestro.fechaEntrada} hasta={maestro.fechaSalida}
                 onCambio={(fechaEntrada, fechaSalida) => setMaestro(m => ({ ...m, fechaEntrada, fechaSalida }))} />
             </div>
-            <div className="md:col-span-3">
+            <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-600">Destino Turístico *</label>
               <input type="text" maxLength={100} required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="Ej. Cancún, México" value={maestro.destino} onChange={e => setMaestro({ ...maestro, destino: e.target.value })} />
+            </div>
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-bold text-slate-600">Monto Total *</label>
+                {/* Moneda de la reservación: aplica también a sus abonos y pagos a proveedores. */}
+                <div role="radiogroup" aria-label="Moneda" className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-2xs font-bold">
+                  {[['MXN', 'Pesos mexicanos'], ['USD', 'Dólares (USD)']].map(([clave, nombre]) => (
+                    <button key={clave} type="button" role="radio" aria-checked={maestro.moneda === clave} title={nombre}
+                      onClick={() => setMaestro(m => ({ ...m, moneda: clave }))}
+                      className={`rounded px-2 py-0.5 transition ${maestro.moneda === clave ? 'bg-brand-petroleo text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                      {clave}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="relative mt-1">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                <CampoMonto required min={0} className="w-full p-2.5 pl-6 pr-12 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
+                  valor={maestro.montoTotal} onCambio={montoTotal => setMaestro(m => ({ ...m, montoTotal }))} />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">{maestro.moneda}</span>
+              </div>
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Descripción del viaje</label>
               <textarea rows={2} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="Ej. Viaje familiar todo incluido, vuelo redondo + hotel" value={maestro.descripcion} onChange={e => setMaestro({ ...maestro, descripcion: e.target.value })} />
-            </div>
-            <div className="md:col-span-3">
-              <label className="block text-xs font-bold text-slate-600">Monto Total de la Reservación ($) *</label>
-              <CampoMonto required min={0} className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
-                valor={maestro.montoTotal} onCambio={montoTotal => setMaestro(m => ({ ...m, montoTotal }))} />
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600">Notas / Pendientes del agente</label>
@@ -313,7 +329,9 @@ export default function Reservaciones({ clienteInicial = null }) {
                   <td className="p-3 text-slate-600">{fechaViaje(r.fechaEntrada)}</td>
                   <td className="p-3 text-slate-600">{fechaViaje(r.fechaSalida)}</td>
                   <td className="p-3 text-slate-600">{r.agente?.nombre || '—'}</td>
-                  <td className="p-3 text-slate-600 font-mono text-xs">${r.totalViaje.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">
+                    {dinero(r.totalViaje)} <span className="text-2xs font-semibold text-slate-400">{r.moneda || 'MXN'}</span>
+                  </td>
                   <td className="p-3">
                     <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{r.estatus}</span>
                   </td>

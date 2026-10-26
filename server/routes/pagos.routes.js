@@ -116,7 +116,8 @@ router.get('/cobranza', async (req, res, next) => {
             { $match: conSaldo },
             {
               $group: {
-                _id: null,
+                // Montos por moneda (nunca se suman pesos con dólares).
+                _id: { $ifNull: ['$moneda', 'MXN'] },
                 porCobrar: { $sum: '$saldo' },
                 reservaciones: { $sum: 1 },
                 proximosMonto: { $sum: { $cond: [entre(hoy, en(30)), '$saldo', 0] } },
@@ -139,7 +140,10 @@ router.get('/cobranza', async (req, res, next) => {
       },
     ]);
 
-    const ind = resultado.indicadores[0] || {};
+    const indPor = Object.fromEntries(resultado.indicadores.map((i) => [i._id, i]));
+    const ind = indPor.MXN || {};
+    const usd = indPor.USD || {};
+    const cuenta = (campo) => (ind[campo] || 0) + (usd[campo] || 0);
     const filas = resultado.datos.map((r) => {
       const c = r.cliente[0];
       return {
@@ -150,6 +154,7 @@ router.get('/cobranza', async (req, res, next) => {
         fechaEntrada: r.fechaEntrada,
         fechaSalida: r.fechaSalida,
         total: aCentavos(r.montoTotal),
+        moneda: r.moneda || 'MXN',
         pagado: aCentavos(r.pagado),
         saldo: aCentavos(r.saldo),
         abonos: r.abonos,
@@ -159,11 +164,18 @@ router.get('/cobranza', async (req, res, next) => {
 
     res.json({
       ...sobre(filas, resultado.total[0]?.n || 0, p),
+      // Montos en MXN (los mismos campos de siempre) y, aparte, los de USD.
+      // Las cantidades de reservaciones cuentan ambas monedas.
       indicadores: {
         porCobrar: aCentavos(ind.porCobrar),
-        reservaciones: ind.reservaciones || 0,
-        proximos: { cantidad: ind.proximos || 0, monto: aCentavos(ind.proximosMonto) },
-        iniciados: { cantidad: ind.iniciados || 0, monto: aCentavos(ind.iniciadosMonto) },
+        reservaciones: cuenta('reservaciones'),
+        proximos: { cantidad: cuenta('proximos'), monto: aCentavos(ind.proximosMonto) },
+        iniciados: { cantidad: cuenta('iniciados'), monto: aCentavos(ind.iniciadosMonto) },
+        usd: {
+          porCobrar: aCentavos(usd.porCobrar),
+          proximos: aCentavos(usd.proximosMonto),
+          iniciados: aCentavos(usd.iniciadosMonto),
+        },
       },
     });
   } catch (err) {
@@ -201,6 +213,7 @@ router.get('/resumen/:idReservacion', async (req, res, next) => {
       estatusReservacion: reservacion.estatus,
       vendedor: reservacion.agente?.nombre || null,
       empresa,
+      moneda: reservacion.moneda || 'MXN',
       total,
       pagado,
       saldo,
@@ -258,6 +271,7 @@ router.post('/', async (req, res, next) => {
       pago = await Pago.create({
         idReservacion,
         monto,
+        moneda: reservacion.moneda || 'MXN',
         formaPago,
         referencia,
         empresa: reservacion.empresa,
@@ -270,7 +284,7 @@ router.post('/', async (req, res, next) => {
     }
     await registrarEvento({
       entidad: 'Pago', entidadId: pago._id, empresa: pago.empresa, evento: 'abono del cliente',
-      detalle: `$${monto.toFixed(2)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
+      detalle: `$${monto.toFixed(2)} ${pago.moneda} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
       usuario: usuarioDeLaSesion(req),
     });
     res.status(201).json(await pago.populate('agente', 'nombre userId'));

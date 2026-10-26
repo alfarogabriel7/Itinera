@@ -67,6 +67,7 @@ router.get('/reservacion/:idReservacion', async (req, res, next) => {
       idReservacion: reservacion._id,
       destino: reservacion.destino,
       estatusReservacion: reservacion.estatus,
+      moneda: reservacion.moneda || 'MXN',
       totales: { total: suma('total'), pagado: suma('pagado'), saldo: suma('saldo') },
       detalles,
       pagos,
@@ -140,6 +141,7 @@ router.post('/', async (req, res, next) => {
         idDetalle: detalle._id,
         idProveedor: detalle.idProveedor._id,
         monto,
+        moneda: reservacion.moneda || 'MXN',
         formaPago,
         referencia,
         agente: req.agente.id, // capturista

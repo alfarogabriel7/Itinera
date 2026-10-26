@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { dashboardApi, pagosApi, prospectosApi, clientesApi } from '../api';
 import { dinero, fechaViaje, variacion } from '../utils/formato';
 import { EtiquetaViaje, ligaWhatsApp } from './Cobranza';
+import MasUSD from './common/MasUSD';
 import {
   Sun, Sunset, Moon, TrendingUp, TrendingDown, Trophy, Wallet, ListTodo, CheckCircle2, Circle, Undo2,
   Phone, CreditCard, MessageCircle, ArrowRight, Plane,
@@ -18,13 +19,16 @@ function saludo() {
 const diasDesde = (f) => Math.max(0, Math.floor((Date.now() - new Date(f).getTime()) / 86_400_000));
 const haceTexto = (dias) => (dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`);
 
-function Tarjeta({ icono: Icono, titulo, valor, children, acento = 'text-brand-petroleo' }) {
+function Tarjeta({ icono: Icono, titulo, valor, usd, children, acento = 'text-brand-petroleo' }) {
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
         <Icono size={14} className={acento} /> {titulo}
       </div>
-      <div className="text-2xl font-bold text-slate-800">{valor}</div>
+      <div>
+        <div className="text-2xl font-bold text-slate-800">{valor}</div>
+        <MasUSD monto={usd} />
+      </div>
       <div className="text-xs text-slate-500">{children}</div>
     </div>
   );
@@ -122,7 +126,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
 
       {/* Indicadores */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Tarjeta icono={varMes !== null && varMes < 0 ? TrendingDown : TrendingUp} titulo="Mis ventas del mes" valor={mes ? dinero(mes.ventas) : '—'}>
+        <Tarjeta icono={varMes !== null && varMes < 0 ? TrendingDown : TrendingUp} titulo="Mis ventas del mes" valor={mes ? dinero(mes.ventas) : '—'} usd={mes?.ventasUSD}>
           {mes && (varMes === null
             ? `${mes.reservaciones} reservación(es) este mes`
             : <span className={varMes >= 0 ? 'font-semibold text-emerald-700' : 'font-semibold text-red-700'}>
@@ -134,7 +138,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
             ? `de ${resumen.agentesConVentas} vendedor(es) con ventas en el mes`
             : 'Registra tu primera venta del mes para entrar al ranking'}
         </Tarjeta>
-        <Tarjeta icono={Wallet} titulo="Por cobrar a mis clientes" valor={dinero(porCobrar)}>
+        <Tarjeta icono={Wallet} titulo="Por cobrar a mis clientes" valor={dinero(porCobrar)} usd={totalesCobranza.usd?.porCobrar}>
           {totalesCobranza.reservaciones} reservación(es) · {proximos30} viajan en 30 días o menos
         </Tarjeta>
         <Tarjeta icono={ListTodo} titulo="Seguimientos pendientes" valor={acciones.pendientes.length} acento="text-brand-coral">
@@ -241,7 +245,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
                   <div className="w-full sm:w-40">
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-400">{porcentaje}% pagado</span>
-                      <span className="font-mono font-bold text-red-600">{dinero(f.saldo)}</span>
+                      <span className="font-mono font-bold text-red-600">{dinero(f.saldo)}{f.moneda === 'USD' && ' USD'}</span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <div className="h-full rounded-full bg-emerald-500" style={{ width: `${porcentaje}%` }} />

@@ -52,6 +52,8 @@ function Tarjeta({ icono: Icono, titulo, valor, children }) {
 export default function Dashboard() {
   const [datos, setDatos] = useState(null);
   const [periodo, setPeriodo] = useState('mes');
+  // Moneda de todo el tablero: pesos y dólares nunca se suman entre sí.
+  const [moneda, setMoneda] = useState('MXN');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [vista, setVista] = useState('grafica');
@@ -62,7 +64,7 @@ export default function Dashboard() {
     (async () => {
       try {
         setCargando(true);
-        const d = await dashboardApi.admin(periodo);
+        const d = await dashboardApi.admin(periodo, moneda);
         if (!cancelado) { setDatos(d); setError(''); }
       } catch (err) {
         if (!cancelado) setError(err.message);
@@ -71,7 +73,7 @@ export default function Dashboard() {
       }
     })();
     return () => { cancelado = true; };
-  }, [periodo]);
+  }, [periodo, moneda]);
 
   if (!datos) {
     return (
@@ -95,8 +97,8 @@ export default function Dashboard() {
   return (
     // Al recargar por cambio de periodo se mantiene lo anterior atenuado (sin parpadeo).
     <div className={`flex flex-col gap-6 transition-opacity ${cargando ? 'opacity-60' : ''}`}>
-      <Encabezado generado={generado} />
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      <Encabezado generado={generado} monedas={datos.monedas} moneda={moneda} onMoneda={setMoneda} />
+      {error &&<div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Cifra principal + indicadores */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -107,7 +109,7 @@ export default function Dashboard() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-white/70">Ventas · últimos 12 meses</div>
               <div className="mt-3 text-5xl font-bold">{dineroCompacto(ind.ultimos12.ventas)}</div>
-              <div className="mt-1 text-sm text-white/70">{dinero(ind.ultimos12.ventas)} MXN · {ind.ultimos12.reservaciones} reservaciones</div>
+              <div className="mt-1 text-sm text-white/70">{dinero(ind.ultimos12.ventas)} {datos.moneda} · {ind.ultimos12.reservaciones} reservaciones</div>
               <div className="mt-4"><Delta valor={var12} sufijo="vs. los 12 meses anteriores" claro /></div>
             </div>
             {ind.mejorMes && (
@@ -238,6 +240,11 @@ export default function Dashboard() {
                         </div>
                         <span className="w-28 text-right font-semibold text-slate-800">{dinero(a.ventas)}</span>
                       </div>
+                      {a.ventasOtraMoneda > 0 && (
+                        <div className="mt-0.5 text-right text-xs text-slate-400" title={`Vendido en ${datos.otraMoneda} en el mismo periodo (no se suma)`}>
+                          + {dinero(a.ventasOtraMoneda)} {datos.otraMoneda}
+                        </div>
+                      )}
                     </td>
                     <td className="p-3 text-right text-slate-600">{a.participacion.toFixed(1)}%</td>
                     <td className="p-3 text-right text-slate-600">{a.reservaciones}</td>
@@ -256,7 +263,7 @@ export default function Dashboard() {
               <tfoot>
                 <tr className="border-t border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
                   <td className="p-3" colSpan={2}>Total del periodo</td>
-                  <td className="p-3 text-right">{dinero(ranking.total)}</td>
+                  <td className="p-3 text-right">{dinero(ranking.total)} <span className="text-xs text-slate-400">{datos.moneda}</span></td>
                   <td className="p-3 text-right">100%</td>
                   <td className="p-3 text-right">{ranking.agentes.reduce((acc, a) => acc + a.reservaciones, 0)}</td>
                   <td className="p-3" colSpan={periodoActual.previo ? 2 : 1} />
@@ -270,9 +277,11 @@ export default function Dashboard() {
   );
 }
 
-function Encabezado({ generado }) {
+const NOMBRE_MONEDA = { MXN: 'Pesos mexicanos', USD: 'Dólares (USD)' };
+
+function Encabezado({ generado, monedas = [], moneda, onMoneda }) {
   return (
-    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex items-center gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-petroleo text-white shadow-sm">
           <LayoutDashboard size={22} />
@@ -282,11 +291,25 @@ function Encabezado({ generado }) {
           <p className="text-sm text-slate-500">Cómo va el negocio: tendencia mensual, indicadores clave y desempeño del equipo.</p>
         </div>
       </div>
-      {generado && (
-        <p className="text-xs text-slate-400">
-          Actualizado {new Date(generado).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-        </p>
-      )}
+      <div className="flex flex-col items-start gap-1 sm:items-end">
+        {/* Solo si la empresa tiene ventas en más de una moneda. */}
+        {monedas.length > 1 && (
+          <div role="radiogroup" aria-label="Moneda del tablero" className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-sm">
+            {monedas.map((m) => (
+              <button key={m} role="radio" aria-checked={moneda === m} onClick={() => onMoneda(m)} title={NOMBRE_MONEDA[m]}
+                className={`rounded-md px-3 py-1.5 font-semibold ${moneda === m ? 'bg-brand-petroleo text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
+        {generado && (
+          <p className="text-xs text-slate-400">
+            {monedas.length > 1 && <>Cifras en {NOMBRE_MONEDA[moneda]?.toLowerCase()} · </>}
+            Actualizado {new Date(generado).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

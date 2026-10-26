@@ -197,7 +197,7 @@ export default function Pagos({ reservaInicial = '' }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm">
               <div><span className="text-slate-500">Cliente Asociado:</span> <div className="font-bold text-slate-800">{resumen.cliente}</div></div>
               <div><span className="text-slate-500">Destino del Viaje:</span> <div className="font-bold text-slate-800">{resumen.destino}</div><div className="text-xs text-slate-500">Vendió: {resumen.vendedor || '—'} · {resumen.estatusReservacion}</div></div>
-              <div><span className="text-slate-500">Total a Pagar por el Cliente:</span> <div className="font-bold text-slate-800">{dinero(resumen.total)} MXN</div></div>
+              <div><span className="text-slate-500">Total a Pagar por el Cliente:</span> <div className="font-bold text-slate-800">{dinero(resumen.total)} {resumen.moneda || 'MXN'}</div></div>
               <div className="md:col-span-3 border-t border-amber-200 my-1 pt-3 grid grid-cols-2 gap-4">
                 <div><span className="text-slate-500">Abonado a la Fecha:</span> <div className="font-semibold text-emerald-700">{dinero(resumen.pagado)}</div></div>
                 <div>

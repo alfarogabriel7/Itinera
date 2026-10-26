@@ -15,7 +15,7 @@ const POPULATE_AGENTE = 'agente';
 const POPULATE_PROVEEDOR = 'detalleReservacion.idProveedor';
 
 // Campos editables; empresa y agente (quien la vendió) nunca se reasignan desde aquí.
-const CAMPOS = ['idCliente', 'fechaEntrada', 'fechaSalida', 'destino', 'descripcion', 'montoTotal', 'notas', 'detalleReservacion', 'estatus'];
+const CAMPOS = ['idCliente', 'fechaEntrada', 'fechaSalida', 'destino', 'descripcion', 'montoTotal', 'moneda', 'notas', 'detalleReservacion', 'estatus'];
 
 // El cliente debe ser un cliente activo de la misma empresa. Cualquier agente
 // puede venderle (si el responsable no está, otro lo atiende); la venta queda
@@ -156,6 +156,17 @@ router.put('/:id', async (req, res, next) => {
       const abonado = await abonadoDe(reservacion._id);
       if (Number(cambios.montoTotal) < abonado) {
         throw errorHttp(400, `El monto total no puede ser menor a lo ya abonado por el cliente ($${abonado.toFixed(2)}).`);
+      }
+    }
+
+    // La moneda no cambia si ya hay movimientos: quedarían abonos o pagos en otra moneda.
+    if (cambios.moneda !== undefined && cambios.moneda !== (reservacion.moneda || 'MXN')) {
+      const [conAbonos, conPagosProveedor] = await Promise.all([
+        Pago.exists({ idReservacion: reservacion._id }),
+        PagoProveedor.exists({ idReservacion: reservacion._id }),
+      ]);
+      if (conAbonos || conPagosProveedor) {
+        throw errorHttp(409, 'No se puede cambiar la moneda: la reservación ya tiene abonos o pagos a proveedores registrados.');
       }
     }
 

@@ -65,13 +65,19 @@ function enteroALetras(n) {
 }
 
 // 25660.5 -> "Veinticinco mil seiscientos sesenta pesos 50/100 M.N."
-export function montoEnLetra(monto) {
+// 25660.5, 'USD' -> "Veinticinco mil seiscientos sesenta dólares 50/100 USD"
+const MONEDAS = {
+  MXN: { singular: 'peso', plural: 'pesos', sufijo: 'M.N.' },
+  USD: { singular: 'dólar', plural: 'dólares', sufijo: 'USD' },
+};
+export function montoEnLetra(monto, moneda = 'MXN') {
+  const m = MONEDAS[moneda] || MONEDAS.MXN;
   const centavos = Math.round(Number(monto) * 100);
   const enteros = Math.floor(centavos / 100);
   const texto = apocopar(enteroALetras(enteros));
   // Millones exactos llevan "de": "un millón de pesos", pero "un millón cien pesos".
   const de = enteros >= 1_000_000 && enteros % 1_000_000 === 0 ? 'de ' : '';
-  const frase = `${texto} ${de}${enteros === 1 ? 'peso' : 'pesos'} ${String(centavos % 100).padStart(2, '0')}/100 M.N.`;
+  const frase = `${texto} ${de}${enteros === 1 ? m.singular : m.plural} ${String(centavos % 100).padStart(2, '0')}/100 ${m.sufijo}`;
   return frase.charAt(0).toUpperCase() + frase.slice(1);
 }
 
@@ -148,8 +154,8 @@ export async function imprimirRecibo(resumen, pago) {
 
   <div class="monto">
     <div>Recibimos de <strong>${escapar(resumen.cliente)}</strong> la cantidad de:</div>
-    <div class="cifra">${dinero(pago.monto)} MXN</div>
-    <div class="letra">(${escapar(montoEnLetra(pago.monto))})</div>
+    <div class="cifra">${dinero(pago.monto)} ${escapar(resumen.moneda || 'MXN')}</div>
+    <div class="letra">(${escapar(montoEnLetra(pago.monto, resumen.moneda))})</div>
   </div>
 
   <h2>Detalle del pago</h2>
@@ -167,9 +173,9 @@ export async function imprimirRecibo(resumen, pago) {
 
   <h2>Estado de cuenta</h2>
   <table class="totales">
-    <tr><td>Total del viaje</td><td>${dinero(resumen.total)}</td></tr>
-    <tr><td>Abonado a la fecha de este recibo</td><td>${dinero(pagadoAlMomento)}</td></tr>
-    <tr><td>Saldo pendiente</td><td class="saldo">${saldoDespues <= 0 ? 'Liquidado' : dinero(saldoDespues)}</td></tr>
+    <tr><td>Total del viaje</td><td>${dinero(resumen.total)} ${escapar(resumen.moneda || 'MXN')}</td></tr>
+    <tr><td>Abonado a la fecha de este recibo</td><td>${dinero(pagadoAlMomento)} ${escapar(resumen.moneda || 'MXN')}</td></tr>
+    <tr><td>Saldo pendiente</td><td class="saldo">${saldoDespues <= 0 ? 'Liquidado' : `${dinero(saldoDespues)} ${escapar(resumen.moneda || 'MXN')}`}</td></tr>
   </table>
 
   <footer>

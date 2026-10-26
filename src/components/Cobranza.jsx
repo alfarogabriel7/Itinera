@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { pagosApi, agentesApi } from '../api';
 import { dinero, fechaCorta, fechaViaje, diasHasta } from '../utils/formato';
 import PageHeader from './common/PageHeader';
+import MasUSD from './common/MasUSD';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Wallet, Search, AlarmClock, AlertTriangle, ListChecks, CreditCard, MessageCircle, Download } from 'lucide-react';
@@ -33,20 +34,20 @@ export function ligaWhatsApp(fila) {
   const numero = digitos.length === 10 ? `52${digitos}` : digitos;
   const mensaje =
     `Hola ${fila.cliente.nombre}, te escribimos para recordarte que tu viaje a ${fila.destino} ` +
-    `del ${fechaViaje(fila.fechaEntrada)} tiene un saldo pendiente de ${dinero(fila.saldo)} MXN. ` +
+    `del ${fechaViaje(fila.fechaEntrada)} tiene un saldo pendiente de ${dinero(fila.saldo)} ${fila.moneda || 'MXN'}. ` +
     '¡Quedamos atentos para cualquier duda!';
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 }
 
 function exportarCSV(filas, conAgente) {
   const encabezados = ['Cliente', 'Teléfono', 'Correo', 'Destino', 'Inicio del viaje', 'Fin del viaje', 'Días para viajar',
-    ...(conAgente ? ['Agente'] : []), 'Total', 'Pagado', 'Saldo', 'Abonos', 'Último abono'];
+    ...(conAgente ? ['Agente'] : []), 'Moneda', 'Total', 'Pagado', 'Saldo', 'Abonos', 'Último abono'];
   const celda = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lineas = filas.map(f => [
     f.cliente?.nombre, f.cliente?.telefono, f.cliente?.correo, f.destino,
     fechaViaje(f.fechaEntrada), fechaViaje(f.fechaSalida), diasHasta(f.fechaEntrada),
     ...(conAgente ? [f.agente] : []),
-    f.total.toFixed(2), f.pagado.toFixed(2), f.saldo.toFixed(2), f.abonos,
+    f.moneda || 'MXN', f.total.toFixed(2), f.pagado.toFixed(2), f.saldo.toFixed(2), f.abonos,
     f.ultimoAbono ? fechaCorta(f.ultimoAbono) : '',
   ].map(celda).join(','));
   // BOM para que Excel abra los acentos correctamente.
@@ -124,6 +125,7 @@ export default function Cobranza({ onAbonar }) {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"><Wallet size={14} /> Total por cobrar</div>
           <div className="mt-2 text-2xl font-bold text-slate-800">{dinero(indicadores.porCobrar)}</div>
+          <MasUSD monto={indicadores.usd?.porCobrar} className="text-slate-500" />
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"><ListChecks size={14} /> Reservaciones con saldo</div>
@@ -132,11 +134,13 @@ export default function Cobranza({ onAbonar }) {
         <button onClick={() => setUrgencia('30')} className="text-left bg-amber-50 rounded-2xl shadow-sm border border-amber-200 p-5 hover:brightness-95">
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 uppercase tracking-wider"><AlarmClock size={14} /> Viajan en 30 días o menos</div>
           <div className="mt-2 text-2xl font-bold text-amber-900">{dinero(indicadores.proximos.monto)}</div>
+          <MasUSD monto={indicadores.usd?.proximos} className="text-amber-800" />
           <div className="text-xs text-amber-800">{indicadores.proximos.cantidad} reservación(es)</div>
         </button>
         <button onClick={() => setUrgencia('iniciado')} className="text-left bg-red-50 rounded-2xl shadow-sm border border-red-200 p-5 hover:brightness-95">
           <div className="flex items-center gap-2 text-xs font-semibold text-red-700 uppercase tracking-wider"><AlertTriangle size={14} /> Ya viajaron sin liquidar</div>
           <div className="mt-2 text-2xl font-bold text-red-700">{dinero(indicadores.iniciados.monto)}</div>
+          <MasUSD monto={indicadores.usd?.iniciados} className="text-red-700" />
           <div className="text-xs text-red-700">{indicadores.iniciados.cantidad} reservación(es)</div>
         </button>
       </div>
@@ -202,7 +206,10 @@ export default function Cobranza({ onAbonar }) {
                     </td>
                     <td className="p-3 whitespace-nowrap"><EtiquetaViaje fila={f} /></td>
                     <td className="p-3 text-slate-600">{f.agente || '—'}</td>
-                    <td className="p-3 font-mono text-xs text-slate-600">{dinero(f.total)}</td>
+                    <td className="p-3 font-mono text-xs text-slate-600">
+                      {dinero(f.total)}
+                      {f.moneda === 'USD' && <span className="ml-1 rounded bg-sky-100 px-1 font-sans text-2xs font-bold text-sky-700">USD</span>}
+                    </td>
                     <td className="p-3 font-mono text-xs text-emerald-700">{dinero(f.pagado)}</td>
                     <td className="p-3">
                       {f.saldo > 0

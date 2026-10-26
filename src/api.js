@@ -114,7 +114,7 @@ export const empresasApi = {
 };
 
 export const dashboardApi = {
-  admin: (periodo) => request(`/dashboard/admin?periodo=${periodo}`),
+  admin: (periodo, moneda = 'MXN') => request(`/dashboard/admin?periodo=${periodo}&moneda=${moneda}`),
   agente: () => request('/dashboard/agente'),
   resumen: () => request('/dashboard/resumen'),
 };

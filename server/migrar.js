@@ -9,6 +9,7 @@
 //    ya no están declarados en los modelos (syncIndexes).
 // 0. Estatus de agentes: "Inactivo" → "Baja" (homologado con Empresas).
 //    Notas de clientes: de texto libre a lista de notas con acciones.
+//    Moneda: MXN explícito en reservaciones, abonos y pagos a proveedores anteriores.
 // 3. Saldos: recalcula en cada reservación el acumulado abonado por el cliente
 //    y lo pagado a cada proveedor, a partir de los pagos aplicados (necesario
 //    para la aplicación atómica de pagos; también sirve para reconciliar).
@@ -69,6 +70,25 @@ async function convertirNotasDeClientes() {
   console.log(`Notas de clientes convertidas al nuevo formato: ${conTexto.length}.`);
 }
 
+// Moneda explícita en reservaciones, abonos y pagos a proveedores anteriores a
+// este campo (todos eran en pesos). Abonos y pagos toman la de su reservación.
+async function asignarMonedas() {
+  const r = await Reservacion.collection.updateMany({ moneda: { $exists: false } }, { $set: { moneda: 'MXN' } });
+  let pagos = 0;
+  for (const Modelo of [Pago, PagoProveedor]) {
+    const sinMoneda = await Modelo.collection.distinct('idReservacion', { moneda: { $exists: false } });
+    for (const idReservacion of sinMoneda) {
+      const reservacion = await Reservacion.collection.findOne({ _id: idReservacion }, { projection: { moneda: 1 } });
+      const u = await Modelo.collection.updateMany(
+        { idReservacion, moneda: { $exists: false } },
+        { $set: { moneda: reservacion?.moneda || 'MXN' } }
+      );
+      pagos += u.modifiedCount;
+    }
+  }
+  console.log(`Moneda asignada: ${r.modifiedCount} reservación(es) y ${pagos} pago(s).`);
+}
+
 async function sincronizarIndices() {
   for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin]) {
     const eliminados = await Modelo.syncIndexes();
@@ -80,6 +100,7 @@ try {
   await connectDB();
   await homologarEstatusAgentes();
   await convertirNotasDeClientes();
+  await asignarMonedas();
   await asignarAgenteAClientes();
   await sincronizarIndices();
   console.log(`Saldos recalculados en ${await recalcularSaldos()} reservación(es).`);
