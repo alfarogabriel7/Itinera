@@ -12,7 +12,7 @@ import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas }
 
 const EMPTY_FORM = {
   _id: null, nombreCompleto: '', correo: '', telefono: '',
-  direccion: '', fechaNacimiento: '', ciudad: '', pais: 'México', estatus: 'Activo', agente: '',
+  direccion: '', fechaNacimiento: '', ciudad: '', observaciones: '', pais: 'México', estatus: 'Activo', agente: '',
 };
 
 const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
@@ -108,6 +108,7 @@ export default function Clientes({ onGenerarReservacion }) {
   const handleVer = (cliente) => {
     alert(
       `${cliente.nombreCompleto} (${cliente.estatus})\n${cliente.correo || ''}\n${cliente.telefono}\n${cliente.direccion || ''}, ${cliente.ciudad || ''}, ${cliente.pais}\n\n` +
+      `Observaciones / datos de interés:\n${cliente.observaciones || '—'}\n\n` +
       `Seguimiento:\n${resumenNotas(cliente.notas) || 'Sin notas registradas.'}`
     );
   };
@@ -215,6 +216,14 @@ export default function Clientes({ onGenerarReservacion }) {
           )}
 
           <div className="md:col-span-2">
+            <label className={labelClass}>Observaciones / datos de interés <span className="font-normal text-slate-400">(para ofrecerle promociones con anticipación)</span></label>
+            <textarea rows={3} maxLength={1000} className={inputClass}
+              placeholder={'Ej. "Viaja en agosto, 5 habitaciones dobles" o "Viaja en pareja en septiembre"'}
+              value={form.observaciones} onChange={e => setForm({ ...form, observaciones: e.target.value })} />
+            <div className="mt-1 text-right text-2xs text-slate-400">{(form.observaciones || '').length}/1000</div>
+          </div>
+
+          <div className="md:col-span-2">
             <NotasSeguimiento notas={notas} onChange={setNotas} vacio="No hay notas agregadas a este cliente." />
           </div>
 
@@ -239,7 +248,7 @@ export default function Clientes({ onGenerarReservacion }) {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
-              <input type="text" placeholder="Buscar nombre, correo, teléfono..." value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
+              <input type="text" placeholder="Buscar nombre, teléfono u observaciones..." title="Busca en nombre, correo, teléfono, ciudad y observaciones (p.ej. «agosto»)" value={listado.busqueda} onChange={e => listado.setBusqueda(e.target.value)}
                 className="w-full sm:w-64 pl-3 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo" />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>

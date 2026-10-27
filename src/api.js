@@ -81,6 +81,7 @@ export const reservacionesApi = {
   list: (params) => request(conParametros('/reservaciones', params)),
   get: (id) => request(`/reservaciones/${id}`),
   create: (data) => request('/reservaciones', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/reservaciones/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 export const pagosApi = {

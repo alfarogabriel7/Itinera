@@ -72,7 +72,8 @@ async function sembrarHistorico({ empresa, agentes, clientes, proveedores }) {
             claveReservacion: `HIS-${reservaciones.length + 1}`,
             montoReservacion: Math.round(montoTotal * 0.82),
             porcentajeReservacion: 10,
-            montoComisionable: Math.round(montoTotal * 0.82),
+            // Monto comisionable = la comisión (monto base × %).
+            montoComisionable: Math.round(Math.round(montoTotal * 0.82) * 10) / 100,
           },
         ],
       });
@@ -225,8 +226,8 @@ async function seed() {
     montoTotal: 39900,
     notas: 'Cliente pidió habitación con vista al mar; confirmar con el hotel una semana antes.',
     detalleReservacion: [
-      { idProveedor: proveedores[0]._id, claveReservacion: 'AMX-9921X', montoReservacion: 10000, porcentajeReservacion: 16, montoComisionable: 8400 },
-      { idProveedor: proveedores[1]._id, claveReservacion: 'HIL-CUN-44', montoReservacion: 25000, porcentajeReservacion: 0, montoComisionable: 25000 },
+      { idProveedor: proveedores[0]._id, claveReservacion: 'AMX-9921X', montoReservacion: 10000, porcentajeReservacion: 16, montoComisionable: 1600 },
+      { idProveedor: proveedores[1]._id, claveReservacion: 'HIL-CUN-44', montoReservacion: 25000, porcentajeReservacion: 0, montoComisionable: 0 },
     ],
   });
 
