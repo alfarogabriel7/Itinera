@@ -10,6 +10,7 @@
 // 0. Estatus de agentes: "Inactivo" → "Baja" (homologado con Empresas).
 //    Notas de clientes: de texto libre a lista de notas con acciones.
 //    Moneda: MXN explícito en reservaciones, abonos y pagos a proveedores anteriores.
+//    Monto comisionable: en servicios del modo automático, de neto a comisión.
 // 3. Saldos: recalcula en cada reservación el acumulado abonado por el cliente
 //    y lo pagado a cada proveedor, a partir de los pagos aplicados (necesario
 //    para la aplicación atómica de pagos; también sirve para reconciliar).
@@ -89,6 +90,34 @@ async function asignarMonedas() {
   console.log(`Moneda asignada: ${r.modifiedCount} reservación(es) y ${pagos} pago(s).`);
 }
 
+// En modo automático (% de comisión) el formulario guardaba en montoComisionable
+// el neto al proveedor en lugar de la comisión. Se corrige a monto base - total.
+// Un % mayor a 0 indica modo automático (el manual deja el % en 0); con 0 % solo
+// se corrige el caso automático (comisionable = total = monto base → comisión 0).
+// Los servicios del modo manual ya guardan la comisión y no se tocan.
+async function corregirMontoComisionable() {
+  const igual = (a, b) => Math.abs(Number(a) - Number(b)) < 0.005;
+  const reservaciones = await Reservacion.collection
+    .find({ 'detalleReservacion.0': { $exists: true } }, { projection: { detalleReservacion: 1 } })
+    .toArray();
+  let corregidos = 0;
+  for (const r of reservaciones) {
+    for (const d of r.detalleReservacion) {
+      const { montoReservacion: monto, porcentajeReservacion: pct = 0, montoComisionable: com, totalReservacion: total } = d;
+      const comision = Math.round((monto - total) * 100) / 100;
+      const automaticoAnterior = monto > 0 && (pct > 0 ? !igual(com, comision) : igual(com, total) && igual(total, monto));
+      if (!automaticoAnterior) continue;
+      await Reservacion.collection.updateOne(
+        { _id: r._id },
+        { $set: { 'detalleReservacion.$[d].montoComisionable': comision } },
+        { arrayFilters: [{ 'd._id': d._id }] }
+      );
+      corregidos++;
+    }
+  }
+  console.log(`Monto comisionable corregido (modo automático) en ${corregidos} servicio(s).`);
+}
+
 async function sincronizarIndices() {
   for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin]) {
     const eliminados = await Modelo.syncIndexes();
@@ -101,6 +130,7 @@ try {
   await homologarEstatusAgentes();
   await convertirNotasDeClientes();
   await asignarMonedas();
+  await corregirMontoComisionable();
   await asignarAgenteAClientes();
   await sincronizarIndices();
   console.log(`Saldos recalculados en ${await recalcularSaldos()} reservación(es).`);

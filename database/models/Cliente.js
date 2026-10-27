@@ -23,6 +23,9 @@ const ClienteSchema = new mongoose.Schema(
     direccion: { type: String, trim: true },
     fechaNacimiento: { type: Date },
     ciudad: { type: String, trim: true },
+    // Datos de interés del cliente para ofrecerle promociones con anticipación
+    // (p.ej. "Viaja en agosto, 5 habitaciones dobles"). Se puede buscar desde el listado.
+    observaciones: { type: String, trim: true, maxlength: 1000 },
     // Notas de seguimiento con acciones (mismo esquema que Prospecto). Antes era
     // un texto libre; `npm run migrar` convierte ese texto en la primera nota.
     notas: { type: [NotaSeguimientoSchema], default: [] },

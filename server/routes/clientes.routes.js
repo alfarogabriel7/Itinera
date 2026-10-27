@@ -13,7 +13,7 @@ const router = Router();
 router.use(sinSuperAdmin('El rol superAdmin no puede consultar ni gestionar clientes de las empresas.'));
 
 // Campos que se aceptan del formulario; empresa y agente nunca se toman tal cual del body.
-const CAMPOS = ['nombreCompleto', 'tipoDocumento', 'numeroDocumento', 'correo', 'telefono', 'direccion', 'fechaNacimiento', 'ciudad', 'notas', 'pais', 'estatus'];
+const CAMPOS = ['nombreCompleto', 'tipoDocumento', 'numeroDocumento', 'correo', 'telefono', 'direccion', 'fechaNacimiento', 'ciudad', 'observaciones', 'notas', 'pais', 'estatus'];
 const POPULATE_AGENTE = ['agente', 'nombre userId'];
 
 // Agente responsable: un Agente siempre queda como responsable de lo que da de
@@ -32,7 +32,8 @@ router.get('/', async (req, res, next) => {
   try {
     const regex = regexBusqueda(req.query.q);
     const filtroBase = { ...filtroPorAgente(req) };
-    if (regex) filtroBase.$or = [{ nombreCompleto: regex }, { correo: regex }, { ciudad: regex }, { telefono: regex }];
+    // También busca en las observaciones (p.ej. "agosto" para armar una promoción).
+    if (regex) filtroBase.$or = [{ nombreCompleto: regex }, { correo: regex }, { ciudad: regex }, { telefono: regex }, { observaciones: regex }];
     if (req.query.estatus) filtroBase.estatus = String(req.query.estatus);
     const orden = ordenDe(req, { nombre: { nombreCompleto: 1 } }, { createdAt: -1 });
     res.json(await paginar(Cliente, alcanceEmpresa(req, filtroBase), req, { orden, populate: [POPULATE_AGENTE] }));

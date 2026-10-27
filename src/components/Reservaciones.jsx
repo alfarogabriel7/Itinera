@@ -3,9 +3,10 @@ import { clientesApi, proveedoresApi, reservacionesApi, agentesApi } from '../ap
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import SelectorRemoto from './common/SelectorRemoto';
-import { SelectorRangoFechas } from './common/Calendario';
+import { SelectorRangoFechas, aFecha, aTexto } from './common/Calendario';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
-import { Compass, Plus, Send, Search, Eye, X } from 'lucide-react';
+import { obtenerSesion } from '../utils/sesion';
+import { Compass, Plus, Send, Search, Eye, X, Pencil, Save } from 'lucide-react';
 import { fechaViaje, dinero } from '../utils/formato';
 import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
 
@@ -17,16 +18,32 @@ const buscarProveedores = (q) => proveedoresApi.list({ q, estatus: 'Activo', ord
 
 // clienteInicial ({ id, nombre }): cliente precargado al llegar desde Clientes ("Generar reservación").
 export default function Reservaciones({ clienteInicial = null }) {
+  const sesion = obtenerSesion();
   const [guardando, setGuardando] = useState(false);
 
   const [maestro, setMaestro] = useState(MAESTRO_VACIO);
+  const [detalles, setDetalles] = useState([]);
+  // Reservación que se está editando (null = captura nueva).
+  const [editando, setEditando] = useState(null);
+
+  // Editar: solo el agente que registró la reservación o el Administrador (lo
+  // valida también el servidor), y solo mientras esté activa.
+  const puedeEditar = (r) => r.estatus === 'Activa'
+    && (sesion?.rol === 'Administrador' || String(r.agente?._id || r.agente) === String(sesion?.id));
+
+  const limpiarFormulario = () => {
+    setMaestro(MAESTRO_VACIO);
+    setDetalles([]);
+    setEditando(null);
+  };
 
   useEffect(() => {
     if (!clienteInicial) return;
-    setMaestro(m => ({ ...m, idCliente: clienteInicial.id, clienteNombre: clienteInicial.nombre }));
+    setEditando(null);
+    setDetalles([]);
+    setMaestro({ ...MAESTRO_VACIO, idCliente: clienteInicial.id, clienteNombre: clienteInicial.nombre });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [clienteInicial]);
-  const [detalles, setDetalles] = useState([]);
 
   const [agentes, setAgentes] = useState([]);
   useEffect(() => {
@@ -84,12 +101,12 @@ export default function Reservaciones({ clienteInicial = null }) {
       const comisionable = parseFloat(fila.montoComisionable) || 0;
       fila.totalReservacion = monto - comisionable;
     } else {
-      // Automático: se sigue usando la fórmula existente (monto - % de comisión),
-      // y el monto comisionable queda igual al calculado (no editable).
+      // Automático: el monto comisionable es la comisión (monto × %), igual que
+      // en manual, y el total al proveedor es monto - comisión.
       const porcentaje = parseFloat(fila.porcentajeReservacion) || 0;
-      const calculado = monto - (monto * porcentaje) / 100;
-      fila.totalReservacion = calculado;
-      fila.montoComisionable = calculado;
+      const comision = Math.round(monto * porcentaje) / 100;
+      fila.montoComisionable = comision;
+      fila.totalReservacion = monto - comision;
     }
 
     nuevosDetalles[index] = fila;
@@ -105,21 +122,53 @@ export default function Reservaciones({ clienteInicial = null }) {
     setGuardando(true);
     try {
       const { clienteNombre, ...datosMaestro } = maestro;
-      await reservacionesApi.create({
+      const datos = {
         ...datosMaestro,
         // Se manda totalReservacion ya calculado: en modo manual sale de
         // monto base - monto comisionable, una fórmula que el backend no conoce.
+        // Los servicios existentes llevan su _id: así conservan sus pagos al proveedor.
         detalleReservacion: detalles.map(({ key, manual, proveedorNombre, ...d }) => d),
-      });
-      setMaestro(MAESTRO_VACIO);
-      setDetalles([]);
+      };
+      if (editando) await reservacionesApi.update(editando.id, datos);
+      else await reservacionesApi.create(datos);
+      limpiarFormulario();
       await cargarReservaciones();
-      alert('Se guardaron correctamente los datos.');
+      alert(editando ? 'Se actualizó la reservación.' : 'Se guardaron correctamente los datos.');
     } catch (err) {
       alert(err.message);
     } finally {
       setGuardando(false);
     }
+  };
+
+  // Carga una reservación del listado en el formulario. El modo "Manual" no se
+  // guarda: un servicio con 0 % y comisión capturada se abre como manual.
+  const handleEditar = (r) => {
+    setEditando({ id: r._id, cliente: r.idCliente?.nombreCompleto || '', destino: r.destino });
+    setMaestro({
+      idCliente: r.idCliente?._id || r.idCliente || '',
+      clienteNombre: r.idCliente?.nombreCompleto || '',
+      fechaEntrada: aTexto(aFecha(r.fechaEntrada)),
+      fechaSalida: aTexto(aFecha(r.fechaSalida)),
+      destino: r.destino || '',
+      descripcion: r.descripcion || '',
+      montoTotal: String(r.montoTotal ?? ''),
+      moneda: r.moneda || 'MXN',
+      notas: r.notas || '',
+    });
+    setDetalles((r.detalleReservacion || []).map(d => ({
+      key: d._id,
+      _id: d._id,
+      manual: !(d.porcentajeReservacion > 0) && d.montoComisionable > 0,
+      idProveedor: d.idProveedor?._id || d.idProveedor || '',
+      proveedorNombre: d.idProveedor?.nombreProveedor || '',
+      claveReservacion: d.claveReservacion || '',
+      montoReservacion: d.montoReservacion ?? 0,
+      porcentajeReservacion: d.porcentajeReservacion ?? 0,
+      montoComisionable: d.montoComisionable ?? 0,
+      totalReservacion: d.totalReservacion ?? 0,
+    })));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleVer = (r) => {
@@ -143,6 +192,17 @@ export default function Reservaciones({ clienteInicial = null }) {
       )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        {editando && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-coral/30 bg-brand-coral/5 px-4 py-3 text-sm">
+            <span className="flex items-center gap-2 text-slate-700">
+              <Pencil size={16} className="text-brand-coral" />
+              Editando la reservación de <strong>{editando.cliente}</strong> a <strong>{editando.destino}</strong>
+            </span>
+            <button type="button" onClick={limpiarFormulario} className="text-sm font-semibold text-slate-500 hover:text-slate-700">
+              Cancelar edición
+            </button>
+          </div>
+        )}
         <form onSubmit={guardarTodo} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
             <div className="md:col-span-3 font-semibold text-brand-noche text-sm">Datos del viaje</div>
@@ -267,9 +327,16 @@ export default function Reservaciones({ clienteInicial = null }) {
             )}
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            {editando && (
+              <button type="button" onClick={limpiarFormulario}
+                className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
+                <X size={16} /> Cancelar
+              </button>
+            )}
             <button type="submit" disabled={guardando} className="inline-flex items-center gap-2 bg-brand-petroleo text-white px-6 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-brand-noche disabled:opacity-60">
-              <Send size={16} /> {guardando ? 'Guardando...' : 'Procesar y Guardar Reservación'}
+              {editando ? <Save size={16} /> : <Send size={16} />}
+              {guardando ? 'Guardando...' : editando ? 'Guardar cambios' : 'Procesar y Guardar Reservación'}
             </button>
           </div>
         </form>
@@ -313,7 +380,7 @@ export default function Reservaciones({ clienteInicial = null }) {
                 <th className="p-3 font-semibold">Entrada</th>
                 <th className="p-3 font-semibold">Salida</th>
                 <th className="p-3 font-semibold">Agente</th>
-                <th className="p-3 font-semibold">Total</th>
+                <th className="p-3 font-semibold">Total venta</th>
                 <th className="p-3 font-semibold">Estatus</th>
                 <th className="p-3 font-semibold text-center">Acciones</th>
               </tr>
@@ -330,16 +397,22 @@ export default function Reservaciones({ clienteInicial = null }) {
                   <td className="p-3 text-slate-600">{fechaViaje(r.fechaSalida)}</td>
                   <td className="p-3 text-slate-600">{r.agente?.nombre || '—'}</td>
                   <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">
-                    {dinero(r.totalViaje)} <span className="text-2xs font-semibold text-slate-400">{r.moneda || 'MXN'}</span>
+                    {/* Precio de venta al público (lo que paga el cliente), no el costo con proveedores. */}
+                    {dinero(r.montoTotal)} <span className="text-2xs font-semibold text-slate-400">{r.moneda || 'MXN'}</span>
                   </td>
                   <td className="p-3">
                     <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{r.estatus}</span>
                   </td>
                   <td className="p-3">
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center gap-2">
                       <button onClick={() => handleVer(r)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
+                      {puedeEditar(r) && (
+                        <button onClick={() => handleEditar(r)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
+                          <Pencil size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
