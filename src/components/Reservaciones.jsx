@@ -296,8 +296,11 @@ export default function Reservaciones({ clienteInicial = null }) {
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Monto Base ($) *</label>
-                        <CampoMonto required min={0} className="w-full p-1.5 border border-slate-300 rounded text-xs"
-                          valor={d.montoReservacion} onCambio={v => handleDetalleChange(index, 'montoReservacion', v)} />
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                          <CampoMonto required min={0} className="w-full p-1.5 pl-5 border border-slate-300 rounded text-xs"
+                            valor={d.montoReservacion} onCambio={v => handleDetalleChange(index, 'montoReservacion', v)} />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">% Comisión {!d.manual && '*'}</label>
@@ -312,9 +315,12 @@ export default function Reservaciones({ clienteInicial = null }) {
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Monto Comisionable ($) {d.manual && '*'}</label>
-                        <CampoMonto required={d.manual} disabled={!d.manual} min={0}
-                          className="w-full p-1.5 border border-slate-300 rounded text-xs disabled:bg-slate-100 disabled:text-slate-400"
-                          valor={d.montoComisionable} onCambio={v => handleDetalleChange(index, 'montoComisionable', v)} />
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                          <CampoMonto required={d.manual} disabled={!d.manual} min={0}
+                            className="w-full p-1.5 pl-5 border border-slate-300 rounded text-xs disabled:bg-slate-100 disabled:text-slate-400"
+                            valor={d.montoComisionable} onCambio={v => handleDetalleChange(index, 'montoComisionable', v)} />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Total Calculado ($)</label>
