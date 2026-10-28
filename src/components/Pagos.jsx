@@ -5,6 +5,8 @@ import { imprimirRecibo, folioDePago } from '../utils/recibo';
 import { TIPOS_COMPROBANTE, validarComprobante, abrirComprobante } from '../utils/comprobantes';
 import PageHeader from './common/PageHeader';
 import SelectorRemoto from './common/SelectorRemoto';
+import { SelectorFecha, aTexto } from './common/Calendario';
+import CampoMonto from './common/CampoMonto';
 import PagosProveedor from './PagosProveedor';
 import { dinero, fechaCorta, fechaViaje } from '../utils/formato';
 import { DollarSign, CreditCard, Ban, CheckCircle2, Paperclip, Upload, Printer, FileCheck, Users, Truck } from 'lucide-react';
@@ -26,6 +28,8 @@ export default function Pagos({ reservaInicial = '' }) {
   const [montoPago, setMontoPago] = useState('');
   const [formaPago, setFormaPago] = useState('Efectivo');
   const [referencia, setReferencia] = useState('');
+  // Cuándo pagó el cliente: hoy por defecto; puede ser anterior, nunca futura.
+  const [fechaPago, setFechaPago] = useState(() => aTexto(new Date()));
   const [archivo, setArchivo] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [subiendoId, setSubiendoId] = useState('');
@@ -45,6 +49,7 @@ export default function Pagos({ reservaInicial = '' }) {
   const limpiarCaptura = () => {
     setMontoPago('');
     setReferencia('');
+    setFechaPago(aTexto(new Date()));
     setArchivo(null);
     if (inputArchivoForm.current) inputArchivoForm.current.value = '';
   };
@@ -90,7 +95,7 @@ export default function Pagos({ reservaInicial = '' }) {
     }
     setGuardando(true);
     try {
-      const pago = await pagosApi.create({ idReservacion: selectedReservaId, monto, formaPago, referencia });
+      const pago = await pagosApi.create({ idReservacion: selectedReservaId, monto, formaPago, referencia, fecha: fechaPago });
       let aviso = 'Pago registrado correctamente.';
       if (archivo) {
         try {
@@ -229,7 +234,16 @@ export default function Pagos({ reservaInicial = '' }) {
                 <div className="md:col-span-2 font-semibold text-slate-700 text-xs uppercase tracking-wider">Captura de Pago</div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600">Monto a Abonar ($) *</label>
-                  <input type="number" step="0.01" min="0.01" max={resumen.saldo} required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-petroleo" placeholder="0.00" value={montoPago} onChange={e => setMontoPago(e.target.value)} />
+                  <div className="relative mt-1">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                    <CampoMonto required min={0.01} max={resumen.saldo}
+                      className="w-full p-2.5 pl-6 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
+                      valor={montoPago} onCambio={setMontoPago} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600">Fecha del pago *</label>
+                  <SelectorFecha required sinFuturas valor={fechaPago} onCambio={setFechaPago} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600">Método de Cobro *</label>
@@ -281,6 +295,10 @@ export default function Pagos({ reservaInicial = '' }) {
                         <tr key={p._id} className={`text-sm ${cancelado ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
                           <td className="p-3 text-slate-600">
                             {fechaCorta(p.fecha)}
+                            {/* Si se capturó otro día, se indica cuándo (la fecha de arriba es cuando pagó el cliente). */}
+                            {p.createdAt && fechaCorta(p.createdAt) !== fechaCorta(p.fecha) && (
+                              <div className="text-2xs text-slate-400">capturado el {fechaCorta(p.createdAt)}</div>
+                            )}
                             <div className="text-xs text-slate-400 font-mono">{folioDePago(p)}</div>
                           </td>
                           <td className={`p-3 font-mono text-xs ${cancelado ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{dinero(p.monto)}</td>

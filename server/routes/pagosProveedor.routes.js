@@ -6,6 +6,7 @@ import {
 } from '../middleware/tenant.js';
 import { paginar } from '../utils/paginacion.js';
 import { rutasComprobante } from '../utils/comprobantes.js';
+import { fechaDelPago, fechaCortaMx } from '../utils/fechas.js';
 
 // Pagos de la agencia a sus proveedores (cuentas por pagar), por servicio de
 // cada reservación. Mismas reglas que los cobros a clientes: cualquier usuario
@@ -99,6 +100,8 @@ router.post('/', async (req, res, next) => {
     const referencia = String(req.body.referencia || '').trim() || undefined;
     const monto = aCentavos(req.body.monto);
     if (!Number.isFinite(monto) || monto <= 0) throw errorHttp(400, 'El monto del pago debe ser mayor a cero.');
+    // Cuándo se le pagó al proveedor (puede ser antes de capturarlo); la captura queda en createdAt.
+    const fecha = fechaDelPago(req.body.fecha);
 
     const reservacion = await cargarReservacion(req, idReservacion);
     if (reservacion.estatus === 'Cancelada') {
@@ -144,6 +147,7 @@ router.post('/', async (req, res, next) => {
         moneda: reservacion.moneda || 'MXN',
         formaPago,
         referencia,
+        fecha,
         agente: req.agente.id, // capturista
       });
     } catch (err) {
@@ -156,7 +160,7 @@ router.post('/', async (req, res, next) => {
     }
     await registrarEvento({
       entidad: 'PagoProveedor', entidadId: pago._id, empresa: pago.empresa, evento: 'pago a proveedor',
-      detalle: `$${monto.toFixed(2)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · ${detalle.idProveedor.nombreProveedor} (${detalle.claveReservacion}) · reservación ${reservacion._id} (${reservacion.destino})`,
+      detalle: `$${monto.toFixed(2)} ${pago.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · ${detalle.idProveedor.nombreProveedor} (${detalle.claveReservacion}) · reservación ${reservacion._id} (${reservacion.destino})`,
       usuario: usuarioDeLaSesion(req),
     });
     res.status(201).json(await pago.populate([
