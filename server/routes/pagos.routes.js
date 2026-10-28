@@ -3,6 +3,7 @@ import { Pago, Reservacion, Empresa, Cliente, Agente, registrarCambios, registra
 import {
   alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, regexBusqueda, usuarioDeLaSesion,
 } from '../middleware/tenant.js';
+import { DESFASE_MX, fechaDelPago, fechaCortaMx } from '../utils/fechas.js';
 import { paginar, leerPaginacion, sobre } from '../utils/paginacion.js';
 import { rutasComprobante } from '../utils/comprobantes.js';
 
@@ -23,7 +24,6 @@ const SOLO_APLICADOS = { estatus: { $ne: 'Cancelado' } };
 const aCentavos = (n) => Math.round(Number(n) * 100) / 100;
 
 const DIA = 24 * 60 * 60 * 1000;
-const DESFASE_MX = 6 * 60 * 60 * 1000; // centro de México, UTC-6 fijo desde 2022
 
 // Lo que debe pagar el cliente es el precio de venta (montoTotal), no el costo con proveedores.
 async function calcularSaldo(reservacion) {
@@ -234,6 +234,8 @@ router.post('/', async (req, res, next) => {
     if (!Number.isFinite(monto) || monto <= 0) {
       return res.status(400).json({ error: 'El monto del abono debe ser mayor a cero.' });
     }
+    // Cuándo pagó el cliente (puede ser antes de capturarlo); la captura queda en createdAt.
+    const fecha = fechaDelPago(req.body.fecha);
 
     const reservacion = await Reservacion.findById(idReservacion);
     if (!reservacion) return res.status(404).json({ error: 'Reservación no encontrada' });
@@ -274,6 +276,7 @@ router.post('/', async (req, res, next) => {
         moneda: reservacion.moneda || 'MXN',
         formaPago,
         referencia,
+        fecha,
         empresa: reservacion.empresa,
         agente: req.agente.id, // capturista: quien registró el abono en el sistema
       });
@@ -284,7 +287,7 @@ router.post('/', async (req, res, next) => {
     }
     await registrarEvento({
       entidad: 'Pago', entidadId: pago._id, empresa: pago.empresa, evento: 'abono del cliente',
-      detalle: `$${monto.toFixed(2)} ${pago.moneda} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
+      detalle: `$${monto.toFixed(2)} ${pago.moneda} · pagado el ${fechaCortaMx(fecha)} ·${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
       usuario: usuarioDeLaSesion(req),
     });
     res.status(201).json(await pago.populate('agente', 'nombre userId'));

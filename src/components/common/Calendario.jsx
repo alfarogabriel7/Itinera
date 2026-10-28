@@ -58,8 +58,8 @@ function Campo({ texto, placeholder, onAbrir, onLimpiar, required, valorRequerid
 const panelClass = 'absolute z-30 mt-1 rounded-xl border border-slate-200 bg-white p-3 shadow-lg';
 
 // Una fecha (p.ej. nacimiento). Con `nacimiento` muestra selectores de mes y año
-// desde 1920 y no deja elegir fechas futuras.
-export function SelectorFecha({ valor, onCambio, placeholder = 'Selecciona una fecha', required = false, nacimiento = false }) {
+// desde 1920 y no deja elegir fechas futuras; con `sinFuturas`, solo lo último.
+export function SelectorFecha({ valor, onCambio, placeholder = 'Selecciona una fecha', required = false, nacimiento = false, sinFuturas = false }) {
   const { abierto, setAbierto, ref } = usePanel();
   const seleccion = aFecha(valor);
   const hoy = new Date();
@@ -73,6 +73,7 @@ export function SelectorFecha({ valor, onCambio, placeholder = 'Selecciona una f
           <DayPicker mode="single" locale={es} selected={seleccion}
             defaultMonth={seleccion || (nacimiento ? new Date(hoy.getFullYear() - 30, 0) : hoy)}
             onSelect={(f) => { onCambio(aTexto(f)); if (f) setAbierto(false); }}
+            {...(sinFuturas && { endMonth: hoy, disabled: { after: hoy } })}
             {...(nacimiento && {
               captionLayout: 'dropdown',
               startMonth: new Date(1920, 0),

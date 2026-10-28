@@ -2,18 +2,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import { pagosProveedorApi } from '../api';
 import { dinero, fechaCorta } from '../utils/formato';
 import { TIPOS_COMPROBANTE, validarComprobante, abrirComprobante } from '../utils/comprobantes';
+import CampoMonto from './common/CampoMonto';
+import { SelectorFecha, aTexto } from './common/Calendario';
 import { Truck, Send, Ban, CheckCircle2, Paperclip, Upload, FileCheck } from 'lucide-react';
 
 // Pagos de la agencia a los proveedores de una reservación (cuentas por pagar).
 // Por cada servicio del detalle: lo que se le debe al proveedor (ya descontada
 // la comisión), lo pagado y el saldo. Cada pago guarda quién lo capturó, puede
 // llevar comprobante y queda en la bitácora; cancelarlo es del Administrador.
-const FORMULARIO_VACIO = { idDetalle: '', monto: '', formaPago: 'Transferencia', referencia: '' };
+// La fecha del pago es hoy por defecto; puede ser anterior, nunca futura.
+const formularioVacio = () => ({ idDetalle: '', monto: '', fecha: aTexto(new Date()), formaPago: 'Transferencia', referencia: '' });
 
 export default function PagosProveedor({ idReservacion, esAdministrador }) {
   const [estado, setEstado] = useState(null);
   const [error, setError] = useState('');
-  const [form, setForm] = useState(FORMULARIO_VACIO);
+  const [form, setForm] = useState(formularioVacio);
   const [archivo, setArchivo] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [subiendoId, setSubiendoId] = useState('');
@@ -32,7 +35,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
 
   useEffect(() => {
     setEstado(null);
-    setForm(FORMULARIO_VACIO);
+    setForm(formularioVacio());
     cargar();
   }, [idReservacion]);
 
@@ -64,7 +67,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
         }
       }
       alert(aviso);
-      setForm(FORMULARIO_VACIO);
+      setForm(formularioVacio());
       setArchivo(null);
       if (inputArchivoForm.current) inputArchivoForm.current.value = '';
       await cargar();
@@ -191,8 +194,16 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Monto ($) *</label>
-            <input type="number" step="0.01" min="0.01" required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
-              value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })} placeholder="0.00" />
+            <div className="relative mt-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+              <CampoMonto required min={0.01} max={estado.detalles.find(d => d.idDetalle === form.idDetalle)?.saldo}
+                className="w-full p-2.5 pl-6 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
+                valor={form.monto} onCambio={monto => setForm(f => ({ ...f, monto }))} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600">Fecha del pago *</label>
+            <SelectorFecha required sinFuturas valor={form.fecha} onCambio={fecha => setForm(f => ({ ...f, fecha }))} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Forma de pago *</label>
@@ -246,7 +257,13 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
                 const puedeAdjuntar = !cancelado && (!p.comprobante?.id || esAdministrador);
                 return (
                   <tr key={p._id} className={`text-sm ${cancelado ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
-                    <td className="p-3 text-slate-600">{fechaCorta(p.fecha)}</td>
+                    <td className="p-3 text-slate-600">
+                      {fechaCorta(p.fecha)}
+                      {/* Si se capturó otro día, se indica cuándo (la fecha de arriba es cuando se pagó). */}
+                      {p.createdAt && fechaCorta(p.createdAt) !== fechaCorta(p.fecha) && (
+                        <div className="text-2xs text-slate-400">capturado el {fechaCorta(p.createdAt)}</div>
+                      )}
+                    </td>
                     <td className="p-3 text-slate-700">{p.idProveedor?.nombreProveedor || '—'}</td>
                     <td className={`p-3 font-mono text-xs ${cancelado ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{dinero(p.monto)}</td>
                     <td className="p-3 text-slate-600">
