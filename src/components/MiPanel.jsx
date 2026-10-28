@@ -130,7 +130,7 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
           {mes && (varMes === null
             ? `${mes.reservaciones} reservación(es) este mes`
             : <span className={varMes >= 0 ? 'font-semibold text-emerald-700' : 'font-semibold text-red-700'}>
-                {varMes >= 0 ? '▲ +' : '▼ −'}{Math.abs(varMes).toFixed(1)}% <span className="font-normal text-slate-500">vs. mismos días del mes anterior</span>
+                {varMes >= 0 ? '▲ +' : '▼ −'}{Math.abs(varMes).toFixed(1)}% <span className="font-normal text-slate-500">vs. mes anterior</span>
               </span>)}
         </Tarjeta>
         <Tarjeta icono={Trophy} titulo="Mi lugar este mes" valor={resumen?.lugarEnElMes ? `#${resumen.lugarEnElMes}` : '—'} acento="text-brand-coralClaro">

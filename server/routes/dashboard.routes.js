@@ -11,9 +11,16 @@ const router = Router();
 const ZONA = '-06:00';
 const DESFASE_MS = 6 * 60 * 60 * 1000;
 
-// "Venta" = reservación no cancelada, por su precio de venta (montoTotal),
-// en el mes en que se registró.
+// "Venta" = reservación no cancelada, por su precio de venta (montoTotal), en
+// el mes en que inicia el viaje (fechaEntrada): la venta y los pagos se cierran
+// cerca de la fecha del viaje. Un mes cuenta todos sus viajes, también los de
+// días que aún no llegan (ya están vendidos).
 const VENTA_VALIDA = { estatus: { $ne: 'Cancelada' } };
+// fechaEntrada se guarda como día de calendario a medianoche UTC: se agrupa y se
+// compara en UTC (con la zona de México caería en el día anterior).
+const FECHA_VENTA = 'fechaEntrada';
+// Meses siguientes que muestra "Ventas a futuro".
+const MESES_FUTURO = 6;
 const PAGO_APLICADO = { estatus: { $ne: 'Cancelado' } };
 
 const aCentavos = (n) => Math.round(Number(n || 0) * 100) / 100;
@@ -23,40 +30,42 @@ function calendario(ahora = new Date()) {
   const mx = new Date(ahora.getTime() - DESFASE_MS);
   const anio = mx.getUTCFullYear();
   const mes = mx.getUTCMonth();
-  // Medianoche (hora de México) del día 1 de hace `k` meses. Date.UTC acepta meses negativos.
+  // Medianoche (hora de México) del día 1 de hace `k` meses, para los pagos
+  // (su fecha es un momento real). Date.UTC acepta meses negativos.
   const inicioMes = (k, a = anio, m = mes) => new Date(Date.UTC(a, m - k, 1) + DESFASE_MS);
-  const transcurrido = ahora - inicioMes(0);
-  // Mismo punto del mes (día y hora) de hace `k` meses, sin pasarse de ese mes.
-  const equivalente = (k) => new Date(Math.min(inicioMes(k).getTime() + transcurrido, inicioMes(k - 1).getTime()));
   const clave = (k) => {
     const d = new Date(Date.UTC(anio, mes - k, 1));
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   };
-  return { ahora, anio, mes, dia: mx.getUTCDate(), inicioMes, equivalente, clave };
+  return { ahora, anio, mes, dia: mx.getUTCDate(), inicioMes, clave };
 }
 
-// Periodo actual y su equivalente anterior (a la misma altura) para comparar.
+// Día 1 (medianoche UTC) del mes de hace `k` meses; k negativo = meses futuros.
+const mesViaje = (cal, k) => new Date(Date.UTC(cal.anio, cal.mes - k, 1));
+
+// Periodo actual y el anterior para comparar, por meses completos de viaje.
 function rangos(periodo, cal) {
-  const { ahora, inicioMes, equivalente, anio } = cal;
+  const m = (k) => mesViaje(cal, k);
+  const { anio } = cal;
   switch (periodo) {
     case 'mes':
-      return { actual: [inicioMes(0), ahora], previo: [inicioMes(1), equivalente(1)] };
+      return { actual: [m(0), m(-1)], previo: [m(1), m(0)] };
     case 'anio':
       return {
-        actual: [new Date(Date.UTC(anio, 0, 1) + DESFASE_MS), ahora],
-        previo: [new Date(Date.UTC(anio - 1, 0, 1) + DESFASE_MS), equivalente(12)],
+        actual: [new Date(Date.UTC(anio, 0, 1)), new Date(Date.UTC(anio + 1, 0, 1))],
+        previo: [new Date(Date.UTC(anio - 1, 0, 1)), new Date(Date.UTC(anio, 0, 1))],
       };
     case '24m':
-      return { actual: [inicioMes(23), ahora], previo: null };
+      return { actual: [m(23), m(-1)], previo: null };
     case '12m':
     default:
-      return { actual: [inicioMes(11), ahora], previo: [inicioMes(23), equivalente(12)] };
+      return { actual: [m(11), m(-1)], previo: [m(23), m(11)] };
   }
 }
 
 async function ventasEnRango(filtro, [desde, hasta]) {
   const [r] = await Reservacion.aggregate([
-    { $match: { ...filtro, ...VENTA_VALIDA, createdAt: { $gte: desde, $lt: hasta } } },
+    { $match: { ...filtro, ...VENTA_VALIDA, [FECHA_VENTA]: { $gte: desde, $lt: hasta } } },
     { $group: { _id: null, ventas: { $sum: '$montoTotal' }, reservaciones: { $sum: 1 } } },
   ]);
   return { ventas: aCentavos(r?.ventas), reservaciones: r?.reservaciones || 0 };
@@ -64,7 +73,7 @@ async function ventasEnRango(filtro, [desde, hasta]) {
 
 async function ventasPorAgente(empresa, [desde, hasta], moneda = MONEDA_PREDETERMINADA) {
   const filas = await Reservacion.aggregate([
-    { $match: { empresa, ...VENTA_VALIDA, ...filtroMoneda(moneda), createdAt: { $gte: desde, $lt: hasta } } },
+    { $match: { empresa, ...VENTA_VALIDA, ...filtroMoneda(moneda), [FECHA_VENTA]: { $gte: desde, $lt: hasta } } },
     { $group: { _id: '$agente', ventas: { $sum: '$montoTotal' }, reservaciones: { $sum: 1 } } },
   ]);
   return new Map(filas.map((f) => [String(f._id), f]));
@@ -89,10 +98,10 @@ router.get('/admin', async (req, res, next) => {
     // --- Serie mensual de 24 meses (ventas, reservaciones y cobrado) ---
     const [ventasMes, cobradoMes] = await Promise.all([
       Reservacion.aggregate([
-        { $match: { empresa, ...VENTA_VALIDA, ...fm, createdAt: { $gte: desde24 } } },
+        { $match: { empresa, ...VENTA_VALIDA, ...fm, [FECHA_VENTA]: { $gte: mesViaje(cal, 23), $lt: mesViaje(cal, -1) } } },
         {
           $group: {
-            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt', timezone: ZONA } },
+            _id: { $dateToString: { format: '%Y-%m', date: `$${FECHA_VENTA}` } },
             ventas: { $sum: '$montoTotal' },
             reservaciones: { $sum: 1 },
           },
@@ -115,6 +124,30 @@ router.get('/admin', async (req, res, next) => {
         cobrado: aCentavos(cPorMes.get(mes)),
         enCurso: k === 0,
       });
+    }
+
+    // --- Ventas a futuro: viajes ya vendidos que inician en los próximos meses ---
+    // Por mes de viaje: lo vendido, cuántas reservaciones y lo que falta cobrar
+    // (abonado lo mantiene el servidor en cada reservación).
+    const ventasFuturas = await Reservacion.aggregate([
+      { $match: { empresa, ...VENTA_VALIDA, ...fm, [FECHA_VENTA]: { $gte: mesViaje(cal, -1), $lt: mesViaje(cal, -(MESES_FUTURO + 1)) } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: `$${FECHA_VENTA}` } },
+          ventas: { $sum: '$montoTotal' },
+          cobrado: { $sum: { $ifNull: ['$abonado', 0] } },
+          reservaciones: { $sum: 1 },
+        },
+      },
+    ]);
+    const fPorMes = new Map(ventasFuturas.map((f) => [f._id, f]));
+    const futuro = [];
+    for (let k = -1; k >= -MESES_FUTURO; k--) {
+      const mes = cal.clave(k);
+      const f = fPorMes.get(mes);
+      const ventas = aCentavos(f?.ventas);
+      const cobrado = aCentavos(f?.cobrado);
+      futuro.push({ mes, ventas, reservaciones: f?.reservaciones || 0, cobrado, porCobrar: aCentavos(ventas - cobrado) });
     }
 
     // --- Indicadores ---
@@ -192,6 +225,7 @@ router.get('/admin', async (req, res, next) => {
       // Monedas con ventas en la empresa: el selector solo se muestra si hay más de una.
       monedas: ventasEnUSD ? MONEDAS : [MONEDA_PREDETERMINADA],
       meses,
+      futuro,
       indicadores: {
         mesALaFecha: { ...mesActual, ventasPrevio: mesPrevio.ventas },
         ultimos12: { ...doce, ventasPrevio: docePrevio.ventas },

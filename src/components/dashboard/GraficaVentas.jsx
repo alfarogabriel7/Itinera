@@ -56,7 +56,7 @@ function Variacion({ valor, etiqueta }) {
   );
 }
 
-export default function GraficaVentas({ meses, variacionEnCurso, diaDelMes }) {
+export default function GraficaVentas({ meses, variacionEnCurso }) {
   const contenedor = useRef(null);
   const [ancho, setAncho] = useState(720);
   const [activo, setActivo] = useState(null);
@@ -198,14 +198,14 @@ export default function GraficaVentas({ meses, variacionEnCurso, diaDelMes }) {
         >
           <div className="mb-2 font-semibold capitalize text-slate-800">
             {nombreMes(filaActiva.mes, { largo: true, conAnio: true })}
-            {filaActiva.enCurso && <span className="ml-1 font-normal normal-case text-slate-400">(al día {diaDelMes})</span>}
+            {filaActiva.enCurso && <span className="ml-1 font-normal normal-case text-slate-400">(en curso)</span>}
           </div>
           <div className="space-y-1">
             <div className="flex justify-between gap-4"><span className="text-slate-500">Ventas</span><span className="font-semibold text-slate-800">{dinero(filaActiva.ventas)}</span></div>
             <div className="flex justify-between gap-4"><span className="text-slate-500">Reservaciones</span><span className="text-slate-700">{filaActiva.reservaciones}</span></div>
             <div className="flex justify-between gap-4"><span className="text-slate-500">Cobrado</span><span className="text-slate-700">{dinero(filaActiva.cobrado)}</span></div>
             <div className="my-1 border-t border-slate-100" />
-            <Variacion valor={filaActiva.vsAnterior} etiqueta={filaActiva.enCurso ? 'vs. mismos días mes ant.' : 'vs. mes anterior'} />
+            <Variacion valor={filaActiva.vsAnterior} etiqueta="vs. mes anterior" />
             {filaActiva.claveAnioAnterior && (
               <Variacion valor={filaActiva.vsAnioAnterior} etiqueta={`vs. ${nombreMes(filaActiva.claveAnioAnterior, { conAnio: true })}`} />
             )}
