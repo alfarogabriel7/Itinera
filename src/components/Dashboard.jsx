@@ -3,11 +3,11 @@ import { dashboardApi } from '../api';
 import { dinero, dineroCompacto, variacion, nombreMes } from '../utils/formato';
 import GraficaVentas from './dashboard/GraficaVentas';
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Receipt, Wallet, HandCoins, CalendarCheck, Trophy, BarChart3, Table2, Crown, ArrowDownUp,
+  LayoutDashboard, TrendingUp, TrendingDown, Receipt, Wallet, HandCoins, CalendarCheck, CalendarClock, Trophy, BarChart3, Table2, Crown, ArrowDownUp,
 } from 'lucide-react';
 
 const PERIODOS = [
-  { key: 'mes', label: 'Este mes', previo: 'vs. mismos días del mes anterior' },
+  { key: 'mes', label: 'Este mes', previo: 'vs. mes anterior' },
   { key: '12m', label: 'Últimos 12 meses', previo: 'vs. 12 meses anteriores' },
   { key: 'anio', label: 'Este año', previo: 'vs. mismo periodo del año pasado' },
   { key: '24m', label: '24 meses', previo: null },
@@ -86,7 +86,7 @@ export default function Dashboard() {
     );
   }
 
-  const { indicadores: ind, meses, ranking, diaDelMes, generado } = datos;
+  const { indicadores: ind, meses, ranking, generado } = datos;
   const var12 = variacion(ind.ultimos12.ventas, ind.ultimos12.ventasPrevio);
   const varMes = variacion(ind.mesALaFecha.ventas, ind.mesALaFecha.ventasPrevio);
   const periodoActual = PERIODOS.find((p) => p.key === periodo);
@@ -125,8 +125,8 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-2">
-          <Tarjeta icono={CalendarCheck} titulo={`Ventas del mes · al día ${diaDelMes}`} valor={dinero(ind.mesALaFecha.ventas)}>
-            <Delta valor={varMes} sufijo="vs. mismos días del mes anterior" />
+          <Tarjeta icono={CalendarCheck} titulo={`Ventas de ${nombreMes(meses[meses.length - 1].mes, { largo: true })} · por fecha de viaje`} valor={dinero(ind.mesALaFecha.ventas)}>
+            <Delta valor={varMes} sufijo="vs. mes anterior" />
           </Tarjeta>
           <Tarjeta icono={Receipt} titulo="Ticket promedio · 12 meses" valor={dinero(ind.ticketPromedio12)}>
             <span className="text-slate-500">Venta promedio por reservación</span>
@@ -145,7 +145,7 @@ export default function Dashboard() {
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-800">Ventas por mes · últimos 24 meses</h2>
-            <p className="text-sm text-slate-500">Monto vendido según la fecha de registro de cada reservación (sin canceladas).</p>
+            <p className="text-sm text-slate-500">Monto vendido según la fecha de entrada (inicio del viaje) de cada reservación, sin canceladas. El mes en curso incluye los viajes de días que aún no llegan.</p>
           </div>
           <div className="inline-flex shrink-0 rounded-lg border border-slate-200 p-0.5 text-sm">
             <button onClick={() => setVista('grafica')} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold ${vista === 'grafica' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}>
@@ -166,11 +166,14 @@ export default function Dashboard() {
         </div>
 
         {vista === 'grafica' ? (
-          <GraficaVentas meses={meses} variacionEnCurso={varMes} diaDelMes={diaDelMes} />
+          <GraficaVentas meses={meses} variacionEnCurso={varMes} />
         ) : (
           <TablaMeses meses={meses} varMes={varMes} />
         )}
       </div>
+
+      {/* Ventas a futuro */}
+      {datos.futuro && <VentasFuturo futuro={datos.futuro} moneda={datos.moneda} />}
 
       {/* Ranking de agentes */}
       <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
@@ -279,6 +282,61 @@ export default function Dashboard() {
 
 const NOMBRE_MONEDA = { MXN: 'Pesos mexicanos', USD: 'Dólares (USD)' };
 
+// Viajes ya vendidos que inician en los próximos meses: lo vendido por mes de
+// viaje y cuánto falta cobrar (la cobranza se concentra cerca del viaje).
+function VentasFuturo({ futuro, moneda }) {
+  const total = futuro.reduce((acc, f) => ({
+    ventas: acc.ventas + f.ventas, porCobrar: acc.porCobrar + f.porCobrar, reservaciones: acc.reservaciones + f.reservaciones,
+  }), { ventas: 0, porCobrar: 0, reservaciones: 0 });
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><CalendarClock size={18} className="text-brand-petroleo" /> Ventas a futuro · próximos {futuro.length} meses</h2>
+          <p className="text-sm text-slate-500">Viajes ya vendidos según su mes de inicio, y lo que falta cobrar de cada mes.</p>
+        </div>
+        {total.reservaciones > 0 && (
+          <div className="text-sm text-slate-600 sm:text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <span className="font-semibold text-slate-800">{dinero(total.ventas)} {moneda}</span> vendidos en {total.reservaciones} reservación(es)
+            <div className="text-xs text-red-600">Por cobrar: {dinero(total.porCobrar)} {moneda}</div>
+          </div>
+        )}
+      </div>
+
+      {total.reservaciones === 0 ? (
+        <div className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">Aún no hay viajes vendidos para los próximos meses.</div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {futuro.map((f) => {
+            const avance = f.ventas > 0 ? Math.min(100, Math.round((f.cobrado / f.ventas) * 100)) : 0;
+            return (
+              <div key={f.mes} className={`rounded-xl border p-4 ${f.reservaciones ? 'border-slate-200' : 'border-dashed border-slate-200 bg-slate-50/60'}`}>
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{nombreMes(f.mes, { largo: true, conAnio: true })}</div>
+                <div className="mt-1 text-lg font-bold text-slate-800">{f.reservaciones ? dineroCompacto(f.ventas) : '—'}</div>
+                <div className="text-xs text-slate-500">{f.reservaciones} reservación(es)</div>
+                {f.reservaciones > 0 && (
+                  <>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100" title={`Cobrado ${avance}%`}>
+                      <div className="h-full rounded-full bg-emerald-500" style={{ width: `${avance}%` }} />
+                    </div>
+                    <div className="mt-1 flex justify-between text-2xs">
+                      <span className="text-slate-400">{avance}% cobrado</span>
+                      {f.porCobrar > 0
+                        ? <span className="font-semibold text-red-600">{dinero(f.porCobrar)}</span>
+                        : <span className="font-semibold text-emerald-700">Liquidado</span>}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Encabezado({ generado, monedas = [], moneda, onMoneda }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -342,7 +400,7 @@ function TablaMeses({ meses, varMes }) {
                 <td className="p-3 text-right font-semibold text-slate-800">{dinero(m.ventas)}</td>
                 <td className="p-3 text-right text-slate-600">{m.reservaciones}</td>
                 <td className="p-3 text-right text-slate-600">{dinero(m.cobrado)}</td>
-                <td className="p-3"><Delta valor={v} sufijo={m.enCurso ? 'mismos días' : ''} compacto /></td>
+                <td className="p-3"><Delta valor={v} compacto /></td>
               </tr>
             );
           })}
