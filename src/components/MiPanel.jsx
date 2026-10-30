@@ -68,7 +68,8 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
       // Cada sección carga por separado: si una falla, las demás se muestran igual.
       const [r, c, a] = await Promise.allSettled([
         dashboardApi.agente(),
-        pagosApi.cobranza({ mios: 1, porPagina: 10 }),
+        // Sin "mios": el servidor ya limita al agente a lo que vendió y a sus clientes asignados.
+        pagosApi.cobranza({ porPagina: 10 }),
         obtenerAcciones(),
       ]);
       if (r.status === 'fulfilled') setResumen(r.value);
