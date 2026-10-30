@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { dashboardApi } from '../api';
 import { dinero, dineroCompacto, variacion, nombreMes } from '../utils/formato';
 import GraficaVentas from './dashboard/GraficaVentas';
+import SeccionProveedores from './dashboard/SeccionProveedores';
 import {
   LayoutDashboard, TrendingUp, TrendingDown, Receipt, Wallet, HandCoins, CalendarCheck, CalendarClock, Trophy, BarChart3, Table2, Crown, ArrowDownUp,
 } from 'lucide-react';
@@ -174,6 +175,9 @@ export default function Dashboard() {
 
       {/* Ventas a futuro */}
       {datos.futuro && <VentasFuturo futuro={datos.futuro} moneda={datos.moneda} />}
+
+      {/* Acumulado por proveedor (consulta propia, con su rango de fechas) */}
+      <SeccionProveedores moneda={moneda} />
 
       {/* Ranking de agentes */}
       <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">

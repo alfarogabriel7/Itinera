@@ -4,6 +4,7 @@ import {
   alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, regexBusqueda, usuarioDeLaSesion,
 } from '../middleware/tenant.js';
 import { DESFASE_MX, fechaDelPago, fechaCortaMx } from '../utils/fechas.js';
+import { completarTerminadas, reactivarSiTieneSaldo } from '../utils/estatusReservacion.js';
 import { paginar, leerPaginacion, sobre } from '../utils/paginacion.js';
 import { rutasComprobante } from '../utils/comprobantes.js';
 
@@ -56,6 +57,7 @@ router.get('/', async (req, res, next) => {
 //   - q y urgencia solo acotan la tabla (los indicadores muestran el total).
 router.get('/cobranza', async (req, res, next) => {
   try {
+    await completarTerminadas(req.agente.empresa);
     const p = leerPaginacion(req);
     const incluirLiquidadas = req.query.incluirLiquidadas === '1';
 
@@ -328,6 +330,8 @@ router.patch('/:id/cancelar', async (req, res, next) => {
     );
     if (!cancelado) return res.status(400).json({ error: 'Este abono ya estaba cancelado.' });
     await Reservacion.updateOne({ _id: pago.idReservacion }, { $inc: { abonado: -pago.monto, __v: 1 } });
+    // Si ya estaba completada, vuelve a tener saldo: regresa a Activa.
+    await reactivarSiTieneSaldo(pago.idReservacion, usuario);
 
     await registrarCambios({
       entidad: 'Pago',

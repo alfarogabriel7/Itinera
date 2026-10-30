@@ -3,9 +3,10 @@ import { dashboardApi, pagosApi, prospectosApi, clientesApi } from '../api';
 import { dinero, fechaViaje, variacion } from '../utils/formato';
 import { EtiquetaViaje, ligaWhatsApp } from './Cobranza';
 import MasUSD from './common/MasUSD';
+import ProximosViajes from './common/ProximosViajes';
 import {
   Sun, Sunset, Moon, TrendingUp, TrendingDown, Trophy, Wallet, ListTodo, CheckCircle2, Circle, Undo2,
-  Phone, CreditCard, MessageCircle, ArrowRight, Plane,
+  Phone, CreditCard, MessageCircle, ArrowRight, Plane, PlaneTakeoff,
 } from 'lucide-react';
 
 function saludo() {
@@ -268,6 +269,15 @@ export default function MiPanel({ nombre, onAbonar, onIr }) {
             })}
           </ul>
         </div>
+      </div>
+
+      {/* Próximos viajes de mis clientes */}
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="mb-4">
+          <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><PlaneTakeoff size={18} className="text-brand-petroleo" /> Próximos viajes · 30 días</h2>
+          <p className="text-sm text-slate-500">Tus reservaciones activas por fecha de entrada, para estar al pendiente de tus clientes.</p>
+        </div>
+        <ProximosViajes mios dias={30} onAbonar={onAbonar} />
       </div>
     </div>
   );

@@ -82,6 +82,8 @@ export const reservacionesApi = {
   get: (id) => request(`/reservaciones/${id}`),
   create: (data) => request('/reservaciones', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/reservaciones/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  cancelar: (id, motivo) => request(`/reservaciones/${id}/cancelar`, { method: 'PATCH', body: JSON.stringify({ motivo }) }),
+  proximas: (params) => request(conParametros('/reservaciones/proximas', params)),
 };
 
 export const pagosApi = {
@@ -116,6 +118,7 @@ export const empresasApi = {
 
 export const dashboardApi = {
   admin: (periodo, moneda = 'MXN') => request(`/dashboard/admin?periodo=${periodo}&moneda=${moneda}`),
+  proveedores: (desde, hasta, moneda = 'MXN') => request(`/dashboard/proveedores?desde=${desde}&hasta=${hasta}&moneda=${moneda}`),
   agente: () => request('/dashboard/agente'),
   resumen: () => request('/dashboard/resumen'),
 };

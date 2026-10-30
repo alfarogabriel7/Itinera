@@ -39,7 +39,17 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
     cargar();
   }, [idReservacion]);
 
-  const elegirServicio = (d) => setForm({ ...form, idDetalle: d.idDetalle, monto: String(d.saldo) });
+  // Elige el servicio a pagar. El monto se captura a mano (no se llena con el
+  // saldo); el formulario no deja pasar de lo pendiente con el proveedor.
+  const elegirServicio = (d) => setForm(f => ({ ...f, idDetalle: d.idDetalle, monto: '' }));
+
+  // Botón "Pagar" de la tabla: además lleva al formulario y deja el cursor en el monto.
+  const formRef = useRef(null);
+  const pagarServicio = (d) => {
+    elegirServicio(d);
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => document.getElementById('monto-pago-proveedor')?.focus({ preventScroll: true }), 350);
+  };
 
   const handleArchivoForm = (e) => {
     const elegido = e.target.files[0] || null;
@@ -118,6 +128,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
   if (!estado) return <p className="mt-6 text-sm text-slate-400">Cargando pagos a proveedores...</p>;
 
   const pendientes = estado.detalles.filter(d => d.saldo > 0);
+  const servicioElegido = estado.detalles.find(d => d.idDetalle === form.idDetalle);
   const admitePagos = estado.estatusReservacion !== 'Cancelada';
   const porcentaje = estado.totales.total > 0 ? Math.min(100, Math.round((estado.totales.pagado / estado.totales.total) * 100)) : 0;
 
@@ -163,7 +174,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
                 <td className="p-3 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}</td>
                 <td className="p-3 text-right">
                   {admitePagos && d.saldo > 0 && (
-                    <button type="button" onClick={() => elegirServicio(d)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
+                    <button type="button" onClick={() => pagarServicio(d)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
                       <Send size={13} /> Pagar
                     </button>
                   )}
@@ -182,7 +193,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
       )}
 
       {admitePagos && pendientes.length > 0 && (
-        <form onSubmit={handleGuardar} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-100 rounded-xl">
+        <form ref={formRef} onSubmit={handleGuardar} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-100 rounded-xl">
           <div className="md:col-span-2 font-semibold text-slate-700 text-xs uppercase tracking-wider">Registrar pago a proveedor</div>
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-slate-600">Servicio / proveedor *</label>
@@ -196,10 +207,17 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
             <label className="block text-xs font-bold text-slate-600">Monto ($) *</label>
             <div className="relative mt-1">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
-              <CampoMonto required min={0.01} max={estado.detalles.find(d => d.idDetalle === form.idDetalle)?.saldo}
+              <CampoMonto id="monto-pago-proveedor" required min={0.01} max={servicioElegido?.saldo}
                 className="w-full p-2.5 pl-6 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
                 valor={form.monto} onCambio={monto => setForm(f => ({ ...f, monto }))} />
             </div>
+            {servicioElegido && (
+              <p className={`mt-1 text-xs ${Number(form.monto) > servicioElegido.saldo ? 'font-semibold text-red-600' : 'text-slate-500'}`}>
+                {Number(form.monto) > servicioElegido.saldo
+                  ? `Excede el saldo pendiente con el proveedor (${dinero(servicioElegido.saldo)}).`
+                  : `Saldo pendiente: ${dinero(servicioElegido.saldo)}`}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Fecha del pago *</label>
