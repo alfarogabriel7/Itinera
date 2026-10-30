@@ -30,7 +30,7 @@ export function completo(crudo) {
   return `${miles(entero)}.${decimales}`;
 }
 
-export default function CampoMonto({ valor, onCambio, min, max, required = false, disabled = false, className = '', placeholder = '0.00' }) {
+export default function CampoMonto({ id, valor, onCambio, min, max, required = false, disabled = false, className = '', placeholder = '0.00' }) {
   const crudo = limpiar(valor === 0 && !required ? '' : valor);
   const [enFoco, setEnFoco] = useState(false);
   const ref = useRef(null);
@@ -67,7 +67,7 @@ export default function CampoMonto({ valor, onCambio, min, max, required = false
   };
 
   return (
-    <input ref={ref} type="text" inputMode="decimal" autoComplete="off" required={required} disabled={disabled}
+    <input ref={ref} id={id} type="text" inputMode="decimal" autoComplete="off" required={required} disabled={disabled}
       placeholder={placeholder} className={`text-right tabular-nums ${className}`}
       value={texto} onChange={cambiar} onFocus={() => setEnFoco(true)} onBlur={() => setEnFoco(false)} />
   );

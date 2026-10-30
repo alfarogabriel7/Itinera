@@ -5,6 +5,8 @@ import {
   soloCampos, usuarioDeLaSesion, errorHttp, filtroPorAgente, regexBusqueda,
 } from '../middleware/tenant.js';
 import { paginar } from '../utils/paginacion.js';
+import { completarTerminadas } from '../utils/estatusReservacion.js';
+import { hoyEnMexico } from '../utils/fechas.js';
 
 const router = Router();
 
@@ -67,6 +69,7 @@ async function abonadoDe(idReservacion) {
 // q busca en el destino y en el nombre/teléfono del cliente.
 router.get('/', async (req, res, next) => {
   try {
+    await completarTerminadas(req.agente.empresa);
     const filtroBase = { ...filtroPorAgente(req) };
     if (req.query.idCliente) filtroBase.idCliente = req.query.idCliente;
     if (req.query.estatus) filtroBase.estatus = String(req.query.estatus);
@@ -84,6 +87,46 @@ router.get('/', async (req, res, next) => {
         [POPULATE_PROVEEDOR, 'nombreProveedor'],
       ],
     }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/reservaciones/proximas?dias=30&mios=1
+// Reservaciones activas cuyo viaje inicia hoy o en los próximos `dias` días
+// (máx. 90), de la más cercana a la más lejana (máx. 50). Para "Mi panel" y la
+// campana de avisos. Consulta indexada {empresa, estatus, fechaEntrada}.
+router.get('/proximas', async (req, res, next) => {
+  try {
+    const dias = Math.min(90, Math.max(1, Number(req.query.dias) || 30));
+    const hoy = new Date(`${hoyEnMexico()}T00:00:00Z`);
+    const hasta = new Date(hoy.getTime() + dias * 24 * 60 * 60 * 1000);
+    const filtro = alcanceEmpresa(req, { estatus: 'Activa', fechaEntrada: { $gte: hoy, $lte: hasta }, ...filtroPorAgente(req) });
+    const [filas, total] = await Promise.all([
+      Reservacion.find(filtro)
+        .select('idCliente agente destino fechaEntrada fechaSalida montoTotal abonado moneda')
+        .populate(POPULATE_CLIENTE, 'nombreCompleto telefono')
+        .populate(POPULATE_AGENTE, 'nombre')
+        .sort({ fechaEntrada: 1 })
+        .limit(50)
+        .lean(),
+      Reservacion.countDocuments(filtro),
+    ]);
+    res.json({
+      dias,
+      total,
+      datos: filas.map((r) => ({
+        idReservacion: r._id,
+        cliente: r.idCliente ? { nombre: r.idCliente.nombreCompleto, telefono: r.idCliente.telefono } : null,
+        agente: r.agente?.nombre || null,
+        destino: r.destino,
+        fechaEntrada: r.fechaEntrada,
+        fechaSalida: r.fechaSalida,
+        diasParaViajar: Math.round((new Date(r.fechaEntrada) - hoy) / (24 * 60 * 60 * 1000)),
+        moneda: r.moneda || 'MXN',
+        saldo: Math.round(((r.montoTotal || 0) - (r.abonado || 0)) * 100) / 100,
+      })),
+    });
   } catch (err) {
     next(err);
   }
@@ -134,7 +177,13 @@ router.put('/:id', async (req, res, next) => {
       return res.status(403).json({ error: 'Solo el agente que registró la reservación o el Administrador pueden editarla.' });
     }
 
+    // Solo se editan reservaciones activas; el estatus no se cambia desde aquí
+    // (cancelar es una acción aparte, exclusiva del Administrador).
+    if (reservacion.estatus !== 'Activa') {
+      throw errorHttp(409, `No se puede editar una reservación ${reservacion.estatus.toLowerCase()}.`);
+    }
     const cambios = soloCampos(req.body, CAMPOS);
+    delete cambios.estatus;
     // Las referencias que cambian se revalidan contra la empresa (antes solo se
     // validaban al crear y una edición podía ligar clientes/proveedores ajenos).
     if (cambios.idCliente !== undefined && String(cambios.idCliente) !== String(reservacion.idCliente)) {
@@ -187,6 +236,45 @@ router.put('/:id', async (req, res, next) => {
       });
     }
     res.json(reservacion);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/reservaciones/:id/cancelar { motivo? }
+// Solo el Administrador de la empresa. Únicamente cambia el estatus a Cancelada:
+// los abonos del cliente y los pagos a proveedores se conservan tal cual, como
+// histórico. Una reservación cancelada deja de contar en ventas, cobranza y el
+// acumulado de proveedores, y ya no admite abonos, pagos ni ediciones.
+router.patch('/:id/cancelar', async (req, res, next) => {
+  try {
+    if (req.agente.rol !== 'Administrador') {
+      throw errorHttp(403, 'Solo el Administrador de la empresa puede cancelar reservaciones.');
+    }
+    const reservacion = await Reservacion.findById(req.params.id);
+    if (!reservacion) return res.status(404).json({ error: 'Reservación no encontrada' });
+    if (!perteneceAlAlcance(reservacion, req)) {
+      return res.status(403).json({ error: 'No tienes permiso para cancelar esta reservación.' });
+    }
+    if (reservacion.estatus === 'Cancelada') throw errorHttp(409, 'La reservación ya está cancelada.');
+
+    const anterior = reservacion.estatus;
+    const motivo = String(req.body?.motivo || '').trim().slice(0, 300);
+    // updateOne: solo el estatus, sin revalidar ni tocar el resto del documento.
+    await Reservacion.updateOne({ _id: reservacion._id }, { $set: { estatus: 'Cancelada' }, $inc: { __v: 1 } });
+
+    const usuario = usuarioDeLaSesion(req);
+    await registrarCambios({
+      entidad: 'Reservacion', entidadId: reservacion._id, empresa: reservacion.empresa,
+      anterior: { estatus: anterior }, nuevo: { estatus: 'Cancelada' }, usuario,
+    });
+    if (motivo) {
+      await registrarEvento({
+        entidad: 'Reservacion', entidadId: reservacion._id, empresa: reservacion.empresa,
+        evento: 'motivo de cancelación', detalle: motivo, usuario,
+      });
+    }
+    res.json({ _id: reservacion._id, estatus: 'Cancelada' });
   } catch (err) {
     next(err);
   }

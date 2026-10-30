@@ -7,6 +7,7 @@ import {
 import { paginar } from '../utils/paginacion.js';
 import { rutasComprobante } from '../utils/comprobantes.js';
 import { fechaDelPago, fechaCortaMx } from '../utils/fechas.js';
+import { reactivarSiTieneSaldo } from '../utils/estatusReservacion.js';
 
 // Pagos de la agencia a sus proveedores (cuentas por pagar), por servicio de
 // cada reservación. Mismas reglas que los cobros a clientes: cualquier usuario
@@ -197,6 +198,8 @@ router.patch('/:id/cancelar', async (req, res, next) => {
       { _id: pago.idReservacion, 'detalleReservacion._id': pago.idDetalle },
       { $inc: { 'detalleReservacion.$.pagado': -pago.monto, __v: 1 } }
     );
+    // Si ya estaba completada, vuelve a tener saldo con el proveedor: regresa a Activa.
+    await reactivarSiTieneSaldo(pago.idReservacion, usuario);
 
     await registrarCambios({
       entidad: 'PagoProveedor', entidadId: pago._id, empresa: pago.empresa,

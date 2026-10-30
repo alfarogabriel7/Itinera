@@ -6,9 +6,15 @@ import SelectorRemoto from './common/SelectorRemoto';
 import { SelectorRangoFechas, aFecha, aTexto } from './common/Calendario';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { obtenerSesion } from '../utils/sesion';
-import { Compass, Plus, Send, Search, Eye, X, Pencil, Save } from 'lucide-react';
+import { Compass, Plus, Send, Search, Eye, X, Pencil, Save, Ban, CreditCard } from 'lucide-react';
 import { fechaViaje, dinero } from '../utils/formato';
 import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
+
+const COLOR_ESTATUS = {
+  Activa: 'bg-emerald-100 text-emerald-700',
+  Completada: 'bg-slate-100 text-slate-600',
+  Cancelada: 'bg-red-100 text-red-700',
+};
 
 const MAESTRO_VACIO = { idCliente: '', clienteNombre: '', fechaEntrada: '', fechaSalida: '', destino: '', descripcion: '', montoTotal: '', moneda: 'MXN', notas: '' };
 
@@ -17,7 +23,8 @@ const buscarClientes = (q) => clientesApi.list({ q, estatus: 'Activo', orden: 'n
 const buscarProveedores = (q) => proveedoresApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
 
 // clienteInicial ({ id, nombre }): cliente precargado al llegar desde Clientes ("Generar reservación").
-export default function Reservaciones({ clienteInicial = null }) {
+// onAbonar(idReservacion): abre Registro de Pagos con esa reservación elegida.
+export default function Reservaciones({ clienteInicial = null, onAbonar }) {
   const sesion = obtenerSesion();
   const [guardando, setGuardando] = useState(false);
 
@@ -53,7 +60,9 @@ export default function Reservaciones({ clienteInicial = null }) {
   }, []);
   // Filtros del listado: agente que vendió ('' todos, 'mios', o id) y estatus.
   const [filtroAgente, setFiltroAgente] = useState('');
-  const [filtroEstatus, setFiltroEstatus] = useState('');
+  // Abre en "Activas" (las vigentes) para que el listado diario no crezca con el
+  // histórico; completadas, canceladas o todas se eligen en el filtro.
+  const [filtroEstatus, setFiltroEstatus] = useState('Activa');
 
   const listado = useListadoRemoto(params => reservacionesApi.list(params), {
     filtros: {
@@ -169,6 +178,25 @@ export default function Reservaciones({ clienteInicial = null }) {
       totalReservacion: d.totalReservacion ?? 0,
     })));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Solo el Administrador (lo valida también el servidor). Únicamente cambia el
+  // estatus: los abonos y pagos a proveedores se conservan como histórico.
+  const esAdministrador = sesion?.rol === 'Administrador';
+  const handleCancelar = async (r) => {
+    const motivo = window.prompt(
+      `¿Cancelar la reservación de ${r.idCliente?.nombreCompleto || 'el cliente'} a ${r.destino}?\n\n` +
+      'Los abonos del cliente y los pagos a proveedores se conservan como histórico, pero la reservación ' +
+      'dejará de contar en ventas, cobranza y el acumulado de proveedores.\n\nMotivo (opcional):'
+    );
+    if (motivo === null) return;
+    try {
+      await reservacionesApi.cancelar(r._id, motivo.trim());
+      if (editando?.id === r._id) limpiarFormulario();
+      await cargarReservaciones();
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleVer = (r) => {
@@ -407,16 +435,29 @@ export default function Reservaciones({ clienteInicial = null }) {
                     {dinero(r.montoTotal)} <span className="text-2xs font-semibold text-slate-400">{r.moneda || 'MXN'}</span>
                   </td>
                   <td className="p-3">
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{r.estatus}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${COLOR_ESTATUS[r.estatus] || COLOR_ESTATUS.Activa}`}>{r.estatus}</span>
                   </td>
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-2">
                       <button onClick={() => handleVer(r)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
+                      {/* Atajo a Registro de Pagos con esta reservación (solo activas con saldo). */}
+                      {onAbonar && r.estatus === 'Activa' && (r.montoTotal || 0) - (r.abonado || 0) > 0.005 && (
+                        <button onClick={() => onAbonar(r._id)}
+                          title={`Registrar abono · saldo ${dinero((r.montoTotal || 0) - (r.abonado || 0))} ${r.moneda || 'MXN'}`}
+                          className="w-8 h-8 rounded-full bg-brand-coral hover:brightness-90 text-white flex items-center justify-center">
+                          <CreditCard size={14} />
+                        </button>
+                      )}
                       {puedeEditar(r) && (
                         <button onClick={() => handleEditar(r)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                           <Pencil size={14} />
+                        </button>
+                      )}
+                      {esAdministrador && r.estatus === 'Activa' && (
+                        <button onClick={() => handleCancelar(r)} title="Cancelar reservación" className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center">
+                          <Ban size={14} />
                         </button>
                       )}
                     </div>

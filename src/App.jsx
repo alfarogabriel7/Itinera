@@ -14,10 +14,11 @@ import { authApi, dashboardApi, empresasApi, setUnauthorizedHandler } from './ap
 import { obtenerSesion } from './utils/sesion';
 import { TEMA_PREDETERMINADO } from '../database/catalogos/temas.js';
 import MasUSD from './components/common/MasUSD';
+import CampanaViajes from './components/common/CampanaViajes';
 import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
-  Users, Truck, Compass, DollarSign, Bell, ChevronDown,
+  Users, Truck, Compass, DollarSign, ChevronDown,
   Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home,
 } from 'lucide-react';
 
@@ -303,10 +304,8 @@ export default function App() {
             <h2 className="text-lg font-semibold text-slate-700">{PAGE_TITLES[activeTab]}</h2>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative text-slate-400 hover:text-slate-600">
-              <Bell size={20} />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" />
-            </button>
+            {/* El superAdmin no tiene reservaciones: sin campana de viajes. */}
+            {auth.rol !== 'superAdmin' && <CampanaViajes auth={auth} onAbonar={abonarDesdeCobranza} />}
             <MenuUsuario auth={auth} onLogout={handleLogout} />
           </div>
         </header>
@@ -319,7 +318,7 @@ export default function App() {
             {activeTab === 'prospectos' && auth.rol !== 'superAdmin' && <Prospectos />}
             {activeTab === 'empresas' && auth.rol === 'superAdmin' && <Empresas />}
             {activeTab === 'proveedores' && auth.rol !== 'superAdmin' && <Proveedores />}
-            {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones clienteInicial={clienteParaReservar} />}
+            {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones clienteInicial={clienteParaReservar} onAbonar={abonarDesdeCobranza} />}
             {activeTab === 'pagos' && auth.rol !== 'superAdmin' && <Pagos reservaInicial={reservaParaAbonar} />}
             {activeTab === 'cobranza' && auth.rol !== 'superAdmin' && <Cobranza onAbonar={abonarDesdeCobranza} />}
             {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}

@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { Reservacion, Pago, Agente, Cliente } from '../../database/index.js';
+import { Reservacion, Pago, Agente, Cliente, Proveedor } from '../../database/index.js';
 import { bloquearSuperAdmin } from '../middleware/tenant.js';
 import { MONEDAS, MONEDA_PREDETERMINADA, monedaDe, filtroMoneda } from '../../database/catalogos/monedas.js';
+import { completarTerminadas } from '../utils/estatusReservacion.js';
 
 const router = Router();
 
@@ -89,6 +90,7 @@ router.get('/admin', async (req, res, next) => {
       return res.status(403).json({ error: 'El tablero de ventas es solo para el Administrador de la empresa.' });
     }
     const empresa = new mongoose.Types.ObjectId(String(req.agente.empresa));
+    await completarTerminadas(empresa);
     const cal = calendario();
     const desde24 = cal.inicioMes(23);
     const moneda = monedaDe(req.query.moneda);
@@ -235,6 +237,73 @@ router.get('/admin', async (req, res, next) => {
         mejorMes: mejorMes && mejorMes.ventas > 0 ? { mes: mejorMes.mes, ventas: mejorMes.ventas } : null,
       },
       ranking: { periodo, total: aCentavos(totalPeriodo), agentes: ranking },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/dashboard/proveedores?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&moneda=MXN|USD
+// Acumulado por proveedor del catálogo de la empresa, de reservaciones activas
+// y completadas (sin canceladas) cuyo viaje inicia en el rango (ambos días incluidos). Una sola
+// agregación: filtra por el índice {empresa, estatus, fechaEntrada}, separa los
+// servicios del detalle y agrupa por proveedor; el nombre se busca al final,
+// ya agrupado (uno por proveedor).
+router.get('/proveedores', async (req, res, next) => {
+  try {
+    if (req.agente.rol !== 'Administrador') {
+      return res.status(403).json({ error: 'El tablero de ventas es solo para el Administrador de la empresa.' });
+    }
+    const dia = (t) => (/^\d{4}-\d{2}-\d{2}$/.test(String(t)) ? new Date(`${t}T00:00:00Z`) : null);
+    const desde = dia(req.query.desde);
+    const hasta = dia(req.query.hasta);
+    if (!desde || !hasta || Number.isNaN(desde.getTime()) || Number.isNaN(hasta.getTime()) || hasta < desde) {
+      return res.status(400).json({ error: 'Rango de fechas inválido.' });
+    }
+    const empresa = new mongoose.Types.ObjectId(String(req.agente.empresa));
+    const moneda = monedaDe(req.query.moneda);
+
+    const filas = await Reservacion.aggregate([
+      {
+        $match: {
+          empresa,
+          estatus: { $in: ['Activa', 'Completada'] },
+          ...filtroMoneda(moneda),
+          [FECHA_VENTA]: { $gte: desde, $lt: new Date(hasta.getTime() + 24 * 60 * 60 * 1000) },
+        },
+      },
+      { $project: { detalleReservacion: 1 } },
+      { $unwind: '$detalleReservacion' },
+      {
+        $group: {
+          _id: '$detalleReservacion.idProveedor',
+          reservaciones: { $addToSet: '$_id' },
+          servicios: { $sum: 1 },
+          totalPagar: { $sum: '$detalleReservacion.totalReservacion' },
+          comision: { $sum: '$detalleReservacion.montoComisionable' },
+          pagado: { $sum: { $ifNull: ['$detalleReservacion.pagado', 0] } },
+        },
+      },
+      { $lookup: { from: Proveedor.collection.name, localField: '_id', foreignField: '_id', as: 'proveedor', pipeline: [{ $project: { nombreProveedor: 1, estatus: 1 } }] } },
+      { $sort: { totalPagar: -1 } },
+    ]);
+
+    const proveedores = filas.map((f) => ({
+      id: f._id,
+      nombre: f.proveedor[0]?.nombreProveedor || 'Proveedor eliminado',
+      estatus: f.proveedor[0]?.estatus || null,
+      reservaciones: f.reservaciones.length,
+      servicios: f.servicios,
+      totalPagar: aCentavos(f.totalPagar),
+      comision: aCentavos(f.comision),
+      pagado: aCentavos(f.pagado),
+      saldo: aCentavos(f.totalPagar - f.pagado),
+    }));
+    const suma = (campo) => aCentavos(proveedores.reduce((acc, p) => acc + p[campo], 0));
+    res.json({
+      moneda,
+      proveedores,
+      totales: { totalPagar: suma('totalPagar'), comision: suma('comision'), pagado: suma('pagado'), saldo: suma('saldo') },
     });
   } catch (err) {
     next(err);
