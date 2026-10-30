@@ -19,7 +19,7 @@ import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
   Users, Truck, Compass, DollarSign, ChevronDown,
-  Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home,
+  Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -131,6 +131,15 @@ export default function App() {
   const [auth, setAuth] = useState(obtenerSesion);
   const [activeTab, setActiveTab] = useState(() => tabInicial(obtenerSesion()?.rol));
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Menú lateral compactado a íconos (solo computadora). Se recuerda en este
+  // navegador; si el almacenamiento no está disponible, inicia expandido.
+  const [menuCompacto, setMenuCompacto] = useState(() => {
+    try { return localStorage.getItem('menuCompacto') === '1'; } catch { return false; }
+  });
+  const alternarMenuCompacto = () => setMenuCompacto((v) => {
+    try { localStorage.setItem('menuCompacto', v ? '0' : '1'); } catch { /* sin almacenamiento: solo en esta sesión */ }
+    return !v;
+  });
 
   const [resumen, setResumen] = useState({ clientesRegistrados: 0, reservacionesActivas: 0, pagosDelMes: 0 });
 
@@ -140,7 +149,11 @@ export default function App() {
   // u otro rol) arranque limpio y no arrastre datos del usuario anterior.
   const handleLogout = () => {
     authApi.logout().catch(() => {}); // best-effort: el logout local sigue aunque falle la red
+    // Se borra todo lo de la sesión; solo se conserva la preferencia visual del menú.
+    let preferenciaMenu = null;
+    try { preferenciaMenu = localStorage.getItem('menuCompacto'); } catch { /* sin almacenamiento */ }
     localStorage.clear();
+    try { if (preferenciaMenu) localStorage.setItem('menuCompacto', preferenciaMenu); } catch { /* sin almacenamiento */ }
     sessionStorage.clear();
     setAuth(null);
     setActiveTab('clientes');
@@ -241,9 +254,18 @@ export default function App() {
         <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-64 shrink-0 flex flex-col text-white bg-gradient-to-b from-brand-noche to-brand-petroleo transition-transform duration-200 overflow-y-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex items-center justify-between gap-3 px-6 py-6">
+      {/* Sidebar. En computadora se puede compactar a una barra de íconos (menuCompacto);
+          en celular siempre es el panel completo que se abre y se cierra. */}
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-64 shrink-0 flex flex-col text-white bg-gradient-to-b from-brand-noche to-brand-petroleo transition-all duration-200 overflow-y-auto overflow-x-hidden ${menuCompacto ? 'md:w-20' : ''} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        {/* Logo compacto (solo computadora con el menú compactado). */}
+        {menuCompacto && (
+          <div className="hidden md:flex justify-center py-6">
+            {logoEmpresa
+              ? <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center overflow-hidden p-1"><img src={logoEmpresa} alt="Logo de la empresa" className="max-w-full max-h-full object-contain" /></div>
+              : <img src={simboloItinera} alt="Itinera" className="h-10 w-10" />}
+          </div>
+        )}
+        <div className={`flex items-center justify-between gap-3 px-6 py-6 ${menuCompacto ? 'md:hidden' : ''}`}>
           {logoEmpresa === undefined ? (
             <div className="flex-1 h-24" />
           ) : logoEmpresa ? (
@@ -261,25 +283,27 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-2 space-y-1">
+        <nav className={`flex-1 py-2 space-y-1 ${menuCompacto ? 'px-4 md:px-3' : 'px-4'}`}>
           {navItemsVisibles.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => goTo(key)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${
+              title={menuCompacto ? label : undefined}
+              aria-label={label}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${menuCompacto ? 'md:justify-center md:px-0' : ''} ${
                 activeTab === key
                   ? 'bg-white text-brand-noche shadow-sm'
                   : 'text-white/75 hover:bg-white/10 hover:text-white'
               }`}
             >
-              <Icon size={18} className={activeTab === key ? 'text-brand-coral' : ''} />
-              {label}
+              <Icon size={18} className={`shrink-0 ${activeTab === key ? 'text-brand-coral' : ''}`} />
+              <span className={`whitespace-nowrap ${menuCompacto ? 'md:hidden' : ''}`}>{label}</span>
             </button>
           ))}
         </nav>
 
         {/* Con el logo de la empresa arriba, la marca de la plataforma queda como firma. */}
-        <div className="px-6 py-5 min-h-[64px] shrink-0 flex items-end">
+        <div className={`px-6 py-5 min-h-[64px] shrink-0 flex items-end ${menuCompacto ? 'md:hidden' : ''}`}>
           {logoEmpresa && (
             <div className="flex items-center gap-2 text-2xs uppercase tracking-wider text-white/50">
               con tecnología de <img src={logoItineraBlanco} alt="Itinera" className="h-4 w-auto opacity-80" />
@@ -287,9 +311,10 @@ export default function App() {
           )}
         </div>
 
-        <button onClick={handleLogout} className="shrink-0 flex items-center gap-3 px-6 py-5 text-sm font-medium text-white/75 hover:text-white hover:bg-white/10 border-t border-white/10">
-          <LogOut size={18} />
-          Cerrar sesión
+        <button onClick={handleLogout} title={menuCompacto ? 'Cerrar sesión' : undefined} aria-label="Cerrar sesión"
+          className={`shrink-0 flex items-center gap-3 px-6 py-5 text-sm font-medium text-white/75 hover:text-white hover:bg-white/10 border-t border-white/10 ${menuCompacto ? 'md:justify-center md:px-0' : ''}`}>
+          <LogOut size={18} className="shrink-0" />
+          <span className={`whitespace-nowrap ${menuCompacto ? 'md:hidden' : ''}`}>Cerrar sesión</span>
         </button>
       </aside>
 
@@ -300,7 +325,10 @@ export default function App() {
             <button className="md:hidden text-slate-500" onClick={() => setSidebarOpen(true)}>
               <Menu size={22} />
             </button>
-            <Menu className="hidden md:block text-slate-400" size={20} />
+            <button onClick={alternarMenuCompacto} className="hidden md:block text-slate-400 hover:text-slate-600"
+              title={menuCompacto ? 'Mostrar menú' : 'Ocultar menú'} aria-label={menuCompacto ? 'Mostrar menú' : 'Ocultar menú'} aria-expanded={!menuCompacto}>
+              {menuCompacto ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+            </button>
             <h2 className="text-lg font-semibold text-slate-700">{PAGE_TITLES[activeTab]}</h2>
           </div>
           <div className="flex items-center gap-4">
