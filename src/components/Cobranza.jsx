@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { pagosApi, agentesApi } from '../api';
-import { dinero, fechaCorta, fechaViaje, diasHasta } from '../utils/formato';
+import { dinero, fechaCorta, fechaViaje, diasHasta, telefono } from '../utils/formato';
 import PageHeader from './common/PageHeader';
 import MasUSD from './common/MasUSD';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
@@ -37,6 +37,43 @@ export function ligaWhatsApp(fila) {
     `del ${fechaViaje(fila.fechaEntrada)} tiene un saldo pendiente de ${dinero(fila.saldo)} ${fila.moneda || 'MXN'}. ` +
     '¡Quedamos atentos para cualquier duda!';
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+}
+
+// Saldo con barra de avance de pago (tabla y tarjetas).
+function SaldoConAvance({ fila: f }) {
+  const porcentaje = f.total > 0 ? Math.min(100, Math.round((f.pagado / f.total) * 100)) : 0;
+  return (
+    <div>
+      {f.saldo > 0
+        ? <div className="text-xs font-bold text-red-600 tabular-nums">{dinero(f.saldo)}</div>
+        : <div className="text-xs font-semibold text-emerald-700">Liquidada</div>}
+      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${porcentaje}%` }} />
+      </div>
+      <div className="text-[11px] text-slate-400 mt-0.5">{porcentaje}% pagado</div>
+    </div>
+  );
+}
+
+// Abonar y recordatorio por WhatsApp, solo ícono (la descripción va en el title).
+function AccionesCobranza({ fila: f, onAbonar }) {
+  const whatsapp = f.saldo > 0 && ligaWhatsApp(f);
+  return (
+    <div className="flex items-center justify-center gap-1.5">
+      {f.saldo > 0 && (
+        <button onClick={() => onAbonar(f.idReservacion)} title="Registrar abono" aria-label="Registrar abono"
+          className="w-8 h-8 rounded-full bg-brand-coral hover:brightness-90 text-white flex items-center justify-center">
+          <CreditCard size={14} />
+        </button>
+      )}
+      {whatsapp && (
+        <a href={whatsapp} target="_blank" rel="noopener noreferrer" title="Enviar recordatorio de pago por WhatsApp" aria-label="Enviar recordatorio por WhatsApp"
+          className="w-8 h-8 rounded-full border border-emerald-200 text-emerald-700 hover:bg-emerald-50 flex items-center justify-center">
+          <MessageCircle size={14} />
+        </a>
+      )}
+    </div>
+  );
 }
 
 function exportarCSV(filas, conAgente) {
@@ -102,7 +139,7 @@ export default function Cobranza({ onAbonar }) {
     }
   };
 
-  const columnas = 9;
+  const columnas = 6;
 
   return (
     <div className="flex flex-col gap-6">
@@ -172,18 +209,16 @@ export default function Cobranza({ onAbonar }) {
           <SelectorPorPagina listado={listado} />
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
+        {/* Pantallas anchas: tabla compacta de 6 columnas. */}
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-brand-noche text-white text-sm">
                 <th className="p-3 font-semibold">Cliente</th>
                 <th className="p-3 font-semibold">Viaje</th>
-                <th className="p-3 font-semibold">Inicio</th>
-                <th className="p-3 font-semibold">Vendió</th>
-                <th className="p-3 font-semibold">Total</th>
-                <th className="p-3 font-semibold">Pagado</th>
-                <th className="p-3 font-semibold min-w-[140px]">Saldo</th>
-                <th className="p-3 font-semibold">Último abono</th>
+                <th className="p-3 font-semibold text-right">Montos</th>
+                <th className="p-3 font-semibold min-w-[130px]">Saldo</th>
+                <th className="p-3 font-semibold hidden xl:table-cell">Último abono</th>
                 <th className="p-3 font-semibold text-center">Acciones</th>
               </tr>
             </thead>
@@ -191,56 +226,30 @@ export default function Cobranza({ onAbonar }) {
               {loading && filtradas.length === 0 && (
                 <tr><td colSpan={columnas} className="p-6 text-center text-slate-400 text-sm">Cargando cobranza...</td></tr>
               )}
-              {filtradas.map(f => {
-                const porcentaje = f.total > 0 ? Math.min(100, Math.round((f.pagado / f.total) * 100)) : 0;
-                const whatsapp = f.saldo > 0 && ligaWhatsApp(f);
-                return (
-                  <tr key={f.idReservacion} className="text-sm hover:bg-slate-50">
-                    <td className="p-3">
-                      <div className="font-medium text-slate-700">{f.cliente?.nombre || '—'}</div>
-                      {f.cliente?.telefono && <div className="text-xs text-slate-400">{f.cliente.telefono}</div>}
-                    </td>
-                    <td className="p-3 text-slate-600">
-                      {f.destino}
-                      <div className="text-xs text-slate-400">{fechaViaje(f.fechaEntrada)} al {fechaViaje(f.fechaSalida)}</div>
-                    </td>
-                    <td className="p-3 whitespace-nowrap"><EtiquetaViaje fila={f} /></td>
-                    <td className="p-3 text-slate-600">{f.agente || '—'}</td>
-                    <td className="p-3 font-mono text-xs text-slate-600">
-                      {dinero(f.total)}
-                      {f.moneda === 'USD' && <span className="ml-1 rounded bg-sky-100 px-1 font-sans text-2xs font-bold text-sky-700">USD</span>}
-                    </td>
-                    <td className="p-3 font-mono text-xs text-emerald-700">{dinero(f.pagado)}</td>
-                    <td className="p-3">
-                      {f.saldo > 0
-                        ? <div className="font-mono text-xs font-bold text-red-600">{dinero(f.saldo)}</div>
-                        : <div className="text-xs font-semibold text-emerald-700">Liquidada</div>}
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${porcentaje}%` }} />
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">{porcentaje}% pagado</div>
-                    </td>
-                    <td className="p-3 text-slate-600 text-xs">
-                      {f.ultimoAbono ? fechaCorta(f.ultimoAbono) : <span className="text-red-600 font-semibold">Sin abonos</span>}
-                      {f.abonos > 0 && <div className="text-slate-400">{f.abonos} abono(s)</div>}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {f.saldo > 0 && (
-                          <button onClick={() => onAbonar(f.idReservacion)} title="Registrar abono" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
-                            <CreditCard size={14} /> Abonar
-                          </button>
-                        )}
-                        {whatsapp && (
-                          <a href={whatsapp} target="_blank" rel="noopener noreferrer" title="Enviar recordatorio por WhatsApp" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-50">
-                            <MessageCircle size={14} /> Recordar
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtradas.map(f => (
+                <tr key={f.idReservacion} className="text-sm hover:bg-slate-50 align-top">
+                  <td className="p-3">
+                    <div className="font-medium text-slate-700">{f.cliente?.nombre || '—'}</div>
+                    {f.cliente?.telefono && <div className="text-xs text-slate-400 tabular-nums">{telefono(f.cliente.telefono)}</div>}
+                    {f.agente && <div className="text-xs text-slate-400">Vendió: {f.agente}</div>}
+                  </td>
+                  <td className="p-3 text-slate-600">
+                    <div>{f.destino}</div>
+                    <div className="text-xs text-slate-400 whitespace-nowrap">{fechaViaje(f.fechaEntrada)} al {fechaViaje(f.fechaSalida)}</div>
+                    <div className="mt-1"><EtiquetaViaje fila={f} /></div>
+                  </td>
+                  <td className="p-3 text-right text-xs tabular-nums whitespace-nowrap">
+                    <div className="text-slate-600">{dinero(f.total)}{f.moneda === 'USD' && <span className="ml-1 rounded bg-sky-100 px-1 text-2xs font-bold text-sky-700">USD</span>}</div>
+                    <div className="text-emerald-700">Pagado {dinero(f.pagado)}</div>
+                  </td>
+                  <td className="p-3"><SaldoConAvance fila={f} /></td>
+                  <td className="p-3 text-slate-600 text-xs hidden xl:table-cell">
+                    {f.ultimoAbono ? fechaCorta(f.ultimoAbono) : <span className="text-red-600 font-semibold">Sin abonos</span>}
+                    {f.abonos > 0 && <div className="text-slate-400">{f.abonos} abono(s)</div>}
+                  </td>
+                  <td className="p-3"><AccionesCobranza fila={f} onAbonar={onAbonar} /></td>
+                </tr>
+              ))}
               {!loading && listado.total === 0 && (
                 <tr><td colSpan={columnas} className="p-6 text-center text-slate-400 text-sm">
                   {indicadores.reservaciones === 0 ? 'No hay reservaciones con saldo pendiente.' : 'Ninguna reservación coincide con los filtros.'}
@@ -248,6 +257,37 @@ export default function Cobranza({ onAbonar }) {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Celular / pantallas angostas: tarjetas, sin scroll horizontal. */}
+        <div className="md:hidden space-y-3">
+          {loading && filtradas.length === 0 && <p className="p-6 text-center text-slate-400 text-sm">Cargando cobranza...</p>}
+          {filtradas.map(f => (
+            <div key={f.idReservacion} className="rounded-xl border border-slate-100 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-700 truncate">{f.cliente?.nombre || '—'}</div>
+                  <div className="text-xs text-slate-500 truncate">{f.destino} · {fechaViaje(f.fechaEntrada)} al {fechaViaje(f.fechaSalida)}</div>
+                  {f.agente && <div className="text-xs text-slate-400">Vendió: {f.agente}</div>}
+                </div>
+                <div className="shrink-0"><EtiquetaViaje fila={f} /></div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs tabular-nums">
+                <div>
+                  <div className="text-slate-600">Total {dinero(f.total)}{f.moneda === 'USD' && ' USD'}</div>
+                  <div className="text-emerald-700">Pagado {dinero(f.pagado)}</div>
+                  <div className="text-slate-400">{f.ultimoAbono ? `Último abono ${fechaCorta(f.ultimoAbono)}` : 'Sin abonos'}</div>
+                </div>
+                <SaldoConAvance fila={f} />
+              </div>
+              <div className="mt-3 flex justify-end"><AccionesCobranza fila={f} onAbonar={onAbonar} /></div>
+            </div>
+          ))}
+          {!loading && listado.total === 0 && (
+            <p className="p-6 text-center text-slate-400 text-sm">
+              {indicadores.reservaciones === 0 ? 'No hay reservaciones con saldo pendiente.' : 'Ninguna reservación coincide con los filtros.'}
+            </p>
+          )}
         </div>
 
         <Paginacion listado={listado} etiqueta="reservaciones" />
