@@ -118,6 +118,29 @@ async function corregirMontoComisionable() {
   console.log(`Monto comisionable corregido (modo automático) en ${corregidos} servicio(s).`);
 }
 
+// Montos de los servicios con decimales de más por punto flotante
+// (p.ej. 32580.569999999996): se dejan en centavos exactos.
+async function redondearMontosDetalle() {
+  const centavos = (n) => Math.round(Number(n) * 100) / 100;
+  const campos = ['montoReservacion', 'montoComisionable', 'totalReservacion', 'pagado'];
+  const reservaciones = await Reservacion.collection
+    .find({ 'detalleReservacion.0': { $exists: true } }, { projection: { detalleReservacion: 1 } })
+    .toArray();
+  let corregidos = 0;
+  for (const r of reservaciones) {
+    for (const d of r.detalleReservacion) {
+      const set = {};
+      for (const campo of campos) {
+        if (typeof d[campo] === 'number' && centavos(d[campo]) !== d[campo]) set[`detalleReservacion.$[d].${campo}`] = centavos(d[campo]);
+      }
+      if (!Object.keys(set).length) continue;
+      await Reservacion.collection.updateOne({ _id: r._id }, { $set: set }, { arrayFilters: [{ 'd._id': d._id }] });
+      corregidos++;
+    }
+  }
+  console.log(`Montos de servicios redondeados a centavos: ${corregidos}.`);
+}
+
 async function sincronizarIndices() {
   for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin]) {
     const eliminados = await Modelo.syncIndexes();
@@ -131,6 +154,7 @@ try {
   await convertirNotasDeClientes();
   await asignarMonedas();
   await corregirMontoComisionable();
+  await redondearMontosDetalle();
   await asignarAgenteAClientes();
   await sincronizarIndices();
   console.log(`Saldos recalculados en ${await recalcularSaldos()} reservación(es).`);

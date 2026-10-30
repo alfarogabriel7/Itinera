@@ -104,18 +104,20 @@ export default function Reservaciones({ clienteInicial = null, onAbonar }) {
       fila[field] = value;
     }
 
+    // Todo en centavos exactos (35699.20 - 3118.63 no da 32580.57 en punto flotante).
+    const centavos = (n) => Math.round(n * 100) / 100;
     const monto = parseFloat(fila.montoReservacion) || 0;
     if (fila.manual) {
       // Manual: el monto calculado sale de monto base - monto comisionable.
       const comisionable = parseFloat(fila.montoComisionable) || 0;
-      fila.totalReservacion = monto - comisionable;
+      fila.totalReservacion = centavos(monto - comisionable);
     } else {
       // Automático: el monto comisionable es la comisión (monto × %), igual que
       // en manual, y el total al proveedor es monto - comisión.
       const porcentaje = parseFloat(fila.porcentajeReservacion) || 0;
       const comision = Math.round(monto * porcentaje) / 100;
       fila.montoComisionable = comision;
-      fila.totalReservacion = monto - comision;
+      fila.totalReservacion = centavos(monto - comision);
     }
 
     nuevosDetalles[index] = fila;

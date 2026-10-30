@@ -35,6 +35,20 @@ async function validarProveedores(req, detalle, { exigirActivo }) {
     exigirActivo ? { estatus: 'Activo' } : {});
 }
 
+// Montos en centavos exactos: 35699.20 - 3118.63 da 32580.569999999996 en
+// punto flotante, y comparado contra 32580.57 pagados parecía menor.
+const aCentavos = (n) => Math.round(Number(n || 0) * 100) / 100;
+const CAMPOS_MONTO_DETALLE = ['montoReservacion', 'montoComisionable', 'totalReservacion'];
+function redondearDetalle(detalle) {
+  if (!Array.isArray(detalle)) return detalle;
+  return detalle.map((d) => {
+    if (!d || typeof d !== 'object') return d;
+    const limpio = { ...d };
+    for (const campo of CAMPOS_MONTO_DETALLE) if (limpio[campo] !== undefined && limpio[campo] !== '') limpio[campo] = aCentavos(limpio[campo]);
+    return limpio;
+  });
+}
+
 // Si el detalle cambia, cada servicio que ya tiene pagos al proveedor debe
 // seguir existiendo (mismo _id y mismo proveedor) y no puede quedar con un
 // total menor a lo ya pagado; si no, esos pagos quedarían huérfanos.
@@ -49,7 +63,7 @@ async function validarPagosAProveedores(reservacion, nuevoDetalle) {
     if (!nuevo || String(nuevo.idProveedor) !== String(anterior?.idProveedor)) {
       throw errorHttp(409, `El servicio ${anterior?.claveReservacion || ''} ya tiene pagos al proveedor; no se puede quitar ni cambiar de proveedor. Cancela primero esos pagos.`);
     }
-    if (nuevo.totalReservacion !== undefined && Number(nuevo.totalReservacion) < pagado) {
+    if (nuevo.totalReservacion !== undefined && aCentavos(nuevo.totalReservacion) + 0.005 < aCentavos(pagado)) {
       throw errorHttp(400, `El total del servicio ${anterior.claveReservacion} no puede ser menor a lo ya pagado al proveedor ($${pagado.toFixed(2)}).`);
     }
   }
@@ -153,6 +167,7 @@ router.post('/', async (req, res, next) => {
     const empresa = empresaDeLaSesion(req, 'Tu sesión no tiene una empresa asociada; no puedes crear reservaciones.');
     const datos = soloCampos(req.body, CAMPOS);
     delete datos.estatus; // toda reservación nace Activa
+    datos.detalleReservacion = redondearDetalle(datos.detalleReservacion);
 
     await validarCliente(req, datos.idCliente);
     await validarProveedores(req, datos.detalleReservacion, { exigirActivo: true });
@@ -184,6 +199,7 @@ router.put('/:id', async (req, res, next) => {
     }
     const cambios = soloCampos(req.body, CAMPOS);
     delete cambios.estatus;
+    if (cambios.detalleReservacion !== undefined) cambios.detalleReservacion = redondearDetalle(cambios.detalleReservacion);
     // Las referencias que cambian se revalidan contra la empresa (antes solo se
     // validaban al crear y una edición podía ligar clientes/proveedores ajenos).
     if (cambios.idCliente !== undefined && String(cambios.idCliente) !== String(reservacion.idCliente)) {
@@ -203,7 +219,7 @@ router.put('/:id', async (req, res, next) => {
     // El precio de venta no puede quedar por debajo de lo que el cliente ya pagó.
     if (cambios.montoTotal !== undefined) {
       const abonado = await abonadoDe(reservacion._id);
-      if (Number(cambios.montoTotal) < abonado) {
+      if (aCentavos(cambios.montoTotal) + 0.005 < aCentavos(abonado)) {
         throw errorHttp(400, `El monto total no puede ser menor a lo ya abonado por el cliente ($${abonado.toFixed(2)}).`);
       }
     }
