@@ -100,6 +100,7 @@ export const pagosApi = {
 // Pagos de la agencia a sus proveedores, por servicio de cada reservación.
 export const pagosProveedorApi = {
   estadoReservacion: (idReservacion) => request(`/pagos-proveedor/reservacion/${idReservacion}`),
+  pendientes: (params) => request(conParametros('/pagos-proveedor/pendientes', params)),
   list: (params) => request(conParametros('/pagos-proveedor', params)),
   create: (data) => request('/pagos-proveedor', { method: 'POST', body: JSON.stringify(data) }),
   cancelar: (id, motivo) => request(`/pagos-proveedor/${id}/cancelar`, { method: 'PATCH', body: JSON.stringify({ motivo }) }),

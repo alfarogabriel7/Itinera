@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { PagoProveedor, Reservacion, registrarCambios, registrarEvento } from '../../database/index.js';
+import { PagoProveedor, Reservacion, Cliente, Agente, Proveedor, registrarCambios, registrarEvento } from '../../database/index.js';
 import {
-  alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, usuarioDeLaSesion, errorHttp,
+  alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, usuarioDeLaSesion, errorHttp, regexBusqueda,
 } from '../middleware/tenant.js';
-import { paginar } from '../utils/paginacion.js';
+import { paginar, leerPaginacion, sobre } from '../utils/paginacion.js';
 import { rutasComprobante } from '../utils/comprobantes.js';
-import { fechaDelPago, fechaCortaMx } from '../utils/fechas.js';
-import { reactivarSiTieneSaldo } from '../utils/estatusReservacion.js';
+import { fechaDelPago, fechaCortaMx, hoyEnMexico } from '../utils/fechas.js';
+import { completarTerminadas, reactivarSiTieneSaldo } from '../utils/estatusReservacion.js';
+import { filtroCartera } from '../utils/cartera.js';
 
 // Pagos de la agencia a sus proveedores (cuentas por pagar), por servicio de
 // cada reservación. Mismas reglas que los cobros a clientes: cualquier usuario
@@ -36,6 +37,114 @@ async function cargarReservacion(req, id) {
   if (!perteneceAlAlcance(reservacion, req)) throw errorHttp(403, 'No tienes permiso para consultar esta reservación.');
   return reservacion;
 }
+
+// GET /api/pagos-proveedor/pendientes?q=&urgencia=todas|iniciado|7|30|mas&agente=<id>|mios=1&pagina=&porPagina=
+// Módulo "Pago a Proveedores": reservaciones activas con saldo pendiente con
+// sus proveedores, de la fecha de entrada más próxima a la más lejana. Por fila,
+// los servicios que faltan por pagar. Un Agente solo ve su cartera (lo que
+// vendió y lo de sus clientes asignados); el Administrador, toda la empresa.
+// Todo en una agregación: tabla paginada, su total e indicadores por moneda.
+//   - q y urgencia solo acotan la tabla (los indicadores muestran el total).
+router.get('/pendientes', async (req, res, next) => {
+  try {
+    await completarTerminadas(req.agente.empresa);
+    const p = leerPaginacion(req);
+    const hoy = new Date(`${hoyEnMexico()}T00:00:00Z`);
+    const en = (dias) => new Date(hoy.getTime() + dias * 24 * 60 * 60 * 1000);
+
+    const filtroTabla = {};
+    const urgencias = { iniciado: { $lt: hoy }, 7: { $gte: hoy, $lte: en(7) }, 30: { $gte: hoy, $lte: en(30) }, mas: { $gt: en(30) } };
+    if (urgencias[req.query.urgencia]) filtroTabla.fechaEntrada = urgencias[req.query.urgencia];
+    const regex = regexBusqueda(req.query.q);
+    if (regex) {
+      const clientes = await Cliente.find(alcanceEmpresa(req, { $or: [{ nombreCompleto: regex }, { telefono: regex }] })).select('_id').limit(500).lean();
+      const proveedores = await Proveedor.find(alcanceEmpresa(req, { nombreProveedor: regex })).select('_id').limit(500).lean();
+      filtroTabla.$or = [
+        { destino: regex },
+        { idCliente: { $in: clientes.map((c) => c._id) } },
+        { 'detalleReservacion.idProveedor': { $in: proveedores.map((x) => x._id) } },
+        { 'detalleReservacion.claveReservacion': regex },
+      ];
+    }
+    const entre = (desde, hasta) => ({ $and: [{ $gte: ['$fechaEntrada', desde] }, { $lte: ['$fechaEntrada', hasta] }] });
+    const cartera = await filtroCartera(req);
+
+    const [r] = await Reservacion.aggregate([
+      { $match: alcanceEmpresa(req, { estatus: 'Activa', ...filtroPorAgente(req), ...cartera }) },
+      {
+        $addFields: {
+          porPagar: { $sum: '$detalleReservacion.totalReservacion' },
+          pagadoProveedores: { $sum: { $map: { input: '$detalleReservacion', as: 'd', in: { $ifNull: ['$$d.pagado', 0] } } } },
+        },
+      },
+      { $addFields: { saldo: { $subtract: ['$porPagar', '$pagadoProveedores'] } } },
+      { $match: { saldo: { $gt: 0.005 } } },
+      {
+        $facet: {
+          indicadores: [{
+            $group: {
+              _id: { $ifNull: ['$moneda', 'MXN'] },
+              porPagar: { $sum: '$saldo' },
+              reservaciones: { $sum: 1 },
+              proximosMonto: { $sum: { $cond: [entre(hoy, en(7)), '$saldo', 0] } },
+              proximos: { $sum: { $cond: [entre(hoy, en(7)), 1, 0] } },
+              iniciadosMonto: { $sum: { $cond: [{ $lt: ['$fechaEntrada', hoy] }, '$saldo', 0] } },
+              iniciados: { $sum: { $cond: [{ $lt: ['$fechaEntrada', hoy] }, 1, 0] } },
+            },
+          }],
+          total: [{ $match: filtroTabla }, { $count: 'n' }],
+          datos: [
+            { $match: filtroTabla },
+            { $sort: { fechaEntrada: 1, _id: 1 } },
+            { $skip: p.saltar },
+            { $limit: p.porPagina },
+            { $lookup: { from: Cliente.collection.name, localField: 'idCliente', foreignField: '_id', as: 'cliente', pipeline: [{ $project: { nombreCompleto: 1, telefono: 1 } }] } },
+            { $lookup: { from: Agente.collection.name, localField: 'agente', foreignField: '_id', as: 'vendedor', pipeline: [{ $project: { nombre: 1 } }] } },
+            { $lookup: { from: Proveedor.collection.name, localField: 'detalleReservacion.idProveedor', foreignField: '_id', as: 'proveedores', pipeline: [{ $project: { nombreProveedor: 1 } }] } },
+          ],
+        },
+      },
+    ]);
+
+    const filas = r.datos.map((x) => {
+      const nombres = new Map(x.proveedores.map((pv) => [String(pv._id), pv.nombreProveedor]));
+      return {
+        idReservacion: x._id,
+        cliente: x.cliente[0] ? { nombre: x.cliente[0].nombreCompleto, telefono: x.cliente[0].telefono } : null,
+        agente: x.vendedor[0]?.nombre || null,
+        destino: x.destino,
+        fechaEntrada: x.fechaEntrada,
+        fechaSalida: x.fechaSalida,
+        moneda: x.moneda || 'MXN',
+        total: aCentavos(x.porPagar),
+        pagado: aCentavos(x.pagadoProveedores),
+        saldo: aCentavos(x.saldo),
+        // Solo los servicios que todavía tienen saldo con su proveedor.
+        pendientes: x.detalleReservacion
+          .map((d) => ({ proveedor: nombres.get(String(d.idProveedor)) || 'Proveedor', clave: d.claveReservacion, saldo: aCentavos(d.totalReservacion - (d.pagado || 0)) }))
+          .filter((d) => d.saldo > 0.005),
+      };
+    });
+
+    const por = Object.fromEntries(r.indicadores.map((i) => [i._id, i]));
+    const mxn = por.MXN || {};
+    const usd = por.USD || {};
+    const cuenta = (campo) => (mxn[campo] || 0) + (usd[campo] || 0);
+    res.json({
+      ...sobre(filas, r.total[0]?.n || 0, p),
+      // Montos en MXN y aparte los de USD (no se suman); las cantidades cuentan ambas.
+      indicadores: {
+        porPagar: aCentavos(mxn.porPagar),
+        reservaciones: cuenta('reservaciones'),
+        proximos: { cantidad: cuenta('proximos'), monto: aCentavos(mxn.proximosMonto) },
+        iniciados: { cantidad: cuenta('iniciados'), monto: aCentavos(mxn.iniciadosMonto) },
+        usd: { porPagar: aCentavos(usd.porPagar), proximos: aCentavos(usd.proximosMonto), iniciados: aCentavos(usd.iniciadosMonto) },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /api/pagos-proveedor/reservacion/:idReservacion
 // Estado de cuenta con proveedores de una reservación: por cada servicio, lo
