@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { Pago, Reservacion, Empresa, Cliente, Agente, registrarCambios, registrarEvento } from '../../database/index.js';
 import {
   alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, regexBusqueda, usuarioDeLaSesion,
@@ -53,6 +54,7 @@ router.get('/', async (req, res, next) => {
 // Reservaciones activas con lo que el cliente lleva pagado y lo que debe. Todo
 // se calcula en MongoDB (agregación + $facet): la tabla paginada, su total y
 // los indicadores, sin traer todas las reservaciones a memoria.
+//   - un Agente solo ve lo que vendió y lo de sus clientes asignados;
 //   - agente/mios acotan todo (tabla e indicadores);
 //   - q y urgencia solo acotan la tabla (los indicadores muestran el total).
 router.get('/cobranza', async (req, res, next) => {
@@ -85,8 +87,20 @@ router.get('/cobranza', async (req, res, next) => {
     const conSaldo = { saldo: { $gt: 0.005 } };
     const entre = (desde, hasta) => ({ $and: [{ $gte: ['$fechaEntrada', desde] }, { $lte: ['$fechaEntrada', hasta] }] });
 
+    // Un Agente solo ve su cobranza: lo que él vendió y lo de los clientes que
+    // tiene asignados (aunque otro agente haya registrado la venta). El
+    // Administrador ve toda la empresa. Registrar abonos sigue abierto a todos.
+    const carteraDelAgente = req.agente.rol === 'Agente'
+      ? {
+          $or: [
+            { agente: new mongoose.Types.ObjectId(String(req.agente.id)) },
+            { idCliente: { $in: await Cliente.distinct('_id', alcanceEmpresa(req, { agente: new mongoose.Types.ObjectId(String(req.agente.id)) })) } },
+          ],
+        }
+      : {};
+
     const [resultado] = await Reservacion.aggregate([
-      { $match: alcanceEmpresa(req, { estatus: 'Activa', ...filtroPorAgente(req) }) },
+      { $match: alcanceEmpresa(req, { estatus: 'Activa', ...filtroPorAgente(req), ...carteraDelAgente }) },
       {
         $lookup: {
           from: Pago.collection.name,

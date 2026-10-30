@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { pagosApi, agentesApi } from '../api';
+import { obtenerSesion } from '../utils/sesion';
 import { dinero, fechaCorta, fechaViaje, diasHasta, telefono } from '../utils/formato';
 import PageHeader from './common/PageHeader';
 import MasUSD from './common/MasUSD';
@@ -100,8 +101,10 @@ function exportarCSV(filas, conAgente) {
 const INDICADORES_VACIOS = { porCobrar: 0, reservaciones: 0, proximos: { cantidad: 0, monto: 0 }, iniciados: { cantidad: 0, monto: 0 } };
 
 export default function Cobranza({ onAbonar }) {
-  // Toda la empresa ve toda la cobranza (cualquier agente puede cobrar); el
-  // filtro de agente permite ver "mis reservaciones" o las de un compañero.
+  // El Administrador ve la cobranza de toda la empresa y puede filtrar por agente.
+  // Un Agente ve solo la suya (lo que vendió y lo de sus clientes asignados), y
+  // eso lo aplica el servidor. Registrar abonos sigue abierto a todos.
+  const esAgente = obtenerSesion()?.rol === 'Agente';
   const [urgencia, setUrgencia] = useState('todas');
   const [agente, setAgente] = useState('');
   const [orden, setOrden] = useState('fecha');
@@ -110,10 +113,11 @@ export default function Cobranza({ onAbonar }) {
   const [exportando, setExportando] = useState(false);
 
   useEffect(() => {
+    if (esAgente) return; // el agente no elige agente: solo ve lo suyo
     agentesApi.list({ estatus: 'Activo', orden: 'nombre', porPagina: 100 })
       .then(r => setAgentes(r.datos.filter(a => a.rol !== 'superAdmin')))
       .catch(() => setAgentes([]));
-  }, []);
+  }, [esAgente]);
 
   // Filtros, orden, paginación e indicadores se resuelven en el servidor.
   const filtros = {
@@ -192,11 +196,17 @@ export default function Cobranza({ onAbonar }) {
           <select value={urgencia} onChange={e => setUrgencia(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
             {URGENCIAS.map(u => <option key={u.key} value={u.key}>{u.label}</option>)}
           </select>
-          <select value={agente} onChange={e => setAgente(e.target.value)} title="Agente que vendió" className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
-            <option value="">Todos los agentes</option>
-            <option value="mios">Mis reservaciones</option>
-            {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
-          </select>
+          {esAgente ? (
+            <span className="text-xs text-slate-500" title="Lo que tú vendiste y lo de los clientes que tienes asignados">
+              Tus ventas y tus clientes asignados
+            </span>
+          ) : (
+            <select value={agente} onChange={e => setAgente(e.target.value)} title="Agente que vendió" className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
+              <option value="">Todos los agentes</option>
+              <option value="mios">Mis reservaciones</option>
+              {agentes.map(a => <option key={a._id} value={a._id}>{a.nombre}</option>)}
+            </select>
+          )}
           <select value={orden} onChange={e => setOrden(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
             <option value="fecha">Ordenar: viaje más próximo</option>
             <option value="saldo">Ordenar: saldo mayor</option>
