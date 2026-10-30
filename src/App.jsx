@@ -4,6 +4,7 @@ import Proveedores from './components/Proveedores';
 import Reservaciones from './components/Reservaciones';
 import Pagos from './components/Pagos';
 import Cobranza from './components/Cobranza';
+import PagoProveedores from './components/PagoProveedores';
 import Agentes from './components/Agentes';
 import Empresas from './components/Empresas';
 import Prospectos from './components/Prospectos';
@@ -18,7 +19,7 @@ import CampanaViajes from './components/common/CampanaViajes';
 import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
-  Users, Truck, Compass, DollarSign, ChevronDown,
+  Users, Truck, Compass, DollarSign, ChevronDown, HandCoins,
   Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
@@ -39,7 +40,9 @@ const NAV_ITEMS = [
   { key: 'reservaciones', label: 'Reservaciones', icon: Compass, visible: (rol) => rol !== 'superAdmin' },
   // superAdmin no consulta ni registra pagos de ninguna empresa.
   { key: 'pagos', label: 'Registro de Pagos', icon: DollarSign, visible: (rol) => rol !== 'superAdmin' },
-  { key: 'cobranza', label: 'Cobranza', icon: Wallet, visible: (rol) => rol !== 'superAdmin' },
+  { key: 'cobranza', label: 'Cobranza Clientes', icon: Wallet, visible: (rol) => rol !== 'superAdmin' },
+  // Reservaciones con pagos pendientes a proveedores (cuentas por pagar).
+  { key: 'pagoProveedores', label: 'Pago a Proveedores', icon: HandCoins, visible: (rol) => rol !== 'superAdmin' },
   // Un Agente no puede ver el módulo de Agentes en absoluto.
   { key: 'agentes', label: 'Agentes', icon: UserCog, visible: (rol) => rol !== 'Agente' },
 ];
@@ -61,6 +64,7 @@ const PAGE_TITLES = {
   reservaciones: 'Panel de Control',
   pagos: 'Panel de Control',
   cobranza: 'Panel de Control',
+  pagoProveedores: 'Panel de Control',
   agentes: 'Panel de Control',
 };
 
@@ -220,20 +224,31 @@ export default function App() {
     };
   }, [auth?.empresa]);
 
-  // Reservación que Cobranza manda preseleccionada al abrir Registro de Pagos.
+  // Reservación que Cobranza manda preseleccionada al abrir Registro de Pagos,
+  // y la pestaña con la que abre ('cobros' o 'proveedores').
   const [reservaParaAbonar, setReservaParaAbonar] = useState('');
+  const [pestanaPagos, setPestanaPagos] = useState('cobros');
   // Cliente ({ id, nombre }) que Clientes manda preseleccionado al abrir Reservaciones.
   const [clienteParaReservar, setClienteParaReservar] = useState(null);
 
   const goTo = (key) => {
     setActiveTab(key);
     setReservaParaAbonar('');
+    setPestanaPagos('cobros');
     setClienteParaReservar(null);
     setSidebarOpen(false);
   };
 
   const abonarDesdeCobranza = (idReservacion) => {
     setReservaParaAbonar(idReservacion);
+    setPestanaPagos('cobros');
+    setActiveTab('pagos');
+  };
+
+  // Desde "Pago a Proveedores": Registro de Pagos → pestaña Proveedores.
+  const pagarProveedorDesde = (idReservacion) => {
+    setReservaParaAbonar(idReservacion);
+    setPestanaPagos('proveedores');
     setActiveTab('pagos');
   };
 
@@ -347,8 +362,9 @@ export default function App() {
             {activeTab === 'empresas' && auth.rol === 'superAdmin' && <Empresas />}
             {activeTab === 'proveedores' && auth.rol !== 'superAdmin' && <Proveedores />}
             {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones clienteInicial={clienteParaReservar} onAbonar={abonarDesdeCobranza} />}
-            {activeTab === 'pagos' && auth.rol !== 'superAdmin' && <Pagos reservaInicial={reservaParaAbonar} />}
+            {activeTab === 'pagos' && auth.rol !== 'superAdmin' && <Pagos reservaInicial={reservaParaAbonar} pestanaInicial={pestanaPagos} />}
             {activeTab === 'cobranza' && auth.rol !== 'superAdmin' && <Cobranza onAbonar={abonarDesdeCobranza} />}
+            {activeTab === 'pagoProveedores' && auth.rol !== 'superAdmin' && <PagoProveedores onPagar={pagarProveedorDesde} />}
             {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}
           </main>
 

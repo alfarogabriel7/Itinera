@@ -149,7 +149,7 @@ export default function Cobranza({ onAbonar }) {
     <div className="flex flex-col gap-6">
       <PageHeader
         icon={Wallet}
-        title="Cobranza"
+        title="Cobranza Clientes"
         subtitle="Reservaciones activas con saldo pendiente, de la más próxima a viajar a la más lejana."
         action={
           <button onClick={handleExportar} disabled={listado.total === 0 || exportando} className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 shadow-sm">

@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import { Pago, Reservacion, Empresa, Cliente, Agente, registrarCambios, registrarEvento } from '../../database/index.js';
 import {
   alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, regexBusqueda, usuarioDeLaSesion,
 } from '../middleware/tenant.js';
 import { DESFASE_MX, fechaDelPago, fechaCortaMx } from '../utils/fechas.js';
 import { completarTerminadas, reactivarSiTieneSaldo } from '../utils/estatusReservacion.js';
+import { filtroCartera } from '../utils/cartera.js';
 import { paginar, leerPaginacion, sobre } from '../utils/paginacion.js';
 import { rutasComprobante } from '../utils/comprobantes.js';
 
@@ -87,20 +87,12 @@ router.get('/cobranza', async (req, res, next) => {
     const conSaldo = { saldo: { $gt: 0.005 } };
     const entre = (desde, hasta) => ({ $and: [{ $gte: ['$fechaEntrada', desde] }, { $lte: ['$fechaEntrada', hasta] }] });
 
-    // Un Agente solo ve su cobranza: lo que él vendió y lo de los clientes que
-    // tiene asignados (aunque otro agente haya registrado la venta). El
-    // Administrador ve toda la empresa. Registrar abonos sigue abierto a todos.
-    const carteraDelAgente = req.agente.rol === 'Agente'
-      ? {
-          $or: [
-            { agente: new mongoose.Types.ObjectId(String(req.agente.id)) },
-            { idCliente: { $in: await Cliente.distinct('_id', alcanceEmpresa(req, { agente: new mongoose.Types.ObjectId(String(req.agente.id)) })) } },
-          ],
-        }
-      : {};
+    // Un Agente solo ve su cobranza (lo que vendió y lo de sus clientes
+    // asignados); el Administrador, toda la empresa. Ver utils/cartera.js.
+    const cartera = await filtroCartera(req);
 
     const [resultado] = await Reservacion.aggregate([
-      { $match: alcanceEmpresa(req, { estatus: 'Activa', ...filtroPorAgente(req), ...carteraDelAgente }) },
+      { $match: alcanceEmpresa(req, { estatus: 'Activa', ...filtroPorAgente(req), ...cartera }) },
       {
         $lookup: {
           from: Pago.collection.name,

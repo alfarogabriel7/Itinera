@@ -17,10 +17,12 @@ const etiquetaReservacion = (r) => `${r.idCliente?.nombreCompleto || 'Cliente'} 
 // cualquier agente puede registrar el abono aunque la venta sea de otro.
 const buscarReservaciones = (q) => reservacionesApi.list({ q, porPagina: 15 }).then(r => r.datos);
 
-export default function Pagos({ reservaInicial = '' }) {
+// pestanaInicial: 'cobros' (abonos del cliente) o 'proveedores' (al llegar desde "Pago a Proveedores").
+export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }) {
   const esAdministrador = obtenerSesion()?.rol === 'Administrador';
 
-  const [pestana, setPestana] = useState('cobros');
+  const [pestana, setPestana] = useState(pestanaInicial);
+  useEffect(() => { setPestana(pestanaInicial); }, [pestanaInicial, reservaInicial]);
   const [error, setError] = useState('');
   const [selectedReservaId, setSelectedReservaId] = useState('');
   const [etiquetaSeleccion, setEtiquetaSeleccion] = useState('');
