@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Prospecto, Cliente, registrarCambios, registrarEvento } from '../../database/index.js';
+import { Prospecto, Cliente, Pendiente, registrarCambios, registrarEvento } from '../../database/index.js';
 import {
   alcanceEmpresa, perteneceAlAlcance, empresaDeLaSesion, bloquearSuperAdmin, sinSuperAdmin,
   soloCampos, regexBusqueda, usuarioDeLaSesion, filtroPorAgente,
@@ -206,6 +206,8 @@ router.post('/:id/convertir', async (req, res, next) => {
     }
     prospecto.estatus = 'cliente';
     await prospecto.save();
+    // Sus pendientes siguen vigentes, ahora ligados también al cliente nuevo.
+    await Pendiente.updateMany({ prospecto: prospecto._id, cliente: null }, { $set: { cliente: cliente._id } });
 
     const usuario = usuarioDeLaSesion(req);
     await registrarEvento({

@@ -19,6 +19,8 @@ const AccionNotaSchema = new Schema(
     // Solo en prospectos: la acción se cerró aquí porque su seguimiento pasó al
     // cliente al convertirlo. No se lista como "completada" en el panel del agente.
     migradaACliente: { type: Boolean },
+    // La acción se cerró porque su seguimiento pasó a un Pendiente (módulo "Mi día").
+    migradaAPendiente: { type: Boolean },
   },
   { _id: true }
 );
@@ -30,6 +32,7 @@ AccionNotaSchema.pre('validate', function () {
   if (this.estatus !== 'Completada') {
     this.fechaCompletada = undefined;
     this.migradaACliente = undefined;
+    this.migradaAPendiente = undefined;
   }
 });
 

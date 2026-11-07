@@ -98,6 +98,17 @@ export const pagosApi = {
 };
 
 // Pagos de la agencia a sus proveedores, por servicio de cada reservación.
+export const pendientesApi = {
+  miDia: (params) => request(conParametros('/pendientes/mi-dia', params)),
+  resumen: () => request('/pendientes/resumen'),
+  deRegistro: (params) => request(conParametros('/pendientes', params)),
+  create: (data) => request('/pendientes', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/pendientes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  hecho: (id, hecho = true) => request(`/pendientes/${id}/hecho`, { method: 'PATCH', body: JSON.stringify({ hecho }) }),
+  posponer: (id, cuando) => request(`/pendientes/${id}/posponer`, { method: 'PATCH', body: JSON.stringify(cuando) }),
+  remove: (id) => request(`/pendientes/${id}`, { method: 'DELETE' }),
+};
+
 export const pagosProveedorApi = {
   estadoReservacion: (idReservacion) => request(`/pagos-proveedor/reservacion/${idReservacion}`),
   pendientes: (params) => request(conParametros('/pagos-proveedor/pendientes', params)),
