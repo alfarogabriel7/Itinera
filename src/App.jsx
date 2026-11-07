@@ -5,13 +5,14 @@ import Reservaciones from './components/Reservaciones';
 import Pagos from './components/Pagos';
 import Cobranza from './components/Cobranza';
 import PagoProveedores from './components/PagoProveedores';
+import MiDia from './components/MiDia';
 import Agentes from './components/Agentes';
 import Empresas from './components/Empresas';
 import Prospectos from './components/Prospectos';
 import Dashboard from './components/Dashboard';
 import MiPanel from './components/MiPanel';
 import Login from './components/Login';
-import { authApi, dashboardApi, empresasApi, setUnauthorizedHandler } from './api';
+import { authApi, dashboardApi, empresasApi, pendientesApi, setUnauthorizedHandler } from './api';
 import { obtenerSesion } from './utils/sesion';
 import { TEMA_PREDETERMINADO } from '../database/catalogos/temas.js';
 import MasUSD from './components/common/MasUSD';
@@ -19,11 +20,13 @@ import CampanaViajes from './components/common/CampanaViajes';
 import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
-  Users, Truck, Compass, DollarSign, ChevronDown, HandCoins,
+  Users, Truck, Compass, DollarSign, ChevronDown, HandCoins, CalendarCheck,
   Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
+  // Primera opción: los pendientes del usuario (vencidos, de hoy y próximos), con contador.
+  { key: 'midia', label: 'Mi día', icon: CalendarCheck, visible: (rol) => rol !== 'superAdmin', contador: true },
   // Tablero de ventas: solo el Administrador (dueño) de cada empresa.
   { key: 'dashboard', label: 'Tablero de Ventas', icon: LayoutDashboard, visible: (rol) => rol === 'Administrador' },
   // Panel inicial con los pendientes del agente.
@@ -52,7 +55,7 @@ const TAB_INICIAL = { Administrador: 'dashboard', Agente: 'inicio', superAdmin: 
 const tabInicial = (rol) => TAB_INICIAL[rol] || 'inicio';
 
 // Pantallas que ocupan todo el ancho (sin el panel lateral de frase + resumen).
-const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio']);
+const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio', 'midia']);
 
 const PAGE_TITLES = {
   dashboard: 'Panel de Control',
@@ -65,6 +68,7 @@ const PAGE_TITLES = {
   pagos: 'Panel de Control',
   cobranza: 'Panel de Control',
   pagoProveedores: 'Panel de Control',
+  midia: 'Panel de Control',
   agentes: 'Panel de Control',
 };
 
@@ -224,6 +228,16 @@ export default function App() {
     };
   }, [auth?.empresa]);
 
+  // Contador del menú "Mi día": pendientes vencidos + de hoy del usuario.
+  const [pendientesUrgentes, setPendientesUrgentes] = useState(0);
+  const cargarPendientesUrgentes = () => {
+    pendientesApi.resumen().then(r => setPendientesUrgentes(r.vencidos + r.hoy)).catch(() => {});
+  };
+  useEffect(() => {
+    if (!auth || auth.rol === 'superAdmin') { setPendientesUrgentes(0); return; }
+    cargarPendientesUrgentes();
+  }, [auth, activeTab]);
+
   // Reservación que Cobranza manda preseleccionada al abrir Registro de Pagos,
   // y la pestaña con la que abre ('cobros' o 'proveedores').
   const [reservaParaAbonar, setReservaParaAbonar] = useState('');
@@ -299,13 +313,16 @@ export default function App() {
         </div>
 
         <nav className={`flex-1 py-2 space-y-1 ${menuCompacto ? 'px-4 md:px-3' : 'px-4'}`}>
-          {navItemsVisibles.map(({ key, label, icon: Icon }) => (
+          {navItemsVisibles.map(({ key, label, icon: Icon, contador }) => {
+            const n = contador ? pendientesUrgentes : 0;
+            const etiqueta = n ? `${label} · ${n} vencido(s) o para hoy` : label;
+            return (
             <button
               key={key}
               onClick={() => goTo(key)}
-              title={menuCompacto ? label : undefined}
-              aria-label={label}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${menuCompacto ? 'md:justify-center md:px-0' : ''} ${
+              title={menuCompacto ? etiqueta : undefined}
+              aria-label={etiqueta}
+              className={`relative w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${menuCompacto ? 'md:justify-center md:px-0' : ''} ${
                 activeTab === key
                   ? 'bg-white text-brand-noche shadow-sm'
                   : 'text-white/75 hover:bg-white/10 hover:text-white'
@@ -313,8 +330,14 @@ export default function App() {
             >
               <Icon size={18} className={`shrink-0 ${activeTab === key ? 'text-brand-coral' : ''}`} />
               <span className={`whitespace-nowrap ${menuCompacto ? 'md:hidden' : ''}`}>{label}</span>
+              {n > 0 && (
+                <span className={`ml-auto rounded-full bg-red-600 px-2 py-0.5 text-2xs font-bold text-white ${menuCompacto ? 'md:absolute md:right-1 md:top-1 md:ml-0 md:px-1.5' : ''}`}>
+                  {n > 99 ? '99+' : n}
+                </span>
+              )}
             </button>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Con el logo de la empresa arriba, la marca de la plataforma queda como firma. */}
@@ -356,7 +379,7 @@ export default function App() {
         <div className="flex-1 flex flex-col xl:flex-row gap-6 p-4 md:p-8">
           <main className="flex-1 min-w-0">
             {activeTab === 'dashboard' && auth.rol === 'Administrador' && <Dashboard />}
-            {activeTab === 'inicio' && auth.rol === 'Agente' && <MiPanel nombre={auth.nombre} onAbonar={abonarDesdeCobranza} onIr={goTo} />}
+            {activeTab === 'inicio' && auth.rol === 'Agente' && <MiPanel nombre={auth.nombre} onAbonar={abonarDesdeCobranza} onIr={goTo} onCambioPendientes={cargarPendientesUrgentes} />}
             {activeTab === 'clientes' && auth.rol !== 'superAdmin' && <Clientes onGenerarReservacion={reservarDesdeClientes} />}
             {activeTab === 'prospectos' && auth.rol !== 'superAdmin' && <Prospectos />}
             {activeTab === 'empresas' && auth.rol === 'superAdmin' && <Empresas />}
@@ -365,6 +388,7 @@ export default function App() {
             {activeTab === 'pagos' && auth.rol !== 'superAdmin' && <Pagos reservaInicial={reservaParaAbonar} pestanaInicial={pestanaPagos} />}
             {activeTab === 'cobranza' && auth.rol !== 'superAdmin' && <Cobranza onAbonar={abonarDesdeCobranza} />}
             {activeTab === 'pagoProveedores' && auth.rol !== 'superAdmin' && <PagoProveedores onPagar={pagarProveedorDesde} />}
+            {activeTab === 'midia' && auth.rol !== 'superAdmin' && <MiDia onCambioPendientes={cargarPendientesUrgentes} />}
             {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}
           </main>
 

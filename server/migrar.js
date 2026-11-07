@@ -18,7 +18,7 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import {
   connectDB, Cliente, Agente, Reservacion, Empresa, Proveedor, Prospecto, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado,
-  IntentoLogin, recalcularSaldos,
+  IntentoLogin, Pendiente, recalcularSaldos,
 } from '../database/index.js';
 
 async function asignarAgenteAClientes() {
@@ -141,8 +141,58 @@ async function redondearMontosDetalle() {
   console.log(`Montos de servicios redondeados a centavos: ${corregidos}.`);
 }
 
+// Las "acciones" abiertas de las notas de Prospectos y Clientes pasan a ser
+// Pendientes (módulo "Mi día"): mismo responsable, ligados a su registro y con
+// vencimiento hoy (no tenían fecha). La acción queda cerrada y marcada como
+// migrada, así que correrlo de nuevo no duplica nada.
+async function migrarAccionesAPendientes() {
+  const hoy = new Date(`${new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10)}T00:00:00Z`);
+  let creados = 0;
+  for (const [Modelo, entidad] of [[Prospecto, 'Prospecto'], [Cliente, 'Cliente']]) {
+    const registros = await Modelo.collection
+      .find({ 'notas.accionesNotas.estatus': 'En seguimiento' }, { projection: { empresa: 1, agente: 1, notas: 1 } })
+      .toArray();
+    for (const r of registros) {
+      for (const n of r.notas || []) {
+        for (const a of n.accionesNotas || []) {
+          if (a.estatus !== 'En seguimiento') continue;
+          const yaExiste = await Pendiente.exists({ 'origen.idAccion': a._id });
+          if (!yaExiste) {
+            await Pendiente.create({
+              empresa: r.empresa,
+              agente: r.agente,
+              titulo: String(a.descripcion || 'Seguimiento').slice(0, 200),
+              detalle: String(n.texto || '').slice(0, 1000) || undefined,
+              tipo: 'otro',
+              fecha: hoy,
+              ...(entidad === 'Prospecto' ? { prospecto: r._id } : { cliente: r._id }),
+              creadoPor: { userId: 'sistema', nombre: 'Migración de notas' },
+              origen: { entidad, idRegistro: r._id, idNota: n._id, idAccion: a._id },
+            });
+            creados++;
+          }
+          await Modelo.collection.updateOne(
+            { _id: r._id },
+            { $set: { 'notas.$[n].accionesNotas.$[a].estatus': 'Completada', 'notas.$[n].accionesNotas.$[a].fechaCompletada': new Date(), 'notas.$[n].accionesNotas.$[a].migradaAPendiente': true } },
+            { arrayFilters: [{ 'n._id': n._id }, { 'a._id': a._id }] }
+          );
+        }
+      }
+    }
+  }
+  // Prospectos ya convertidos: sus pendientes también quedan ligados al cliente.
+  const convertidos = await Pendiente.find({ prospecto: { $ne: null }, cliente: null }).select('prospecto').lean();
+  for (const p of convertidos) {
+    const evento = await Bitacora.findOne({ entidad: 'Prospecto', entidadId: p.prospecto, campo: 'convertido a cliente' }).select('valorNuevo').lean();
+    if (evento?.valorNuevo && mongoose.isValidObjectId(evento.valorNuevo)) {
+      await Pendiente.updateOne({ _id: p._id }, { $set: { cliente: new mongoose.Types.ObjectId(evento.valorNuevo) } });
+    }
+  }
+  console.log(`Acciones de notas migradas a Pendientes: ${creados}.`);
+}
+
 async function sincronizarIndices() {
-  for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin]) {
+  for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin, Pendiente]) {
     const eliminados = await Modelo.syncIndexes();
     console.log(`Índices de ${Modelo.modelName} sincronizados${eliminados.length ? ` (eliminados: ${eliminados.join(', ')})` : ''}.`);
   }
@@ -155,6 +205,7 @@ try {
   await asignarMonedas();
   await corregirMontoComisionable();
   await redondearMontosDetalle();
+  await migrarAccionesAPendientes();
   await asignarAgenteAClientes();
   await sincronizarIndices();
   console.log(`Saldos recalculados en ${await recalcularSaldos()} reservación(es).`);

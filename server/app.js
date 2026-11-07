@@ -12,6 +12,7 @@ import prospectosRouter from './routes/prospectos.routes.js';
 import bitacoraRouter from './routes/bitacora.routes.js';
 import dashboardRouter from './routes/dashboard.routes.js';
 import pagosProveedorRouter from './routes/pagosProveedor.routes.js';
+import pendientesRouter from './routes/pendientes.routes.js';
 import authRouter from './routes/auth.routes.js';
 import { requireAuth } from './middleware/auth.js';
 
@@ -73,6 +74,7 @@ app.use('/api/empresas', empresasRouter);
 app.use('/api/prospectos', prospectosRouter);
 app.use('/api/bitacora', bitacoraRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/pendientes', pendientesRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 

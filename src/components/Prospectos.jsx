@@ -7,6 +7,7 @@ import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
 import { SelectorFecha } from './common/Calendario';
+import { PendientesDeRegistro } from './pendientes/Pendientes';
 import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas } from './common/NotasSeguimiento';
 import {
   UserPlus, Plus, X, Save, Search, Pencil, UserCheck, Eye,
@@ -269,6 +270,14 @@ export default function Prospectos() {
           </div>
         </form>
       </div>
+
+      {/* Pendientes del prospecto (fuera del formulario: tienen su propio formulario de captura). */}
+      {form._id && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <h2 className="mb-3 text-base font-bold text-brand-noche">Pendientes de {form.nombreCompleto || 'este prospecto'}</h2>
+          <PendientesDeRegistro ligas={{ prospecto: form._id }} />
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
