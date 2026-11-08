@@ -12,5 +12,6 @@ export { default as Comprobante } from './models/Comprobante.js';
 export { default as PagoProveedor } from './models/PagoProveedor.js';
 export { default as IntentoLogin } from './models/IntentoLogin.js';
 export { default as Pendiente } from './models/Pendiente.js';
+export { default as PendienteAutomatico } from './models/PendienteAutomatico.js';
 export { registrarCambios, registrarEvento } from './utils/bitacora.js';
 export { recalcularSaldos } from './utils/saldos.js';

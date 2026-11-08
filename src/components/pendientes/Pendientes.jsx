@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Clock, MessageCircle, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, MessageCircle, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { pendientesApi, clientesApi, prospectosApi, reservacionesApi } from '../../api';
 import { TIPOS_PENDIENTE } from '../../../database/catalogos/tiposPendiente.js';
 import { SelectorFecha, aTexto, aFecha } from '../common/Calendario';
@@ -82,6 +82,12 @@ export function FilaPendiente({ p, hoy, onCambio, mostrarResponsable = false, co
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-sm font-semibold ${hecho ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{p.titulo}</span>
           <ChipTipo tipo={p.tipo} />
+          {p.automatico && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-1.5 py-0.5 text-2xs font-semibold text-slate-500"
+              title="Lo creó Itinera automáticamente; se cierra solo cuando se resuelve (cobro, pago a proveedor, documentos)">
+              <Sparkles size={11} aria-hidden="true" /> Automático
+            </span>
+          )}
           {p.pospuesto >= 2 && !hecho && <span className="text-2xs font-semibold text-amber-700" title="Veces que se ha pospuesto">Pospuesto {p.pospuesto}×</span>}
         </div>
         <TextoLiga p={p} />

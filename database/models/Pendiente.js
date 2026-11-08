@@ -33,6 +33,10 @@ const PendienteSchema = new Schema(
 
     // Si vino de una "acción" de nota (migración), de dónde salió.
     origen: { entidad: String, idRegistro: Schema.Types.ObjectId, idNota: Schema.Types.ObjectId, idAccion: Schema.Types.ObjectId },
+    // Creado por una regla automática (server/utils/pendientesAutomaticos.js):
+    // cobro, proveedor, documentos, regreso, prospecto, recompra o cumpleanos.
+    // detalleId: servicio de la reservación (regla de proveedor).
+    automatico: { regla: String, detalleId: Schema.Types.ObjectId },
   },
   { timestamps: true }
 );
@@ -44,5 +48,7 @@ PendienteSchema.index({ empresa: 1, estatus: 1, fecha: 1 });
 PendienteSchema.index({ prospecto: 1, estatus: 1 });
 PendienteSchema.index({ cliente: 1, estatus: 1 });
 PendienteSchema.index({ reservacion: 1, estatus: 1 });
+// Cierre automático: los abiertos de cada regla.
+PendienteSchema.index({ empresa: 1, 'automatico.regla': 1, estatus: 1 }, { partialFilterExpression: { 'automatico.regla': { $exists: true } } });
 
 export default mongoose.model('Pendiente', PendienteSchema);
