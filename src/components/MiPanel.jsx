@@ -1,21 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { dashboardApi, pagosApi, pendientesApi } from '../api';
-import { FilaPendiente } from './pendientes/Pendientes';
 import { dinero, fechaViaje, variacion } from '../utils/formato';
 import { EtiquetaViaje, ligaWhatsApp } from './Cobranza';
 import MasUSD from './common/MasUSD';
+import PageHeader from './common/PageHeader';
 import ProximosViajes from './common/ProximosViajes';
 import {
-  Sun, Sunset, Moon, TrendingUp, TrendingDown, Trophy, Wallet, ListTodo, CheckCircle2,
-  CreditCard, MessageCircle, ArrowRight, Plane, PlaneTakeoff,
+  TrendingUp, TrendingDown, Trophy, Wallet, ListTodo, CheckCircle2,
+  CreditCard, MessageCircle, ArrowRight, PlaneTakeoff, Home,
 } from 'lucide-react';
-
-function saludo() {
-  const h = new Date().getHours();
-  if (h < 12) return { texto: 'Buenos días', Icono: Sun };
-  if (h < 19) return { texto: 'Buenas tardes', Icono: Sunset };
-  return { texto: 'Buenas noches', Icono: Moon };
-}
 
 
 function Tarjeta({ icono: Icono, titulo, valor, usd, children, acento = 'text-brand-petroleo' }) {
@@ -38,15 +31,10 @@ export default function MiPanel({ nombre, onAbonar, onIr, onCambioPendientes }) 
   // Mi cobranza: las 10 más próximas a viajar + totales de toda mi cartera (calculados en el servidor).
   const [cobranza, setCobranza] = useState([]);
   const [totalesCobranza, setTotalesCobranza] = useState({ porCobrar: 0, reservaciones: 0, proximos: { cantidad: 0 } });
-  // Mis pendientes vencidos y de hoy (el detalle completo está en "Mi día").
+  // Conteo de mis pendientes vencidos y de hoy (para la tarjeta; el detalle está en "Mi día").
   const [dia, setDia] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errores, setErrores] = useState([]);
-
-  const cargarPendientes = async () => {
-    setDia(await pendientesApi.miDia());
-    onCambioPendientes?.();
-  };
 
   useEffect(() => {
     (async () => {
@@ -68,8 +56,6 @@ export default function MiPanel({ nombre, onAbonar, onIr, onCambioPendientes }) 
     })();
   }, []);
 
-  const { texto: textoSaludo, Icono: IconoSaludo } = saludo();
-  const primerNombre = (nombre || '').split(' ')[0];
   const porCobrar = totalesCobranza.porCobrar;
   const proximos30 = totalesCobranza.proximos.cantidad;
   const mes = resumen?.mesALaFecha;
@@ -80,19 +66,9 @@ export default function MiPanel({ nombre, onAbonar, onIr, onCambioPendientes }) 
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Saludo */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-noche to-brand-petroleo p-6 text-white shadow-sm">
-        <Plane size={120} className="absolute -right-4 -top-6 rotate-12 text-white/10" />
-        <div className="relative">
-          <div className="flex items-center gap-2 text-sm text-white/80"><IconoSaludo size={16} /> {textoSaludo}</div>
-          <h1 className="mt-1 text-2xl font-bold">{primerNombre ? `¡Hola, ${primerNombre}!` : '¡Hola!'}</h1>
-          <p className="mt-1 text-sm text-white/80">
-            {cargando
-              ? 'Cargando tus pendientes...'
-              : `Tienes ${urgentes.length} pendiente(s) para hoy${vencidos.length ? ` (${vencidos.length} vencido(s))` : ''} y ${totalesCobranza.reservaciones} reservación(es) con saldo por cobrar.`}
-          </p>
-        </div>
-      </div>
+      {/* El saludo de bienvenida está en "Mi día" (pantalla de inicio). */}
+      <PageHeader icon={Home} title="Mi Panel"
+        subtitle={cargando ? 'Cargando tu resumen…' : `Tus ventas, tu cobranza y tus próximos viajes · ${totalesCobranza.reservaciones} reservación(es) con saldo por cobrar.`} />
 
       {errores.length > 0 && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -122,34 +98,9 @@ export default function MiPanel({ nombre, onAbonar, onIr, onCambioPendientes }) 
         </Tarjeta>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-        {/* Mis pendientes vencidos y de hoy (el detalle está en "Mi día") */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><ListTodo size={18} className="text-brand-coral" /> Mis pendientes de hoy</h2>
-            <button onClick={() => onIr('midia')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-noche hover:underline">
-              Mi día <ArrowRight size={14} />
-            </button>
-          </div>
-
-          {!cargando && urgentes.length === 0 && (
-            <div className="rounded-xl bg-emerald-50 px-4 py-6 text-center text-sm text-emerald-700">
-              <CheckCircle2 size={22} className="mx-auto mb-1" /> No tienes pendientes vencidos ni para hoy.
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {urgentes.slice(0, 8).map((p) => <FilaPendiente key={p._id} p={p} hoy={dia.hoy} onCambio={cargarPendientes} compacta />)}
-          </div>
-          {urgentes.length > 8 && (
-            <button onClick={() => onIr('midia')} className="mt-3 text-sm font-semibold text-brand-noche hover:underline">
-              Ver los {urgentes.length} en Mi día
-            </button>
-          )}
-        </div>
-
-        {/* Cobranza de mis clientes */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm xl:col-span-3">
+      <div className="grid grid-cols-1 gap-6">
+        {/* Cobranza de mis clientes (los pendientes viven en "Mi día") */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><Wallet size={18} className="text-brand-petroleo" /> Cobranza de mis clientes</h2>
             <button onClick={() => onIr('cobranza')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-noche hover:underline">

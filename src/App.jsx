@@ -51,7 +51,8 @@ const NAV_ITEMS = [
 ];
 
 // Pantalla con la que arranca cada rol al iniciar sesión.
-const TAB_INICIAL = { Administrador: 'dashboard', Agente: 'inicio', superAdmin: 'empresas' };
+// El Agente arranca en "Mi día" (sus pendientes y la bienvenida).
+const TAB_INICIAL = { Administrador: 'dashboard', Agente: 'midia', superAdmin: 'empresas' };
 const tabInicial = (rol) => TAB_INICIAL[rol] || 'inicio';
 
 // Pantallas que ocupan todo el ancho (sin el panel lateral de frase + resumen).

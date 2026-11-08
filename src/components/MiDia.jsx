@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarCheck, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import Saludo from './common/Saludo';
 import { pendientesApi, agentesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
 import { TIPOS_PENDIENTE } from '../../database/catalogos/tiposPendiente.js';
@@ -61,6 +62,14 @@ export default function MiDia({ onCambioPendientes }) {
     { clave: 'proximos', titulo: 'Próximos 7 días', clase: 'text-slate-800', lista: datos.proximos },
   ] : [];
 
+  // "Hoy es viernes 7 de noviembre. Tienes 3 pendiente(s) para hoy (1 vencido)."
+  const mensajeBienvenida = !datos ? 'Cargando tus pendientes…' : (() => {
+    const v = abiertos(datos.vencidos);
+    const total = v + abiertos(datos.hoyLista);
+    const de = verDe ? `${usuarios?.find(u => u._id === verDe)?.nombre || 'Este usuario'} tiene` : 'Tienes';
+    return `Hoy es ${fechaLarga(datos.hoy).toLowerCase()}. ${total ? `${de} ${total} pendiente(s) para hoy${v ? ` (${v} vencido${v === 1 ? '' : 's'})` : ''}.` : `${de} todo al día.`}`;
+  })();
+
   const agregarPara = (venta) => {
     setInicial({ titulo: '', liga: venta.tipo === 'prospecto'
       ? { tipo: 'prospecto', id: venta.id, nombre: venta.nombre }
@@ -70,21 +79,17 @@ export default function MiDia({ onCambioPendientes }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{datos ? fechaLarga(datos.hoy) : ''}</p>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-800"><CalendarCheck size={24} className="text-brand-petroleo" /> Mi día</h1>
-        </div>
+      <Saludo nombre={sesion?.nombre} mensaje={mensajeBienvenida}>
         {esAdmin && usuarios?.length > 0 && (
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2 text-sm text-white/90">
             Ver el día de
-            <select value={verDe} onChange={e => setVerDe(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo">
+            <select value={verDe} onChange={e => setVerDe(e.target.value)} className="rounded-lg border border-white/30 bg-white p-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-white">
               <option value="">Mí</option>
               {usuarios.map(u => <option key={u._id} value={u._id}>{u.nombre}</option>)}
             </select>
           </label>
         )}
-      </header>
+      </Saludo>
 
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-slate-700">Nuevo pendiente</h2>
