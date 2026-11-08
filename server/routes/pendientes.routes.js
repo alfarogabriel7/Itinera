@@ -5,6 +5,7 @@ import {
   alcanceEmpresa, empresaDeLaSesion, sinSuperAdmin, asegurarMismaEmpresa, usuarioDeLaSesion, errorHttp, idDe,
 } from '../middleware/tenant.js';
 import { hoyEnMexico } from '../utils/fechas.js';
+import { generarPendientesAutomaticos } from '../utils/pendientesAutomaticos.js';
 
 // Pendientes (módulo "Mi día"). Reglas:
 //   - Un Agente ve y maneja sus pendientes (donde él es el responsable).
@@ -95,6 +96,7 @@ function aFila(p) {
     estatus: p.estatus,
     completadoEn: p.completadoEn || null,
     pospuesto: p.pospuesto || 0,
+    automatico: Boolean(p.automatico?.regla),
     agente: p.agente ? { id: p.agente._id, nombre: p.agente.nombre } : null,
     prospecto: p.prospecto ? { id: p.prospecto._id, nombre: p.prospecto.nombreCompleto, estatus: p.prospecto.estatus } : null,
     cliente: p.cliente ? { id: p.cliente._id, nombre: p.cliente.nombreCompleto } : null,
@@ -114,6 +116,7 @@ const porFechaYHora = (a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 
 router.get('/mi-dia', async (req, res, next) => {
   try {
     const empresa = oid(empresaDeLaSesion(req));
+    await generarPendientesAutomaticos(empresa);
     const responsable = esAdmin(req) && req.query.agente && mongoose.isValidObjectId(req.query.agente)
       ? oid(req.query.agente) : oid(req.agente.id);
     const hoy = hoyUTC();
@@ -165,6 +168,7 @@ router.get('/equipo', async (req, res, next) => {
   try {
     if (!esAdmin(req)) throw errorHttp(403, 'Solo el Administrador ve los pendientes del equipo.');
     const empresa = oid(empresaDeLaSesion(req));
+    await generarPendientesAutomaticos(empresa);
     const hoy = hoyUTC();
     const en7 = new Date(hoy.getTime() + 7 * DIA);
 
@@ -269,6 +273,7 @@ router.post('/reasignar', async (req, res, next) => {
 // GET /api/pendientes/resumen — contadores del usuario (insignia del menú).
 router.get('/resumen', async (req, res, next) => {
   try {
+    await generarPendientesAutomaticos(empresaDeLaSesion(req));
     const base = { empresa: oid(empresaDeLaSesion(req)), agente: oid(req.agente.id), estatus: 'pendiente' };
     const hoy = hoyUTC();
     const [vencidos, deHoy] = await Promise.all([

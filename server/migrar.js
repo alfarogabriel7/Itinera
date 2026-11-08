@@ -18,7 +18,7 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import {
   connectDB, Cliente, Agente, Reservacion, Empresa, Proveedor, Prospecto, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado,
-  IntentoLogin, Pendiente, recalcularSaldos,
+  IntentoLogin, Pendiente, PendienteAutomatico, recalcularSaldos,
 } from '../database/index.js';
 
 async function asignarAgenteAClientes() {
@@ -192,7 +192,7 @@ async function migrarAccionesAPendientes() {
 }
 
 async function sincronizarIndices() {
-  for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin, Pendiente]) {
+  for (const Modelo of [Empresa, Agente, Cliente, Proveedor, Prospecto, Reservacion, Pago, PagoProveedor, Bitacora, Comprobante, TokenRevocado, IntentoLogin, Pendiente, PendienteAutomatico]) {
     const eliminados = await Modelo.syncIndexes();
     console.log(`Índices de ${Modelo.modelName} sincronizados${eliminados.length ? ` (eliminados: ${eliminados.join(', ')})` : ''}.`);
   }
