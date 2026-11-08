@@ -6,6 +6,7 @@ import Pagos from './components/Pagos';
 import Cobranza from './components/Cobranza';
 import PagoProveedores from './components/PagoProveedores';
 import MiDia from './components/MiDia';
+import EquipoPendientes from './components/EquipoPendientes';
 import Agentes from './components/Agentes';
 import Empresas from './components/Empresas';
 import Prospectos from './components/Prospectos';
@@ -20,13 +21,15 @@ import CampanaViajes from './components/common/CampanaViajes';
 import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
-  Users, Truck, Compass, DollarSign, ChevronDown, HandCoins, CalendarCheck,
+  Users, Truck, Compass, DollarSign, ChevronDown, HandCoins, CalendarCheck, ClipboardList,
   Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   // Primera opción: los pendientes del usuario (vencidos, de hoy y próximos), con contador.
   { key: 'midia', label: 'Mi día', icon: CalendarCheck, visible: (rol) => rol !== 'superAdmin', contador: true },
+  // Carga de pendientes del equipo, vencidos y ventas sin próximo paso (solo Administrador).
+  { key: 'equipo', label: 'Pendientes del equipo', icon: ClipboardList, visible: (rol) => rol === 'Administrador' },
   // Tablero de ventas: solo el Administrador (dueño) de cada empresa.
   { key: 'dashboard', label: 'Tablero de Ventas', icon: LayoutDashboard, visible: (rol) => rol === 'Administrador' },
   // Panel inicial con los pendientes del agente.
@@ -51,12 +54,12 @@ const NAV_ITEMS = [
 ];
 
 // Pantalla con la que arranca cada rol al iniciar sesión.
-// El Agente arranca en "Mi día" (sus pendientes y la bienvenida).
-const TAB_INICIAL = { Administrador: 'dashboard', Agente: 'midia', superAdmin: 'empresas' };
+// Agente y Administrador arrancan en "Mi día" (sus pendientes y la bienvenida).
+const TAB_INICIAL = { Administrador: 'midia', Agente: 'midia', superAdmin: 'empresas' };
 const tabInicial = (rol) => TAB_INICIAL[rol] || 'inicio';
 
 // Pantallas que ocupan todo el ancho (sin el panel lateral de frase + resumen).
-const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio', 'midia']);
+const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio', 'midia', 'equipo']);
 
 const PAGE_TITLES = {
   dashboard: 'Panel de Control',
@@ -70,6 +73,7 @@ const PAGE_TITLES = {
   cobranza: 'Panel de Control',
   pagoProveedores: 'Panel de Control',
   midia: 'Panel de Control',
+  equipo: 'Panel de Control',
   agentes: 'Panel de Control',
 };
 
@@ -246,8 +250,17 @@ export default function App() {
   // Cliente ({ id, nombre }) que Clientes manda preseleccionado al abrir Reservaciones.
   const [clienteParaReservar, setClienteParaReservar] = useState(null);
 
+  // Usuario cuyo "Mi día" abre el Administrador desde "Pendientes del equipo".
+  const [diaDe, setDiaDe] = useState('');
+  const verDiaDe = (idAgente) => {
+    setDiaDe(idAgente);
+    setActiveTab('midia');
+    window.scrollTo({ top: 0 });
+  };
+
   const goTo = (key) => {
     setActiveTab(key);
+    setDiaDe('');
     setReservaParaAbonar('');
     setPestanaPagos('cobros');
     setClienteParaReservar(null);
@@ -385,11 +398,12 @@ export default function App() {
             {activeTab === 'prospectos' && auth.rol !== 'superAdmin' && <Prospectos />}
             {activeTab === 'empresas' && auth.rol === 'superAdmin' && <Empresas />}
             {activeTab === 'proveedores' && auth.rol !== 'superAdmin' && <Proveedores />}
-            {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones clienteInicial={clienteParaReservar} onAbonar={abonarDesdeCobranza} />}
+            {activeTab === 'reservaciones' && auth.rol !== 'superAdmin' && <Reservaciones clienteInicial={clienteParaReservar} onAbonar={abonarDesdeCobranza} onPagarProveedor={pagarProveedorDesde} />}
             {activeTab === 'pagos' && auth.rol !== 'superAdmin' && <Pagos reservaInicial={reservaParaAbonar} pestanaInicial={pestanaPagos} />}
             {activeTab === 'cobranza' && auth.rol !== 'superAdmin' && <Cobranza onAbonar={abonarDesdeCobranza} />}
             {activeTab === 'pagoProveedores' && auth.rol !== 'superAdmin' && <PagoProveedores onPagar={pagarProveedorDesde} />}
-            {activeTab === 'midia' && auth.rol !== 'superAdmin' && <MiDia onCambioPendientes={cargarPendientesUrgentes} />}
+            {activeTab === 'midia' && auth.rol !== 'superAdmin' && <MiDia key={diaDe} agenteInicial={diaDe} onCambioPendientes={cargarPendientesUrgentes} onIr={goTo} />}
+            {activeTab === 'equipo' && auth.rol === 'Administrador' && <EquipoPendientes onVerDia={verDiaDe} onCambioPendientes={cargarPendientesUrgentes} />}
             {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}
           </main>
 

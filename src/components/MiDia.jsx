@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ClipboardList, Plus } from 'lucide-react';
 import Saludo from './common/Saludo';
 import { pendientesApi, agentesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
@@ -26,14 +26,14 @@ function Contador({ titulo, valor, clase = 'text-slate-800' }) {
   );
 }
 
-export default function MiDia({ onCambioPendientes }) {
+export default function MiDia({ onCambioPendientes, agenteInicial = '', onIr }) {
   const sesion = obtenerSesion();
   const esAdmin = sesion?.rol === 'Administrador';
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState('todos');
   const [usuarios, setUsuarios] = useState(null);
-  const [verDe, setVerDe] = useState('');
+  const [verDe, setVerDe] = useState(esAdmin ? agenteInicial : '');
   const [inicial, setInicial] = useState(null);
 
   useEffect(() => {
@@ -80,7 +80,16 @@ export default function MiDia({ onCambioPendientes }) {
   return (
     <div className="flex flex-col gap-6">
       <Saludo nombre={sesion?.nombre} mensaje={mensajeBienvenida}>
-        {esAdmin && usuarios?.length > 0 && (
+        {esAdmin && (
+        <div className="flex flex-wrap items-center gap-3">
+        {/* Acción rápida del Administrador: la vista de pendientes de todo el equipo. */}
+        {onIr && (
+          <button type="button" onClick={() => onIr('equipo')}
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-semibold text-brand-noche shadow-sm hover:bg-white/90">
+            <ClipboardList size={16} /> Pendientes del equipo
+          </button>
+        )}
+        {usuarios?.length > 0 && (
           <label className="flex items-center gap-2 text-sm text-white/90">
             Ver el día de
             <select value={verDe} onChange={e => setVerDe(e.target.value)} className="rounded-lg border border-white/30 bg-white p-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-white">
@@ -88,6 +97,8 @@ export default function MiDia({ onCambioPendientes }) {
               {usuarios.map(u => <option key={u._id} value={u._id}>{u.nombre}</option>)}
             </select>
           </label>
+        )}
+        </div>
         )}
       </Saludo>
 

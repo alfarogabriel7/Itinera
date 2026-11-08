@@ -84,6 +84,13 @@ export const reservacionesApi = {
   update: (id, data) => request(`/reservaciones/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cancelar: (id, motivo) => request(`/reservaciones/${id}/cancelar`, { method: 'PATCH', body: JSON.stringify({ motivo }) }),
   proximas: (params) => request(conParametros('/reservaciones/proximas', params)),
+  // Ficha de reservación
+  ficha: (id) => request(`/reservaciones/${id}/ficha`),
+  agregarPeticion: (id, data) => request(`/reservaciones/${id}/peticiones`, { method: 'POST', body: JSON.stringify(data) }),
+  cambiarPeticion: (id, idPeticion, data) => request(`/reservaciones/${id}/peticiones/${idPeticion}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  eliminarPeticion: (id, idPeticion) => request(`/reservaciones/${id}/peticiones/${idPeticion}`, { method: 'DELETE' }),
+  guardarDocumentos: (id, documentos) => request(`/reservaciones/${id}/documentos`, { method: 'PUT', body: JSON.stringify({ documentos }) }),
+  agregarNota: (id, texto) => request(`/reservaciones/${id}/notas`, { method: 'POST', body: JSON.stringify({ texto }) }),
 };
 
 export const pagosApi = {
@@ -101,6 +108,8 @@ export const pagosApi = {
 export const pendientesApi = {
   miDia: (params) => request(conParametros('/pendientes/mi-dia', params)),
   resumen: () => request('/pendientes/resumen'),
+  equipo: () => request('/pendientes/equipo'),
+  reasignar: (de, a) => request('/pendientes/reasignar', { method: 'POST', body: JSON.stringify({ de, a }) }),
   deRegistro: (params) => request(conParametros('/pendientes', params)),
   create: (data) => request('/pendientes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/pendientes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -131,6 +140,7 @@ export const empresasApi = {
 export const dashboardApi = {
   admin: (periodo, moneda = 'MXN') => request(`/dashboard/admin?periodo=${periodo}&moneda=${moneda}`),
   proveedores: (desde, hasta, moneda = 'MXN') => request(`/dashboard/proveedores?desde=${desde}&hasta=${hasta}&moneda=${moneda}`),
+  clientes: (periodo, moneda = 'MXN') => request(`/dashboard/clientes?periodo=${periodo}&moneda=${moneda}`),
   agente: () => request('/dashboard/agente'),
   resumen: () => request('/dashboard/resumen'),
 };

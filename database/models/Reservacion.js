@@ -27,6 +27,37 @@ DetalleReservacionSchema.pre('validate', function () {
   }
 });
 
+// Petición especial del cliente (cuna, vista al mar, cena de aniversario…) y su
+// gestión con el proveedor: Solicitada → Enviada → Confirmada, o Rechazada (con motivo).
+export const ESTATUS_PETICION = ['Solicitada', 'Enviada', 'Confirmada', 'Rechazada'];
+const PeticionSchema = new Schema(
+  {
+    descripcion: { type: String, required: [true, 'Describe la petición del cliente.'], trim: true, maxlength: 300 },
+    canal: { type: String, trim: true, maxlength: 40 }, // por dónde la pidió (WhatsApp, llamada…)
+    estatus: { type: String, enum: { values: ESTATUS_PETICION, message: 'Estatus de petición inválido.' }, default: 'Solicitada' },
+    motivo: { type: String, trim: true, maxlength: 300 }, // por qué se rechazó
+    fechaSolicitud: { type: Date, default: Date.now },
+    fechaEnviada: { type: Date },
+    fechaRespuesta: { type: Date },
+    registradoPor: { id: { type: Schema.Types.ObjectId, ref: 'Agente' }, userId: String, nombre: String },
+    // Pendiente vigente de esta petición (enviar al proveedor, confirmar respuesta o avisar al cliente).
+    pendiente: { type: Schema.Types.ObjectId, ref: 'Pendiente' },
+  },
+  { _id: true }
+);
+
+// Documento del viaje y su estatus (solo el control; los archivos no se guardan aquí).
+export const ESTATUS_DOCUMENTO = ['Pendiente', 'Listo', 'No aplica'];
+export const DOCUMENTOS_BASE = ['Identificaciones', 'Boletos de avión', 'Cupón de hotel', 'Seguro de viaje'];
+const DocumentoSchema = new Schema(
+  {
+    nombre: { type: String, required: true, trim: true, maxlength: 80 },
+    estatus: { type: String, enum: { values: ESTATUS_DOCUMENTO, message: 'Estatus de documento inválido.' }, default: 'Pendiente' },
+    actualizado: { type: Date },
+  },
+  { _id: true }
+);
+
 const ReservacionSchema = new Schema(
   {
     // Empresa a la que pertenece la reservación (multi-tenant, igual que Agente/Cliente/Proveedor).
@@ -50,6 +81,9 @@ const ReservacionSchema = new Schema(
     estatus: { type: String, enum: ['Activa', 'Cancelada', 'Completada'], default: 'Activa' },
     // Acumulado de abonos aplicados del cliente (lo mantiene el servidor con $inc atómicos).
     abonado: { type: Number, default: 0 },
+    // Ficha de reservación: peticiones del cliente y checklist de documentos.
+    peticiones: { type: [PeticionSchema], default: [] },
+    documentos: { type: [DocumentoSchema], default: undefined },
   },
   // optimisticConcurrency: si alguien registra un pago mientras otro edita la
   // reservación, el guardado de la edición falla (409) en vez de pisar los acumulados.

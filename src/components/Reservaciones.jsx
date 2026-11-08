@@ -9,6 +9,7 @@ import { obtenerSesion } from '../utils/sesion';
 import { Compass, Plus, Send, Search, Eye, X, Pencil, Save, Ban, CreditCard } from 'lucide-react';
 import { fechaViaje, dinero } from '../utils/formato';
 import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
+import FichaReservacion from './FichaReservacion';
 
 const COLOR_ESTATUS = {
   Activa: 'bg-emerald-100 text-emerald-700',
@@ -24,9 +25,11 @@ const buscarProveedores = (q) => proveedoresApi.list({ q, estatus: 'Activo', ord
 
 // clienteInicial ({ id, nombre }): cliente precargado al llegar desde Clientes ("Generar reservación").
 // onAbonar(idReservacion): abre Registro de Pagos con esa reservación elegida.
-export default function Reservaciones({ clienteInicial = null, onAbonar }) {
+export default function Reservaciones({ clienteInicial = null, onAbonar, onPagarProveedor }) {
   const sesion = obtenerSesion();
   const [guardando, setGuardando] = useState(false);
+  // Reservación abierta en la ficha (pantalla completa); null = listado.
+  const [fichaId, setFichaId] = useState(null);
 
   const [maestro, setMaestro] = useState(MAESTRO_VACIO);
   const [detalles, setDetalles] = useState([]);
@@ -191,27 +194,30 @@ export default function Reservaciones({ clienteInicial = null, onAbonar }) {
       'Los abonos del cliente y los pagos a proveedores se conservan como histórico, pero la reservación ' +
       'dejará de contar en ventas, cobranza y el acumulado de proveedores.\n\nMotivo (opcional):'
     );
-    if (motivo === null) return;
+    if (motivo === null) return false;
     try {
       await reservacionesApi.cancelar(r._id, motivo.trim());
       if (editando?.id === r._id) limpiarFormulario();
       await cargarReservaciones();
+      return true;
     } catch (err) {
       alert(err.message);
+      return false;
     }
   };
 
-  const handleVer = (r) => {
-    const servicios = r.detalleReservacion
-      .map(d => `- ${d.idProveedor?.nombreProveedor || 'Proveedor'}: comisionable ${dinero(d.montoComisionable)} · total ${dinero(d.totalReservacion)}`)
-      .join('\n');
-    alert(
-      `Destino: ${r.destino}\nCliente: ${r.idCliente?.nombreCompleto || ''}\nAgente: ${r.agente?.nombre || ''}\n` +
-      `Entrada: ${fechaViaje(r.fechaEntrada)}  Salida: ${fechaViaje(r.fechaSalida)}\n` +
-      `Descripción: ${r.descripcion || '—'}\nNotas: ${r.notas || '—'}\n\nServicios:\n${servicios || '—'}\n\n` +
-      `Monto Total de la Reservación: ${dinero(r.montoTotal)} ${r.moneda || 'MXN'}\nCosto con Proveedores: ${dinero(r.totalViaje)} ${r.moneda || 'MXN'}`
+  const handleVer = (r) => setFichaId(r._id);
+
+  if (fichaId) {
+    return (
+      <FichaReservacion id={fichaId}
+        onVolver={() => { setFichaId(null); cargarReservaciones(); }}
+        onEditar={(r) => { setFichaId(null); handleEditar(r); }}
+        onCancelar={handleCancelar}
+        onAbonar={(id) => onAbonar?.(id)}
+        onPagarProveedor={(id) => onPagarProveedor?.(id)} />
     );
-  };
+  }
 
   return (
     <div className="flex flex-col gap-6">
