@@ -41,30 +41,68 @@ const fechaCorta = (f) => `${f.getUTCDate()} ${MESES[f.getUTCMonth()]}`;
 const dinero = (n, moneda) => `$${Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${moneda || 'MXN'}`;
 const masDias = (fecha, n) => new Date(fecha.getTime() + n * DIA);
 const saldoDe = (d) => (d.totalReservacion || 0) - (d.pagado || 0);
+const VIGENTES = ['Activa', 'Completada']; // reservaciones no canceladas
 
-// Se revisa como máximo una vez cada 10 minutos por empresa y por instancia.
+// Frecuencia:
+//   - Reglas de viaje (cobro, proveedor, documentos, regreso) y cierre automático:
+//     como máximo cada 10 minutos por empresa. Primero se descarta en memoria (sin
+//     consultar la base) y luego se "reclama" la revisión en la base, para que las
+//     varias instancias de Vercel no repitan el trabajo.
+//   - Reglas diarias (prospecto, recompra, cumpleaños): una vez al día por empresa.
+// Las marcas viven en PendienteAutomatico con regla 'control'.
 const ultimaRevision = new Map();
 const CADA_MS = 10 * 60 * 1000;
 
-export async function generarPendientesAutomaticos(empresa) {
+export async function generarPendientesAutomaticos(empresa, { forzar = false } = {}) {
   if (!empresa) return;
   const clave = String(empresa);
   const ahora = Date.now();
-  if (ahora - (ultimaRevision.get(clave) || 0) < CADA_MS) return;
+  if (!forzar && ahora - (ultimaRevision.get(clave) || 0) < CADA_MS) return;
   ultimaRevision.set(clave, ahora);
   try {
-    await revisar(new mongoose.Types.ObjectId(clave));
+    const id = new mongoose.Types.ObjectId(clave);
+    if (!forzar && !(await reclamarRevision(id))) return;
+    await revisar(id, { forzar });
   } catch (err) {
     // Nunca debe romper la pantalla que lo disparó.
     console.error('Pendientes automáticos:', err);
   }
 }
 
-// Para pruebas: olvida la última revisión (fuerza la siguiente).
+// Para pruebas: olvida la última revisión en memoria.
 export const reiniciarRevisionAutomaticos = () => ultimaRevision.clear();
 
-async function revisar(empresa) {
-  const hoy = new Date(`${hoyEnMexico()}T00:00:00Z`);
+// Toma la revisión de los próximos 10 minutos para esta instancia. Atómico: si
+// otra instancia revisó hace menos de 10 minutos, el upsert choca con el índice
+// único y regresa false.
+async function reclamarRevision(empresa) {
+  try {
+    await PendienteAutomatico.updateOne(
+      { empresa, clave: 'control:revision', creadoEn: { $lt: new Date(Date.now() - CADA_MS) } },
+      { $set: { creadoEn: new Date() }, $setOnInsert: { regla: 'control' } },
+      { upsert: true }
+    );
+    return true;
+  } catch (err) {
+    if (err.code === 11000) return false;
+    throw err;
+  }
+}
+
+// La primera revisión del día (en México) de la empresa corre las reglas diarias.
+async function reclamarDia(empresa, hoyTexto) {
+  try {
+    await PendienteAutomatico.create({ empresa, clave: `control:diario:${hoyTexto}`, regla: 'control' });
+    return true;
+  } catch (err) {
+    if (err.code === 11000) return false;
+    throw err;
+  }
+}
+
+async function revisar(empresa, { forzar = false } = {}) {
+  const hoyTexto = hoyEnMexico();
+  const hoy = new Date(`${hoyTexto}T00:00:00Z`);
   const usuarios = await Agente.find({ empresa, estatus: 'Activo', rol: { $ne: 'superAdmin' } }).select('rol').lean();
   const activos = new Set(usuarios.map((u) => String(u._id)));
   const admin = usuarios.find((u) => u.rol === 'Administrador')?._id || null;
@@ -79,10 +117,10 @@ async function revisar(empresa) {
   const ctx = { empresa, hoy, elegir };
 
   await cerrarResueltos(ctx);
-  await Promise.all([
-    reglaCobro(ctx), reglaProveedor(ctx), reglaDocumentos(ctx), reglaRegreso(ctx),
-    reglaProspecto(ctx), reglaRecompra(ctx), reglaCumpleanos(ctx),
-  ]);
+  await Promise.all([reglaCobro(ctx), reglaProveedor(ctx), reglaDocumentos(ctx), reglaRegreso(ctx)]);
+  if (forzar || await reclamarDia(empresa, hoyTexto)) {
+    await Promise.all([reglaProspecto(ctx), reglaRecompra(ctx), reglaCumpleanos(ctx)]);
+  }
 }
 
 // Claves ya generadas (de una lista de candidatas).
@@ -255,12 +293,18 @@ async function reglaRecompra(ctx) {
   const desde = new Date(Date.UTC(y, m - REGLAS.recompraMeses - 1, d));
   const hasta = new Date(Date.UTC(y, m - REGLAS.recompraMeses, d));
 
-  const ultimos = await Reservacion.aggregate([
-    { $match: { empresa: ctx.empresa, estatus: { $ne: 'Cancelada' } } },
+  // Solo los viajes de la ventana (usa el índice empresa + estatus + fechaEntrada).
+  const enVentana = await Reservacion.aggregate([
+    { $match: { empresa: ctx.empresa, estatus: { $in: VIGENTES }, fechaEntrada: { $gt: desde, $lte: hasta } } },
     { $sort: { fechaEntrada: -1 } },
     { $group: { _id: '$idCliente', ultima: { $first: '$fechaEntrada' }, destino: { $first: '$destino' }, reservacion: { $first: '$_id' } } },
-    { $match: { ultima: { $gt: desde, $lte: hasta } } },
   ]);
+  if (!enVentana.length) return;
+  // Descarta a quien ya tiene un viaje posterior (índice por cliente).
+  const conOtro = new Set((await Reservacion.distinct('idCliente', {
+    empresa: ctx.empresa, idCliente: { $in: enVentana.map((u) => u._id) }, estatus: { $in: VIGENTES }, fechaEntrada: { $gt: hasta },
+  })).map(String));
+  const ultimos = enVentana.filter((u) => !conOtro.has(String(u._id)));
   const candidatas = ultimos.map((u) => ({ u, clave: `recompra:${u._id}:${u.reservacion}` }));
   const hechas = await yaGeneradas(ctx.empresa, candidatas.map((c) => c.clave));
   const pendientes = candidatas.filter((c) => !hechas.has(c.clave));
@@ -318,12 +362,18 @@ async function cerrarResueltos(ctx) {
   const res = new Map(reservaciones.map((r) => [String(r._id), r]));
   const pros = new Map(prospectos.map((p) => [String(p._id), p]));
 
-  // Recompra: el cliente registró una reservación después de crearse el pendiente.
+  // Recompra: el cliente registró una reservación después de crearse el pendiente
+  // (una sola consulta: la última reservación registrada de cada cliente).
   const recompras = abiertos.filter((p) => p.automatico.regla === 'recompra' && p.cliente);
   const conViajeNuevo = new Set();
-  for (const p of recompras) {
-    if (await Reservacion.exists({ empresa: ctx.empresa, idCliente: p.cliente, estatus: { $ne: 'Cancelada' }, createdAt: { $gt: p.createdAt } })) {
-      conViajeNuevo.add(String(p._id));
+  if (recompras.length) {
+    const ultimas = await Reservacion.aggregate([
+      { $match: { empresa: ctx.empresa, idCliente: { $in: recompras.map((p) => p.cliente) }, estatus: { $in: VIGENTES } } },
+      { $group: { _id: '$idCliente', ultima: { $max: '$createdAt' } } },
+    ]);
+    const ultimaDe = new Map(ultimas.map((u) => [String(u._id), u.ultima]));
+    for (const p of recompras) {
+      if (ultimaDe.get(String(p.cliente)) > p.createdAt) conViajeNuevo.add(String(p._id));
     }
   }
 
