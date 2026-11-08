@@ -13,6 +13,7 @@ import bitacoraRouter from './routes/bitacora.routes.js';
 import dashboardRouter from './routes/dashboard.routes.js';
 import pagosProveedorRouter from './routes/pagosProveedor.routes.js';
 import pendientesRouter from './routes/pendientes.routes.js';
+import fichaReservacionRouter from './routes/fichaReservacion.routes.js';
 import authRouter from './routes/auth.routes.js';
 import { requireAuth } from './middleware/auth.js';
 
@@ -67,6 +68,7 @@ app.use('/api', requireAuth);
 app.use('/api/clientes', clientesRouter);
 app.use('/api/proveedores', proveedoresRouter);
 app.use('/api/reservaciones', reservacionesRouter);
+app.use('/api/reservaciones', fichaReservacionRouter); // ficha: /:id/ficha, peticiones, documentos, notas
 app.use('/api/pagos', pagosRouter);
 app.use('/api/pagos-proveedor', pagosProveedorRouter);
 app.use('/api/agentes', agentesRouter);

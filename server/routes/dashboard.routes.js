@@ -243,6 +243,66 @@ router.get('/admin', async (req, res, next) => {
   }
 });
 
+// GET /api/dashboard/clientes?periodo=mes|12m|anio|24m&moneda=MXN|USD
+// Top 5 de clientes con más reservaciones y top 3 de ventas más grandes del
+// periodo (por fecha de viaje, sin canceladas, en la moneda elegida).
+router.get('/clientes', async (req, res, next) => {
+  try {
+    if (req.agente.rol !== 'Administrador') {
+      return res.status(403).json({ error: 'El tablero de ventas es solo para el Administrador de la empresa.' });
+    }
+    const empresa = new mongoose.Types.ObjectId(String(req.agente.empresa));
+    const moneda = monedaDe(req.query.moneda);
+    const periodo = ['mes', '12m', 'anio', '24m'].includes(req.query.periodo) ? req.query.periodo : '12m';
+    const r = rangos(periodo, calendario());
+    const ventaDelPeriodo = { empresa, ...VENTA_VALIDA, ...filtroMoneda(moneda), [FECHA_VENTA]: { $gte: r.actual[0], $lt: r.actual[1] } };
+    const [gruposCliente, mayores, { ventas: totalPeriodo }] = await Promise.all([
+      Reservacion.aggregate([
+        { $match: ventaDelPeriodo },
+        { $group: { _id: '$idCliente', reservaciones: { $sum: 1 }, ventas: { $sum: '$montoTotal' }, ultimoViaje: { $max: `$${FECHA_VENTA}` } } },
+        // Más reservaciones primero; a igualdad, el que más compró.
+        { $sort: { reservaciones: -1, ventas: -1 } },
+        { $limit: 5 },
+      ]),
+      Reservacion.find(ventaDelPeriodo).sort({ montoTotal: -1, fechaEntrada: 1 }).limit(3)
+        .select('destino montoTotal fechaEntrada fechaSalida estatus idCliente agente')
+        .populate('idCliente', 'nombreCompleto').populate('agente', 'nombre').lean(),
+      ventasEnRango({ empresa, ...filtroMoneda(moneda) }, r.actual),
+    ]);
+    const clientesTop = await Cliente.find({ _id: { $in: gruposCliente.map((g) => g._id) } })
+      .select('nombreCompleto telefono agente').populate('agente', 'nombre').lean();
+    const clienteDe = new Map(clientesTop.map((c) => [String(c._id), c]));
+    const mejoresClientes = gruposCliente.map((g) => {
+      const c = clienteDe.get(String(g._id));
+      return {
+        id: g._id,
+        nombre: c?.nombreCompleto || 'Cliente eliminado',
+        telefono: c?.telefono || null,
+        agente: c?.agente?.nombre || null,
+        reservaciones: g.reservaciones,
+        ventas: aCentavos(g.ventas),
+        ticketPromedio: aCentavos(g.ventas / g.reservaciones),
+        ultimoViaje: g.ultimoViaje,
+      };
+    });
+    const ventasMayores = mayores.map((v) => ({
+      id: v._id,
+      cliente: v.idCliente?.nombreCompleto || '—',
+      destino: v.destino,
+      monto: aCentavos(v.montoTotal),
+      fechaEntrada: v.fechaEntrada,
+      fechaSalida: v.fechaSalida,
+      estatus: v.estatus,
+      agente: v.agente?.nombre || null,
+      participacion: totalPeriodo ? Math.round((v.montoTotal / totalPeriodo) * 1000) / 10 : 0,
+    }));
+
+    res.json({ periodo, moneda, mejoresClientes, ventasMayores });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/dashboard/proveedores?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&moneda=MXN|USD
 // Acumulado por proveedor del catálogo de la empresa, de reservaciones activas
 // y completadas (sin canceladas) cuyo viaje inicia en el rango (ambos días incluidos). Una sola

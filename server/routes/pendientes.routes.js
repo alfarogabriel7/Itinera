@@ -156,6 +156,116 @@ router.get('/mi-dia', async (req, res, next) => {
   }
 });
 
+// GET /api/pendientes/equipo — vista del Administrador ("Pendientes del equipo"):
+//   - carga por agente activo: vencidos, hoy, próximos 7 días y ventas sin próximo paso;
+//   - sin asignar: pendientes abiertos cuyo responsable ya no está activo (de baja);
+//   - vencidos más antiguos de toda la empresa;
+//   - ventas sin próximo paso de todo el equipo (las más olvidadas primero).
+router.get('/equipo', async (req, res, next) => {
+  try {
+    if (!esAdmin(req)) throw errorHttp(403, 'Solo el Administrador ve los pendientes del equipo.');
+    const empresa = oid(empresaDeLaSesion(req));
+    const hoy = hoyUTC();
+    const en7 = new Date(hoy.getTime() + 7 * DIA);
+
+    const [usuarios, cargas, conProspecto, conReservacion] = await Promise.all([
+      Agente.find({ empresa, rol: { $ne: 'superAdmin' } }).select('nombre estatus rol').sort({ nombre: 1 }).lean(),
+      Pendiente.aggregate([
+        { $match: { empresa, estatus: 'pendiente', fecha: { $lte: en7 } } },
+        { $group: {
+          _id: '$agente',
+          vencidos: { $sum: { $cond: [{ $lt: ['$fecha', hoy] }, 1, 0] } },
+          hoy: { $sum: { $cond: [{ $eq: ['$fecha', hoy] }, 1, 0] } },
+          proximos: { $sum: { $cond: [{ $gt: ['$fecha', hoy] }, 1, 0] } },
+        } },
+      ]),
+      Pendiente.distinct('prospecto', { empresa, estatus: 'pendiente', prospecto: { $ne: null } }),
+      Pendiente.distinct('reservacion', { empresa, estatus: 'pendiente', reservacion: { $ne: null } }),
+    ]);
+    const activos = usuarios.filter((u) => u.estatus === 'Activo');
+    const idsActivos = activos.map((u) => u._id);
+
+    // Ventas sin próximo paso: conteo por agente y las 15 más olvidadas.
+    const filtroP = { empresa, estatus: 'prospecto', _id: { $nin: conProspecto } };
+    const filtroR = { empresa, estatus: 'Activa', fechaSalida: { $gte: hoy }, _id: { $nin: conReservacion } };
+    const porAgente = [{ $group: { _id: '$agente', n: { $sum: 1 } } }];
+    const [sinPasoP, sinPasoR, listaP, listaR, sinAsignar, totalSinAsignar, vencidosAntiguos] = await Promise.all([
+      Prospecto.aggregate([{ $match: filtroP }, ...porAgente]),
+      Reservacion.aggregate([{ $match: filtroR }, ...porAgente]),
+      Prospecto.find(filtroP).select('nombreCompleto ciudad agente updatedAt').populate('agente', 'nombre estatus').sort({ updatedAt: 1 }).limit(15).lean(),
+      Reservacion.find(filtroR).select('destino idCliente agente updatedAt').populate('idCliente', 'nombreCompleto').populate('agente', 'nombre estatus')
+        .sort({ updatedAt: 1 }).limit(15).lean(),
+      Pendiente.find({ empresa, estatus: 'pendiente', agente: { $nin: idsActivos } }).sort({ fecha: 1 }).limit(50).populate(POPULATE),
+      Pendiente.countDocuments({ empresa, estatus: 'pendiente', agente: { $nin: idsActivos } }),
+      Pendiente.find({ empresa, estatus: 'pendiente', fecha: { $lt: hoy }, agente: { $in: idsActivos } }).sort({ fecha: 1 }).limit(10).populate(POPULATE),
+    ]);
+
+    const sinPasoDe = new Map();
+    for (const g of [...sinPasoP, ...sinPasoR]) sinPasoDe.set(String(g._id), (sinPasoDe.get(String(g._id)) || 0) + g.n);
+    const cargaDe = new Map(cargas.map((c) => [String(c._id), c]));
+    const yo = String(req.agente.id);
+
+    const agentes = activos.map((u) => {
+      const c = cargaDe.get(String(u._id)) || {};
+      return {
+        id: u._id, nombre: u.nombre, rol: u.rol, esYo: String(u._id) === yo,
+        vencidos: c.vencidos || 0, hoy: c.hoy || 0, proximos: c.proximos || 0, sinProximoPaso: sinPasoDe.get(String(u._id)) || 0,
+      };
+    }).sort((a, b) => b.vencidos - a.vencidos || (b.hoy + b.proximos) - (a.hoy + a.proximos));
+
+    const dias = (f) => Math.max(0, Math.floor((Date.now() - new Date(f).getTime()) / DIA));
+    const agenteDe = (a) => (a ? { id: a._id, nombre: a.nombre, deBaja: a.estatus !== 'Activo' } : null);
+    const ventas = [
+      ...listaP.map((p) => ({ tipo: 'prospecto', id: p._id, nombre: p.nombreCompleto, detalle: `Prospecto${p.ciudad ? ` · ${p.ciudad}` : ''}`, agente: agenteDe(p.agente), diasSinActividad: dias(p.updatedAt) })),
+      ...listaR.map((r) => ({ tipo: 'reservacion', id: r._id, nombre: r.idCliente?.nombreCompleto || '—', detalle: `${r.destino} · Reservación activa`, agente: agenteDe(r.agente), diasSinActividad: dias(r.updatedAt) })),
+    ].sort((a, b) => b.diasSinActividad - a.diasSinActividad).slice(0, 15);
+
+    // Totales solo de usuarios activos (los de usuarios de baja cuentan en "Sin asignar").
+    const total = (campo) => agentes.reduce((s, a) => s + a[campo], 0);
+    res.json({
+      hoy: hoyEnMexico(),
+      totales: {
+        vencidos: total('vencidos'),
+        hoy: total('hoy'),
+        sinAsignar: totalSinAsignar,
+        sinProximoPaso: [...sinPasoDe.values()].reduce((s, n) => s + n, 0), // de todo el equipo, incluso de usuarios de baja
+      },
+      agentes,
+      sinAsignar: sinAsignar.map(aFila),
+      vencidosAntiguos: vencidosAntiguos.map((p) => ({ ...aFila(p), diasVencido: Math.round((hoy - p.fecha) / DIA) })),
+      ventasSinProximoPaso: ventas,
+      usuariosActivos: activos.map((u) => ({ _id: u._id, nombre: u.nombre })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/pendientes/reasignar { de, a } — el Administrador pasa todos los
+// pendientes abiertos de un usuario (normalmente uno dado de baja) a otro activo.
+router.post('/reasignar', async (req, res, next) => {
+  try {
+    if (!esAdmin(req)) throw errorHttp(403, 'Solo el Administrador puede reasignar pendientes.');
+    const { de, a } = req.body || {};
+    if (!mongoose.isValidObjectId(de) || !mongoose.isValidObjectId(a)) throw errorHttp(400, 'Indica de quién y a quién reasignar.');
+    if (String(de) === String(a)) throw errorHttp(400, 'Elige a un responsable distinto.');
+    const empresa = empresaDeLaSesion(req);
+    await asegurarMismaEmpresa(Agente, de, empresa, 'El usuario no pertenece a tu empresa.');
+    const destino = await resolverResponsable(req, a);
+    const r = await Pendiente.updateMany({ empresa, agente: de, estatus: 'pendiente' }, { $set: { agente: destino } });
+    if (r.modifiedCount) {
+      const [origen, nuevo] = await Promise.all([Agente.findById(de).select('nombre').lean(), Agente.findById(destino).select('nombre').lean()]);
+      await registrarEvento({
+        entidad: 'Agente', entidadId: oid(de), empresa, evento: 'pendientes reasignados',
+        detalle: `${r.modifiedCount} pendiente(s) de ${origen?.nombre || '—'} a ${nuevo?.nombre || '—'}`, usuario: usuarioDeLaSesion(req),
+      });
+    }
+    res.json({ reasignados: r.modifiedCount });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/pendientes/resumen — contadores del usuario (insignia del menú).
 router.get('/resumen', async (req, res, next) => {
   try {

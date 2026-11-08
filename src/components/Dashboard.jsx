@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { dashboardApi } from '../api';
-import { dinero, dineroCompacto, variacion, nombreMes } from '../utils/formato';
+import { dinero, dineroCompacto, variacion, nombreMes, fechaViaje } from '../utils/formato';
 import GraficaVentas from './dashboard/GraficaVentas';
 import SeccionProveedores from './dashboard/SeccionProveedores';
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Receipt, Wallet, HandCoins, CalendarCheck, CalendarClock, Trophy, BarChart3, Table2, Crown, ArrowDownUp,
+  LayoutDashboard, TrendingUp, TrendingDown, Receipt, Wallet, HandCoins, CalendarCheck, CalendarClock, Trophy, BarChart3, Table2, Crown, ArrowDownUp, Star,
 } from 'lucide-react';
 
 const PERIODOS = [
@@ -189,14 +189,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap rounded-lg border border-slate-200 p-0.5 text-sm">
-              {PERIODOS.map((p) => (
-                <button key={p.key} onClick={() => setPeriodo(p.key)}
-                  className={`rounded-md px-3 py-1.5 font-semibold ${periodo === p.key ? 'bg-brand-noche text-white' : 'text-slate-500 hover:text-slate-700'}`}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
+            <SelectorPeriodo periodo={periodo} onCambio={setPeriodo} />
             <button onClick={() => setAscendente((v) => !v)} title="Cambiar orden"
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
               <ArrowDownUp size={15} /> {ascendente ? 'Menor a mayor' : 'Mayor a menor'}
@@ -280,6 +273,123 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Mejores clientes y ventas más grandes (consulta y periodo propios) */}
+      <MejoresClientes moneda={moneda} />
+    </div>
+  );
+}
+
+function SelectorPeriodo({ periodo, onCambio }) {
+  return (
+    <div role="group" aria-label="Periodo" className="flex flex-wrap rounded-lg border border-slate-200 p-0.5 text-sm">
+      {PERIODOS.map((p) => (
+        <button key={p.key} onClick={() => onCambio(p.key)} aria-pressed={periodo === p.key}
+          className={`rounded-md px-3 py-1.5 font-semibold ${periodo === p.key ? 'bg-brand-noche text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Top 5 de clientes con más reservaciones y top 3 de ventas más grandes del
+// periodo, sin canceladas y en la moneda elegida. Arranca en "Últimos 12 meses".
+function MejoresClientes({ moneda }) {
+  const [periodo, setPeriodo] = useState('12m');
+  const [datos, setDatos] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelado = false;
+    setCargando(true);
+    dashboardApi.clientes(periodo, moneda)
+      .then((d) => { if (!cancelado) { setDatos(d); setError(''); } })
+      .catch((err) => { if (!cancelado) setError(err.message); })
+      .finally(() => { if (!cancelado) setCargando(false); });
+    return () => { cancelado = true; };
+  }, [periodo, moneda]);
+
+  const clientes = datos?.mejoresClientes || [];
+  const ventas = datos?.ventasMayores || [];
+  const maxReservaciones = Math.max(1, ...clientes.map((c) => c.reservaciones));
+  const MEDALLA = ['bg-brand-coralClaro text-brand-noche', 'bg-slate-200 text-slate-700', 'bg-orange-200 text-orange-900'];
+
+  return (
+    <div className={`rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-opacity ${cargando ? 'opacity-60' : ''}`}>
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><Star size={18} className="text-brand-coralClaro" /> Mejores clientes</h2>
+          <p className="text-sm text-slate-500">Por fecha de viaje, sin canceladas, en {moneda}.</p>
+        </div>
+        <SelectorPeriodo periodo={periodo} onCambio={setPeriodo} />
+      </div>
+
+      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {!datos && !error && <div className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">Cargando…</div>}
+
+      {datos && <div className="flex flex-wrap items-start gap-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {/* Top 5 clientes */}
+        <section className="min-w-0 flex-[999_1_480px]">
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">Top 5 · clientes con más reservaciones</h3>
+          {clientes.length === 0 ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">Aún no hay ventas en este periodo.</div>
+          ) : (
+            <ol className="divide-y divide-slate-100 rounded-xl border border-slate-100">
+              {clientes.map((c, i) => (
+                <li key={c.id} className="flex flex-wrap items-center gap-3 p-3">
+                  <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${MEDALLA[i] || 'bg-slate-100 text-slate-500'}`}>{i + 1}</span>
+                  <div className="min-w-0 flex-1 basis-40">
+                    <div className="truncate font-semibold text-slate-700">{c.nombre}</div>
+                    <div className="truncate text-xs text-slate-400">
+                      {c.agente ? `Agente: ${c.agente}` : 'Sin agente'} · último viaje {fechaViaje(c.ultimoViaje)}
+                    </div>
+                  </div>
+                  <div className="flex w-44 items-center gap-2">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-brand-petroleoMedio" style={{ width: `${(c.reservaciones / maxReservaciones) * 100}%` }} />
+                    </div>
+                    <span className="text-right text-sm font-semibold text-slate-800">{c.reservaciones} <span className="text-xs font-normal text-slate-400">{c.reservaciones === 1 ? 'reservación' : 'reservaciones'}</span></span>
+                  </div>
+                  <div className="w-32 text-right">
+                    <div className="text-sm font-semibold text-slate-800">{dinero(c.ventas)}</div>
+                    <div className="text-xs text-slate-400">ticket {dinero(c.ticketPromedio)}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        {/* Top 3 ventas más grandes */}
+        <section className="min-w-0 flex-[1_1_300px]">
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">Top 3 · ventas más grandes</h3>
+          {ventas.length === 0 ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">Aún no hay ventas en este periodo.</div>
+          ) : (
+            <ol className="flex flex-col gap-3">
+              {ventas.map((v, i) => (
+                <li key={v.id} className={`rounded-xl border p-4 ${i === 0 ? 'border-brand-coralClaro bg-amber-50/50' : 'border-slate-200'}`}>
+                  <div className="flex items-start gap-3">
+                    <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${MEDALLA[i]}`}>
+                      {i === 0 ? <Trophy size={14} /> : i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-lg font-bold text-slate-800">{dinero(v.monto)} <span className="text-xs font-semibold text-slate-400">{moneda}</span></div>
+                      <div className="truncate text-sm font-medium text-slate-700">{v.cliente} · {v.destino}</div>
+                      <div className="text-xs text-slate-400">
+                        Viaja {fechaViaje(v.fechaEntrada)}{v.agente ? ` · vendió ${v.agente}` : ''}{v.estatus === 'Completada' ? ' · Completada' : ''}
+                      </div>
+                      {v.participacion > 0 && <div className="mt-1 text-xs text-slate-500">{v.participacion.toFixed(1)}% de las ventas del periodo</div>}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      </div>}
     </div>
   );
 }

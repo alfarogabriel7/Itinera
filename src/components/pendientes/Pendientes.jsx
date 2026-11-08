@@ -142,7 +142,7 @@ export function FormPendiente({ ligas = null, elegirLiga = false, responsables =
   // Prellenado (p.ej. desde "Ventas sin próximo paso").
   useEffect(() => {
     if (!inicial) return;
-    setF({ ...vacio(), titulo: inicial.titulo || '', ligaTipo: inicial.liga?.tipo || '', ligaId: inicial.liga?.id || '', ligaNombre: inicial.liga?.nombre || '' });
+    setF({ ...vacio(), titulo: inicial.titulo || '', agente: inicial.agente || '', ligaTipo: inicial.liga?.tipo || '', ligaId: inicial.liga?.id || '', ligaNombre: inicial.liga?.nombre || '' });
     titulo.current?.focus();
   }, [inicial]);
 
