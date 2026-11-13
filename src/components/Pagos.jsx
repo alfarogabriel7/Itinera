@@ -254,6 +254,7 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
                     <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
                     <option value="Tarjeta de Débito">Tarjeta de Débito</option>
                     <option value="Transferencia">Transferencia SPEI</option>
+                    <option value="Depósito">Depósito</option>
                   </select>
                 </div>
                 <div>

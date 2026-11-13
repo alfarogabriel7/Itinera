@@ -19,7 +19,7 @@ const PagoProveedorSchema = new Schema(
     moneda: campoMoneda(),
     formaPago: {
       type: String,
-      enum: ['Efectivo', 'Tarjeta de Crédito', 'Tarjeta de Débito', 'Transferencia'],
+      enum: ['Efectivo', 'Tarjeta de Crédito', 'Tarjeta de Débito', 'Transferencia', 'Depósito'],
       required: true,
     },
     // Folio/clave de rastreo SPEI o número de autorización (opcional).

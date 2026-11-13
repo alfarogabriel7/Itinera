@@ -17,7 +17,7 @@ const DIA = 24 * 60 * 60 * 1000;
 // Más viajes en Semana Santa (mar-abr), verano (jun-jul) y fin de año (nov-dic).
 const TEMPORADA = [0.8, 0.7, 1.15, 1.25, 0.85, 1.1, 1.35, 1.0, 0.7, 0.8, 1.1, 1.45];
 const DESTINOS = ['Cancún, México', 'Puerto Vallarta', 'Los Cabos', 'Huatulco', 'Riviera Maya', 'Madrid, España', 'Orlando, EUA', 'Cartagena, Colombia', 'Ixtapa', 'Ciudad de México'];
-const FORMAS = ['Efectivo', 'Tarjeta de Crédito', 'Tarjeta de Débito', 'Transferencia'];
+const FORMAS = ['Efectivo', 'Tarjeta de Crédito', 'Tarjeta de Débito', 'Transferencia', 'Depósito'];
 
 // Histórico de 24 meses de ventas para que el tablero del Administrador y el
 // panel del agente tengan datos. Las reservaciones se insertan directo en la
