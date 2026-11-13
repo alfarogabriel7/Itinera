@@ -231,6 +231,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
               <option value="Efectivo">Efectivo</option>
               <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
               <option value="Tarjeta de Débito">Tarjeta de Débito</option>
+              <option value="Depósito">Depósito</option>
             </select>
           </div>
           <div>

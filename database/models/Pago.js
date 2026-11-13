@@ -16,7 +16,7 @@ const PagoSchema = new Schema(
     moneda: campoMoneda(),
     formaPago: {
       type: String,
-      enum: ['Efectivo', 'Tarjeta de Crédito', 'Tarjeta de Débito', 'Transferencia'],
+      enum: ['Efectivo', 'Tarjeta de Crédito', 'Tarjeta de Débito', 'Transferencia', 'Depósito'],
       required: true,
     },
     fecha: { type: Date, default: Date.now },
