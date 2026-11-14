@@ -43,8 +43,9 @@ function ServiciosPendientes({ fila: f }) {
     <ul className="space-y-0.5">
       {f.pendientes.map((s, i) => (
         <li key={i} className="flex items-baseline justify-between gap-2 text-xs">
-          <span className="min-w-0 truncate text-slate-600" title={`${s.proveedor} · ${s.clave}`}>
-            {s.proveedor} <span className="text-slate-400">· {s.clave}</span>
+          {/* Sin truncate/nowrap: en una tabla eso obliga a la columna a medir todo el texto y provoca scroll. */}
+          <span className="min-w-0 break-words text-slate-600" title={`${s.proveedor} · ${s.clave}`}>
+            {s.proveedor} <span className="text-slate-400 break-all">· {s.clave}</span>
           </span>
           <span className="shrink-0 tabular-nums font-semibold text-red-600">{dinero(s.saldo)}</span>
         </li>
@@ -136,47 +137,46 @@ export default function PagoProveedores({ onPagar }) {
         </div>
 
         {/* Pantallas anchas: tabla. */}
-        <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-100">
+        {/* Pantallas anchas: tabla de 4 columnas que cabe sin scroll horizontal. */}
+        <div className="hidden lg:block rounded-xl border border-slate-100 overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Viaje</th>
-                <th className="p-3 font-semibold">Cliente</th>
-                <th className="p-3 font-semibold min-w-[220px]">Pendiente por proveedor</th>
-                <th className="p-3 font-semibold text-right">Montos</th>
-                <th className="p-3 font-semibold min-w-[120px]">Saldo</th>
-                <th className="p-3 font-semibold text-center">Acción</th>
+                <th className="p-3 font-semibold">Viaje y cliente</th>
+                <th className="p-3 font-semibold">Pendiente por proveedor</th>
+                <th className="p-3 font-semibold w-44">Saldo</th>
+                <th className="p-3 font-semibold text-center w-24">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {cargando && filas.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">Cargando pagos a proveedores...</td></tr>}
+              {cargando && filas.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400 text-sm">Cargando pagos a proveedores...</td></tr>}
               {filas.map(f => (
                 <tr key={f.idReservacion} className="text-sm hover:bg-slate-50 align-top">
                   <td className="p-3 text-slate-600">
-                    <div className="font-medium text-slate-700">{f.destino}</div>
-                    <div className="text-xs text-slate-400 whitespace-nowrap">{fechaViaje(f.fechaEntrada)} al {fechaViaje(f.fechaSalida)}</div>
-                    <div className="mt-1"><EtiquetaViaje fila={f} /></div>
-                  </td>
-                  <td className="p-3">
-                    <div className="text-slate-700">{f.cliente?.nombre || '—'}</div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-medium text-slate-700">{f.destino}</span>
+                      <EtiquetaViaje fila={f} />
+                    </div>
+                    <div className="text-xs text-slate-400">{fechaViaje(f.fechaEntrada)} al {fechaViaje(f.fechaSalida)}</div>
+                    <div className="mt-1 text-slate-700">{f.cliente?.nombre || '—'}</div>
                     {f.agente && <div className="text-xs text-slate-400">Vendió: {f.agente}</div>}
                   </td>
                   <td className="p-3"><ServiciosPendientes fila={f} /></td>
-                  <td className="p-3 text-right text-xs tabular-nums whitespace-nowrap">
-                    <div className="text-slate-600">A pagar {dinero(f.total)}</div>
-                    <div className="text-emerald-700">Pagado {dinero(f.pagado)}</div>
+                  <td className="p-3">
+                    <SaldoConAvance fila={f} />
+                    <div className="mt-1 text-[11px] tabular-nums text-slate-500">A pagar {dinero(f.total)}</div>
+                    <div className="text-[11px] tabular-nums text-emerald-700">Pagado {dinero(f.pagado)}</div>
                   </td>
-                  <td className="p-3"><SaldoConAvance fila={f} /></td>
                   <td className="p-3 text-center"><BotonPagar fila={f} /></td>
                 </tr>
               ))}
-              {!cargando && listado.total === 0 && <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">{vacio}</td></tr>}
+              {!cargando && listado.total === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400 text-sm">{vacio}</td></tr>}
             </tbody>
           </table>
         </div>
 
-        {/* Celular: tarjetas. */}
-        <div className="md:hidden space-y-3">
+        {/* Celular y tableta: tarjetas. */}
+        <div className="lg:hidden space-y-3">
           {cargando && filas.length === 0 && <p className="p-6 text-center text-slate-400 text-sm">Cargando pagos a proveedores...</p>}
           {filas.map(f => (
             <div key={f.idReservacion} className="rounded-xl border border-slate-100 p-4">
