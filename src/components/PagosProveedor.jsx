@@ -132,6 +132,69 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
   const admitePagos = estado.estatusReservacion !== 'Cancelada';
   const porcentaje = estado.totales.total > 0 ? Math.min(100, Math.round((estado.totales.pagado / estado.totales.total) * 100)) : 0;
 
+  // Piezas del historial: se usan igual en la tabla (pantallas anchas) y en las tarjetas (celular).
+  const datosDelPago = (p) => (
+    <>
+      <div className="font-medium text-slate-700 break-words">{p.idProveedor?.nombreProveedor || '—'}</div>
+      <div className="text-xs text-slate-500">{fechaCorta(p.fecha)}</div>
+      {/* Si se capturó otro día, se indica cuándo (la fecha de arriba es cuando se pagó). */}
+      {p.createdAt && fechaCorta(p.createdAt) !== fechaCorta(p.fecha) && (
+        <div className="text-2xs text-slate-400">capturado el {fechaCorta(p.createdAt)}</div>
+      )}
+      <div className="text-xs text-slate-400" title="Usuario que capturó el pago en el sistema">Capturó: {p.agente?.nombre || '—'}</div>
+    </>
+  );
+
+  const montoDelPago = (p) => (
+    <>
+      <div className={`font-mono text-xs whitespace-nowrap ${p.estatus === 'Cancelado' ? 'text-slate-400 line-through' : 'font-semibold text-slate-700'}`}>{dinero(p.monto)}</div>
+      <div className="text-xs text-slate-600">{p.formaPago}</div>
+      {p.referencia && <div className="text-xs text-slate-400 font-mono break-all">Ref. {p.referencia}</div>}
+    </>
+  );
+
+  const estatusDelPago = (p) => (p.estatus === 'Cancelado' ? (
+    <div>
+      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Cancelado</span>
+      <div className="mt-1 text-xs text-slate-500">{p.canceladoPor?.nombre} · {fechaCorta(p.fechaCancelacion)}<div className="italic break-words">"{p.motivoCancelacion}"</div></div>
+    </div>
+  ) : (
+    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aplicado</span>
+  ));
+
+  const accionesDelPago = (p, alineacion) => {
+    const cancelado = p.estatus === 'Cancelado';
+    const puedeAdjuntar = !cancelado && (!p.comprobante?.id || esAdministrador);
+    return (
+      <div className={`flex flex-wrap items-center gap-1.5 ${alineacion}`}>
+        {p.comprobante?.id && (
+          <button onClick={() => abrirComprobante(() => pagosProveedorApi.descargarComprobante(p._id))} title={`Ver comprobante: ${p.comprobante.nombreArchivo}`}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-noche border border-brand-petroleo/20 hover:bg-brand-petroleo/5">
+            <FileCheck size={14} /> Comprobante
+          </button>
+        )}
+        {puedeAdjuntar && (
+          <button onClick={() => elegirComprobante(p)} disabled={subiendoId === p._id}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-100 disabled:opacity-60">
+            {p.comprobante?.id ? <Upload size={14} /> : <Paperclip size={14} />}
+            {subiendoId === p._id ? 'Subiendo...' : p.comprobante?.id ? 'Reemplazar' : 'Adjuntar'}
+          </button>
+        )}
+        {esAdministrador && !cancelado && (
+          <button onClick={() => handleCancelar(p)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50">
+            <Ban size={14} /> Cancelar
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const botonPagarServicio = (d) => admitePagos && d.saldo > 0 && (
+    <button type="button" onClick={() => pagarServicio(d)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
+      <Send size={13} /> Pagar
+    </button>
+  );
+
   return (
     <div className="space-y-6 animate-fadeIn mt-6">
       <input ref={inputArchivoFila} type="file" accept={TIPOS_COMPROBANTE} className="hidden" onChange={handleArchivoFila} />
@@ -152,7 +215,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
       </div>
 
       {/* Saldo por servicio */}
-      <div className="overflow-x-auto rounded-xl border border-slate-100">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100">
         <table className="w-full text-left border-collapse text-sm">
           <thead>
             <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
@@ -172,13 +235,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
                 <td className="p-3 text-right text-slate-600">{dinero(d.total)}</td>
                 <td className="p-3 text-right text-emerald-700">{dinero(d.pagado)}</td>
                 <td className="p-3 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}</td>
-                <td className="p-3 text-right">
-                  {admitePagos && d.saldo > 0 && (
-                    <button type="button" onClick={() => pagarServicio(d)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
-                      <Send size={13} /> Pagar
-                    </button>
-                  )}
-                </td>
+                <td className="p-3 text-right">{botonPagarServicio(d)}</td>
               </tr>
             ))}
             {estado.detalles.length === 0 && (
@@ -186,6 +243,29 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Celular y tableta: tarjetas por servicio. */}
+      <div className="lg:hidden space-y-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {estado.detalles.length === 0 && <p className="p-6 text-center text-slate-400 text-sm rounded-xl border border-slate-100">Esta reservación no tiene servicios con proveedores.</p>}
+        {estado.detalles.map(d => (
+          <div key={d.idDetalle} className={`rounded-xl border p-3 text-sm ${form.idDetalle === d.idDetalle ? 'border-brand-petroleo/30 bg-brand-petroleo/5' : 'border-slate-100'}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium text-slate-700 break-words">{d.proveedor?.nombre || '—'}</div>
+                <div className="font-mono text-xs text-slate-500 break-all">{d.claveReservacion}</div>
+              </div>
+              <div className="shrink-0 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}</div>
+            </div>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div className="text-xs">
+                <div className="text-slate-600">A pagar {dinero(d.total)}</div>
+                <div className="text-emerald-700">Pagado {dinero(d.pagado)}</div>
+              </div>
+              {botonPagarServicio(d)}
+            </div>
+          </div>
+        ))}
       </div>
 
       {!admitePagos && (
@@ -254,79 +334,50 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
 
       <div>
         <div className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-3">Historial de pagos a proveedores</div>
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
+
+        {/* Pantallas anchas: tabla compacta (4 columnas) para que quepa junto al menú y el panel lateral. */}
+        <div className="hidden lg:block rounded-xl border border-slate-100 overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Fecha</th>
-                <th className="p-3 font-semibold">Proveedor</th>
+                <th className="p-3 font-semibold">Pago</th>
                 <th className="p-3 font-semibold">Monto</th>
-                <th className="p-3 font-semibold">Forma de pago</th>
-                <th className="p-3 font-semibold" title="Usuario que capturó el pago en el sistema">Capturó</th>
                 <th className="p-3 font-semibold">Estatus</th>
                 <th className="p-3 font-semibold text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {estado.pagos.length === 0 && (
-                <tr><td colSpan={7} className="p-6 text-center text-slate-400 text-sm">Aún no hay pagos a proveedores.</td></tr>
+                <tr><td colSpan={4} className="p-6 text-center text-slate-400 text-sm">Aún no hay pagos a proveedores.</td></tr>
               )}
               {estado.pagos.map(p => {
                 const cancelado = p.estatus === 'Cancelado';
-                const puedeAdjuntar = !cancelado && (!p.comprobante?.id || esAdministrador);
                 return (
-                  <tr key={p._id} className={`text-sm ${cancelado ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
-                    <td className="p-3 text-slate-600">
-                      {fechaCorta(p.fecha)}
-                      {/* Si se capturó otro día, se indica cuándo (la fecha de arriba es cuando se pagó). */}
-                      {p.createdAt && fechaCorta(p.createdAt) !== fechaCorta(p.fecha) && (
-                        <div className="text-2xs text-slate-400">capturado el {fechaCorta(p.createdAt)}</div>
-                      )}
-                    </td>
-                    <td className="p-3 text-slate-700">{p.idProveedor?.nombreProveedor || '—'}</td>
-                    <td className={`p-3 font-mono text-xs ${cancelado ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{dinero(p.monto)}</td>
-                    <td className="p-3 text-slate-600">
-                      {p.formaPago}
-                      {p.referencia && <div className="text-xs text-slate-400 font-mono">Ref. {p.referencia}</div>}
-                    </td>
-                    <td className="p-3 text-slate-600">{p.agente?.nombre || '—'}</td>
-                    <td className="p-3">
-                      {cancelado ? (
-                        <div>
-                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Cancelado</span>
-                          <div className="mt-1 text-xs text-slate-500">{p.canceladoPor?.nombre} · {fechaCorta(p.fechaCancelacion)}<div className="italic">"{p.motivoCancelacion}"</div></div>
-                        </div>
-                      ) : (
-                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aplicado</span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-wrap items-center justify-center gap-1.5">
-                        {p.comprobante?.id && (
-                          <button onClick={() => abrirComprobante(() => pagosProveedorApi.descargarComprobante(p._id))} title={`Ver comprobante: ${p.comprobante.nombreArchivo}`}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-noche border border-brand-petroleo/20 hover:bg-brand-petroleo/5">
-                            <FileCheck size={14} /> Comprobante
-                          </button>
-                        )}
-                        {puedeAdjuntar && (
-                          <button onClick={() => elegirComprobante(p)} disabled={subiendoId === p._id}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-100 disabled:opacity-60">
-                            {p.comprobante?.id ? <Upload size={14} /> : <Paperclip size={14} />}
-                            {subiendoId === p._id ? 'Subiendo...' : p.comprobante?.id ? 'Reemplazar' : 'Adjuntar'}
-                          </button>
-                        )}
-                        {esAdministrador && !cancelado && (
-                          <button onClick={() => handleCancelar(p)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50">
-                            <Ban size={14} /> Cancelar
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                  <tr key={p._id} className={`text-sm align-top ${cancelado ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
+                    <td className="p-3">{datosDelPago(p)}</td>
+                    <td className="p-3">{montoDelPago(p)}</td>
+                    <td className="p-3">{estatusDelPago(p)}</td>
+                    <td className="p-3">{accionesDelPago(p, 'justify-center')}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Celular y tableta: tarjetas. */}
+        <div className="lg:hidden space-y-3">
+          {estado.pagos.length === 0 && <p className="p-6 text-center text-slate-400 text-sm rounded-xl border border-slate-100">Aún no hay pagos a proveedores.</p>}
+          {estado.pagos.map(p => (
+            <div key={p._id} className={`rounded-xl border border-slate-100 p-4 text-sm ${p.estatus === 'Cancelado' ? 'bg-slate-50' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">{datosDelPago(p)}</div>
+                <div className="shrink-0 text-right">{montoDelPago(p)}</div>
+              </div>
+              <div className="mt-3">{estatusDelPago(p)}</div>
+              <div className="mt-3">{accionesDelPago(p, 'justify-start')}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
