@@ -94,6 +94,9 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
       // value = { id, nombre } desde el selector con búsqueda
       fila.idProveedor = value.id;
       fila.proveedorNombre = value.nombre;
+      // Se precarga el % de comisión que tiene el proveedor (editable). En modo
+      // Manual no: ahí el % queda en 0 y bloqueado, como siempre.
+      if (!fila.manual && value.porcentaje > 0) fila.porcentajeReservacion = String(value.porcentaje);
     } else if (field === 'manual') {
       fila.manual = value;
       if (value) {
@@ -324,7 +327,7 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
                         <SelectorRemoto required compacto buscar={buscarProveedores} placeholder="-- Prov --"
                           valor={d.idProveedor} etiquetaValor={d.proveedorNombre}
                           etiqueta={p => p.nombreProveedor}
-                          onCambio={(id, p) => handleDetalleChange(index, 'proveedor', { id, nombre: p?.nombreProveedor || '' })} />
+                          onCambio={(id, p) => handleDetalleChange(index, 'proveedor', { id, nombre: p?.nombreProveedor || '', porcentaje: Number(p?.porcentajeComision) || 0 })} />
                       </div>
                       <div>
                         <label className="block text-2xs uppercase text-slate-500 font-bold">Clave Confirmación *</label>

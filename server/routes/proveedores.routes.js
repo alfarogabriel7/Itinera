@@ -11,7 +11,7 @@ const router = Router();
 // Los proveedores (y sus cuentas bancarias) son datos de cada empresa: el superAdmin no los ve.
 router.use(sinSuperAdmin('El rol superAdmin no puede consultar ni gestionar proveedores de las empresas.'));
 
-const CAMPOS = ['nombreProveedor', 'telefono1', 'telefono2', 'numeroCuenta1', 'numeroCuenta2', 'estatus'];
+const CAMPOS = ['nombreProveedor', 'telefono1', 'telefono2', 'numeroCuenta1', 'numeroCuenta2', 'porcentajeComision', 'estatus'];
 
 // GET /api/proveedores?q=&estatus=Activo&orden=nombre&pagina=&porPagina=
 router.get('/', async (req, res, next) => {
