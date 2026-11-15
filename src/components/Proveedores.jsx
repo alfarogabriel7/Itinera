@@ -7,11 +7,14 @@ import { Truck, Plus, X, Save, Search, Eye, Pencil, Trash2 } from 'lucide-react'
 import { obtenerSesion } from '../utils/sesion';
 import { telefono, cuentaBancaria } from '../utils/formato';
 import { soloTelefono, soloNumeros } from '../utils/validadores';
+import { limpiar as limpiarMonto } from './common/CampoMonto';
 
 const EMPTY_FORM = {
   _id: null, nombreProveedor: '', telefono1: '', telefono2: '',
-  numeroCuenta1: '', numeroCuenta2: '', estatus: 'Activo',
+  numeroCuenta1: '', numeroCuenta2: '', porcentajeComision: '', estatus: 'Activo',
 };
+
+const porcentajeVisible = (p) => `${Number(p.porcentajeComision || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 })} %`;
 
 const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
@@ -30,7 +33,8 @@ export default function Proveedores() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { _id, ...payload } = form;
+    const { _id, ...datos } = form;
+    const payload = { ...datos, porcentajeComision: Number(datos.porcentajeComision) || 0 };
     setGuardando(true);
     try {
       if (_id) {
@@ -57,7 +61,7 @@ export default function Proveedores() {
   };
 
   const handleEditar = (proveedor) => {
-    setForm({ ...EMPTY_FORM, ...proveedor });
+    setForm({ ...EMPTY_FORM, ...proveedor, porcentajeComision: proveedor.porcentajeComision ? String(proveedor.porcentajeComision) : '' });
     setEstatusOriginal(proveedor.estatus);
   };
 
@@ -74,7 +78,7 @@ export default function Proveedores() {
   };
 
   const handleVer = (proveedor) => {
-    alert(`${proveedor.nombreProveedor} (${proveedor.estatus})\nTeléfono: ${telefono(proveedor.telefono1)}\nCuenta: ${cuentaBancaria(proveedor.numeroCuenta1)}`);
+    alert(`${proveedor.nombreProveedor} (${proveedor.estatus})\nTeléfono: ${telefono(proveedor.telefono1)}\nCuenta: ${cuentaBancaria(proveedor.numeroCuenta1)}\n% Comisión: ${porcentajeVisible(proveedor)}`);
   };
 
   return (
@@ -124,6 +128,16 @@ export default function Proveedores() {
             <input type="text" inputMode="numeric" maxLength={18} placeholder="Ej. 012180001234567891" className={inputClass} value={form.numeroCuenta2} onChange={e => setForm({ ...form, numeroCuenta2: soloNumeros(e.target.value).slice(0, 18) })} />
           </div>
           <div>
+            <label className={labelClass}>% Comisión</label>
+            {/* De 0 a 100, máximo 2 decimales. Se precarga al elegir el proveedor en una reservación. */}
+            <div className="relative">
+              <input type="text" inputMode="decimal" autoComplete="off" placeholder="Ej. 10" className={`${inputClass} pr-8 tabular-nums`}
+                value={form.porcentajeComision}
+                onChange={e => { const v = limpiarMonto(e.target.value); setForm({ ...form, porcentajeComision: Number(v) > 100 ? '100' : v }); }} />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-sm text-slate-400">%</span>
+            </div>
+          </div>
+          <div>
             <label className={labelClass}>Estatus *</label>
             <select required className={`${inputClass} bg-white`}
               value={form.estatus} onChange={e => setForm({ ...form, estatus: e.target.value })}>
@@ -170,19 +184,21 @@ export default function Proveedores() {
                 <th className="p-3 font-semibold">Proveedor</th>
                 <th className="p-3 font-semibold">Teléfono</th>
                 <th className="p-3 font-semibold">Cuenta Principal</th>
+                <th className="p-3 font-semibold text-right">% Comisión</th>
                 <th className="p-3 font-semibold">Estatus</th>
                 <th className="p-3 font-semibold text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {listado.cargando && listado.datos.length === 0 && (
-                <tr><td colSpan={5} className="p-6 text-center text-slate-400 text-sm">Cargando proveedores...</td></tr>
+                <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">Cargando proveedores...</td></tr>
               )}
               {listado.datos.map(p => (
                 <tr key={p._id} className="text-sm hover:bg-slate-50">
                   <td className="p-3 font-medium text-slate-700">{p.nombreProveedor}</td>
                   <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(p.telefono1)}</td>
                   <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{cuentaBancaria(p.numeroCuenta1)}</td>
+                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums text-right">{porcentajeVisible(p)}</td>
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                       {p.estatus}
@@ -206,7 +222,7 @@ export default function Proveedores() {
                 </tr>
               ))}
               {!listado.cargando && listado.total === 0 && (
-                <tr><td colSpan={5} className="p-6 text-center text-slate-400 text-sm">No se encontraron proveedores.</td></tr>
+                <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">No se encontraron proveedores.</td></tr>
               )}
             </tbody>
           </table>
