@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { prospectosApi, agentesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
-import { telefono } from '../utils/formato';
+import { telefono, fechaViaje } from '../utils/formato';
+import FichaDetalle from './common/FichaDetalle';
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
 import { SelectorFecha } from './common/Calendario';
 import { PendientesDeRegistro } from './pendientes/Pendientes';
-import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas } from './common/NotasSeguimiento';
+import NotasSeguimiento, { notasDesdeServidor, notasParaServidor } from './common/NotasSeguimiento';
+import { avisarExito, avisarError } from '../utils/avisos';
+import { irAlFormulario } from '../utils/irAlFormulario';
 import {
   UserPlus, Plus, X, Save, Search, Pencil, UserCheck, Eye,
   Mail, Phone, TrendingUp,
@@ -89,15 +92,18 @@ export default function Prospectos() {
       }
       resetForm();
       await cargarProspectos();
-      alert('Se guardaron correctamente los datos.');
+      avisarExito(_id ? 'Datos del prospecto actualizados correctamente.' : 'Prospecto registrado correctamente.');
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
   };
 
+  const formRef = useRef(null);
+
   const handleEditar = (prospecto) => {
+    irAlFormulario(formRef.current);
     setForm({
       ...EMPTY_FORM,
       ...prospecto,
@@ -108,13 +114,8 @@ export default function Prospectos() {
 
   // Consulta de solo lectura para quien no es el responsable (p.ej. para atender
   // al prospecto si su agente no está disponible).
-  const handleVer = (p) => {
-    const seguimiento = resumenNotas(p.notas);
-    alert(
-      `${p.nombreCompleto}\nTel. ${p.telefono}${p.correo ? ` · ${p.correo}` : ''}\nAgente responsable: ${p.agente?.nombre || '—'}\n\n` +
-      `Seguimiento:\n${seguimiento || 'Sin notas registradas.'}`
-    );
-  };
+  const [viendo, setViendo] = useState(null);
+  const handleVer = (p) => setViendo(p);
 
   const handleConvertir = async (prospecto) => {
     if (!confirm(`¿Convertir a ${prospecto.nombreCompleto} en cliente?`)) return;
@@ -122,14 +123,33 @@ export default function Prospectos() {
       await prospectosApi.convertir(prospecto._id);
       await cargarProspectos();
       await cargarEstadisticas();
-      alert('El prospecto se convirtió en cliente correctamente.');
+      avisarExito(` se convirtió en cliente correctamente.`);
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 
   return (
     <div className="flex flex-col gap-6">
+      {viendo && (
+        <FichaDetalle icono={UserPlus} titulo={viendo.nombreCompleto} onCerrar={() => setViendo(null)}
+          estatus={viendo.estatus === 'cliente' ? { texto: 'Convertido en cliente', tono: 'ok' } : { texto: 'Prospecto', tono: 'info' }}
+          subtitulo={viendo.agente?.nombre ? `Agente responsable: ${viendo.agente.nombre}` : null}
+          secciones={[
+            { titulo: 'Contacto y datos generales', columnas: 4, campos: [
+              { etiqueta: 'Teléfono', valor: viendo.telefono && telefono(viendo.telefono), mono: true },
+              { etiqueta: 'Correo', valor: viendo.correo },
+              { etiqueta: 'Fecha de registro', valor: (viendo.fechaRegistro || viendo.createdAt) && new Date(viendo.fechaRegistro || viendo.createdAt).toLocaleDateString('es-MX') },
+              { etiqueta: 'Fecha de nacimiento', valor: viendo.fechaNacimiento && fechaViaje(viendo.fechaNacimiento) },
+            ] },
+            { titulo: 'Ubicación', columnas: 4, campos: [
+              { etiqueta: 'Dirección', valor: viendo.direccion, doble: true },
+              { etiqueta: 'Ciudad', valor: viendo.ciudad },
+              { etiqueta: 'País', valor: viendo.pais },
+            ] },
+          ]}
+          notas={viendo.notas || []} />
+      )}
       <PageHeader
         icon={UserPlus}
         title="Prospectos"
@@ -196,13 +216,13 @@ export default function Prospectos() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <div data-tarjeta-formulario className="scroll-mt-24 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center gap-2 mb-6">
           <UserPlus size={18} className="text-brand-petroleo" />
           <h2 className="text-base font-bold text-brand-noche">Información del Prospecto</h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <label className={labelClass}>Nombre completo *</label>

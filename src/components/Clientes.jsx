@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { clientesApi, agentesApi } from '../api';
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
@@ -6,15 +6,21 @@ import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Users, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, Compass } from 'lucide-react';
 import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/validadores';
 import { obtenerSesion } from '../utils/sesion';
-import { telefono } from '../utils/formato';
+import { telefono, fechaViaje } from '../utils/formato';
+import FichaDetalle from './common/FichaDetalle';
 import { SelectorFecha } from './common/Calendario';
 import { PendientesDeRegistro } from './pendientes/Pendientes';
-import NotasSeguimiento, { notasDesdeServidor, notasParaServidor, resumenNotas } from './common/NotasSeguimiento';
+import NotasSeguimiento, { notasDesdeServidor, notasParaServidor } from './common/NotasSeguimiento';
+import { avisarExito, avisarError } from '../utils/avisos';
+import { irAlFormulario } from '../utils/irAlFormulario';
 
 const EMPTY_FORM = {
   _id: null, nombreCompleto: '', correo: '', telefono: '',
   direccion: '', fechaNacimiento: '', ciudad: '', observaciones: '', pais: 'México', estatus: 'Activo', agente: '',
+  tipoDocumento: '', numeroDocumento: '',
 };
+
+const TIPOS_DOCUMENTO = ['INE', 'Pasaporte', 'Cédula'];
 
 const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
@@ -57,6 +63,13 @@ export default function Clientes({ onGenerarReservacion }) {
     // Solo el Administrador asigna agente; si no elige, el servidor lo deja a nombre de quien da de alta.
     if (esAdministrador && agente) payload.agente = agente;
     payload.notas = notasParaServidor(notas);
+    // Sin documento: null (el servidor borra el tipo; '' no es un tipo válido).
+    payload.numeroDocumento = (payload.numeroDocumento || '').trim();
+    payload.tipoDocumento = payload.numeroDocumento ? payload.tipoDocumento : null;
+    if (payload.numeroDocumento && !payload.tipoDocumento) {
+      avisarError('Selecciona el tipo de documento (INE, Pasaporte o Cédula).');
+      return;
+    }
     setGuardando(true);
     try {
       if (_id) {
@@ -66,9 +79,9 @@ export default function Clientes({ onGenerarReservacion }) {
       }
       resetForm();
       await cargarClientes();
-      alert('Se guardaron correctamente los datos.');
+      avisarExito(_id ? 'Datos del cliente actualizados correctamente.' : 'Cliente registrado correctamente.');
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
@@ -83,12 +96,17 @@ export default function Clientes({ onGenerarReservacion }) {
     setEstatusOriginal('Activo');
   };
 
+  const formRef = useRef(null);
+
   const handleEditar = (cliente) => {
+    irAlFormulario(formRef.current);
     setForm({
       ...EMPTY_FORM,
       ...cliente,
       fechaNacimiento: cliente.fechaNacimiento ? cliente.fechaNacimiento.slice(0, 10) : '',
       agente: cliente.agente?._id || cliente.agente || '',
+      tipoDocumento: cliente.tipoDocumento || '',
+      numeroDocumento: cliente.numeroDocumento || '',
     });
     setNotas(notasDesdeServidor(cliente.notas));
     setEstatusOriginal(cliente.estatus);
@@ -102,20 +120,37 @@ export default function Clientes({ onGenerarReservacion }) {
       await clientesApi.update(cliente._id, { estatus: 'Baja' });
       await cargarClientes();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 
-  const handleVer = (cliente) => {
-    alert(
-      `${cliente.nombreCompleto} (${cliente.estatus})\n${cliente.correo || ''}\n${cliente.telefono}\n${cliente.direccion || ''}, ${cliente.ciudad || ''}, ${cliente.pais}\n\n` +
-      `Observaciones / datos de interés:\n${cliente.observaciones || '—'}\n\n` +
-      `Seguimiento:\n${resumenNotas(cliente.notas) || 'Sin notas registradas.'}`
-    );
-  };
+  const [viendo, setViendo] = useState(null);
+  const handleVer = (cliente) => setViendo(cliente);
 
   return (
     <div className="flex flex-col gap-6">
+      {viendo && (
+        <FichaDetalle icono={Users} titulo={viendo.nombreCompleto} onCerrar={() => setViendo(null)}
+          estatus={{ texto: viendo.estatus, tono: viendo.estatus === 'Activo' ? 'ok' : 'baja' }}
+          subtitulo={viendo.agente?.nombre ? `Agente: ${viendo.agente.nombre}` : null}
+          secciones={[
+            { titulo: 'Contacto y datos personales', columnas: 4, campos: [
+              { etiqueta: 'Teléfono', valor: viendo.telefono && telefono(viendo.telefono), mono: true },
+              { etiqueta: 'Correo', valor: viendo.correo },
+              { etiqueta: 'Documento', valor: viendo.numeroDocumento && `${viendo.tipoDocumento ? `${viendo.tipoDocumento} · ` : ''}${viendo.numeroDocumento}` },
+              { etiqueta: 'Fecha de nacimiento', valor: viendo.fechaNacimiento && fechaViaje(viendo.fechaNacimiento) },
+            ] },
+            { titulo: 'Ubicación', columnas: 4, campos: [
+              { etiqueta: 'Dirección', valor: viendo.direccion, doble: true },
+              { etiqueta: 'Ciudad', valor: viendo.ciudad },
+              { etiqueta: 'País', valor: viendo.pais },
+            ] },
+            { titulo: 'Observaciones / datos de interés', campos: [
+              { etiqueta: 'Observaciones', valor: viendo.observaciones, completo: true },
+            ] },
+          ]}
+          notas={viendo.notas || []} />
+      )}
       <PageHeader
         icon={Users}
         title="Clientes"
@@ -134,13 +169,13 @@ export default function Clientes({ onGenerarReservacion }) {
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <div data-tarjeta-formulario className="scroll-mt-24 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center gap-2 mb-6">
           <Users size={18} className="text-brand-petroleo" />
           <h2 className="text-base font-bold text-brand-noche">Información del Cliente</h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div>
             <label className={labelClass}>Nombre completo *</label>
             <input type="text" required placeholder="Ej. Juan Pérez López" className={inputClass}
@@ -167,6 +202,23 @@ export default function Clientes({ onGenerarReservacion }) {
             <label className={labelClass}>Dirección</label>
             <input type="text" placeholder="Ej. Av Principal 123 Col Centro" className={inputClass}
               value={form.direccion} onChange={e => setForm({ ...form, direccion: soloDireccion(e.target.value) })} />
+          </div>
+
+          <div>
+            <label className={labelClass}>Tipo de documento {form.numeroDocumento && '*'}</label>
+            <select required={Boolean(form.numeroDocumento)} className={`${inputClass} bg-white`}
+              value={form.tipoDocumento} onChange={e => setForm({ ...form, tipoDocumento: e.target.value })}>
+              <option value="">Sin documento</option>
+              {TIPOS_DOCUMENTO.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Número de documento</label>
+            {/* Solo letras y números, en mayúsculas (así viene en INE y pasaporte). */}
+            <input type="text" maxLength={20} autoComplete="off" className={`${inputClass} font-mono uppercase`}
+              placeholder={form.tipoDocumento === 'Pasaporte' ? 'Ej. G12345678' : form.tipoDocumento === 'INE' ? 'Ej. clave de elector o IDMEX' : 'Ej. G12345678'}
+              value={form.numeroDocumento}
+              onChange={e => setForm({ ...form, numeroDocumento: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20) })} />
           </div>
 
           <div>

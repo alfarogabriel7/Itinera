@@ -9,8 +9,9 @@ const ClienteSchema = new mongoose.Schema(
     // sus clientes; el Administrador ve todos y puede reasignarlos.
     agente: { type: mongoose.Schema.Types.ObjectId, ref: 'Agente', required: true },
     nombreCompleto: { type: String, required: true, trim: true, maxlength: 120 },
-    tipoDocumento: { type: String, enum: ['INE', 'Pasaporte', 'Cédula'] },
-    numeroDocumento: { type: String, trim: true },
+    tipoDocumento: { type: String, enum: { values: ['INE', 'Pasaporte', 'Cédula'], message: 'Tipo de documento inválido: usa INE, Pasaporte o Cédula.' } },
+    // Pasaporte, INE o cédula: letras y números en mayúsculas (útil para vuelos internacionales).
+    numeroDocumento: { type: String, trim: true, uppercase: true, maxlength: 20, match: [/^[A-Z0-9]*$/, 'El número de documento solo puede contener letras y números'] },
     correo: {
       type: String,
       trim: true,

@@ -5,6 +5,7 @@ import { TIPOS_COMPROBANTE, validarComprobante, abrirComprobante } from '../util
 import CampoMonto from './common/CampoMonto';
 import { SelectorFecha, aTexto } from './common/Calendario';
 import { Truck, Send, Ban, CheckCircle2, Paperclip, Upload, FileCheck } from 'lucide-react';
+import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 
 // Pagos de la agencia a los proveedores de una reservación (cuentas por pagar).
 // Por cada servicio del detalle: lo que se le debe al proveedor (ya descontada
@@ -54,7 +55,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
   const handleArchivoForm = (e) => {
     const elegido = e.target.files[0] || null;
     const problema = elegido && validarComprobante(elegido);
-    if (problema) { alert(problema); e.target.value = ''; setArchivo(null); return; }
+    if (problema) { avisarError(problema); e.target.value = ''; setArchivo(null); return; }
     setArchivo(elegido);
   };
 
@@ -62,27 +63,29 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
     e.preventDefault();
     const detalle = estado.detalles.find(d => d.idDetalle === form.idDetalle);
     const monto = Math.round(parseFloat(form.monto) * 100) / 100;
-    if (!detalle) { alert('Selecciona el servicio que se le paga al proveedor.'); return; }
-    if (!(monto > 0)) { alert('El monto debe ser mayor a cero.'); return; }
-    if (monto > detalle.saldo) { alert(`El monto excede el saldo pendiente con el proveedor (${dinero(detalle.saldo)}).`); return; }
+    if (!detalle) { avisarError('Selecciona el servicio que se le paga al proveedor.'); return; }
+    if (!(monto > 0)) { avisarError('El monto debe ser mayor a cero.'); return; }
+    if (monto > detalle.saldo) { avisarError(`El monto excede el saldo pendiente con el proveedor (${dinero(detalle.saldo)}).`); return; }
     setGuardando(true);
     try {
       const pago = await pagosProveedorApi.create({ idReservacion, ...form, monto });
       let aviso = 'Pago al proveedor registrado correctamente.';
+      let archivoFallo = false;
       if (archivo) {
         try {
           await pagosProveedorApi.subirComprobante(pago._id, archivo);
         } catch (err) {
+          archivoFallo = true;
           aviso = `El pago se registró, pero no se pudo subir el comprobante: ${err.message}\nPuedes adjuntarlo desde el historial.`;
         }
       }
-      alert(aviso);
+      (archivoFallo ? avisarAdvertencia : avisarExito)(aviso);
       setForm(formularioVacio());
       setArchivo(null);
       if (inputArchivoForm.current) inputArchivoForm.current.value = '';
       await cargar();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
@@ -91,12 +94,12 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
   const handleCancelar = async (pago) => {
     const motivo = window.prompt(`Cancelar el pago de ${dinero(pago.monto)} a ${pago.idProveedor?.nombreProveedor || 'el proveedor'}.\n\nEscribe el motivo de la cancelación:`);
     if (motivo === null) return;
-    if (!motivo.trim()) { alert('El motivo de la cancelación es obligatorio.'); return; }
+    if (!motivo.trim()) { avisarError('El motivo de la cancelación es obligatorio.'); return; }
     try {
       await pagosProveedorApi.cancelar(pago._id, motivo.trim());
       await cargar();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 
@@ -112,13 +115,13 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
     const pago = pagoParaAdjuntar.current;
     if (!elegido || !pago) return;
     const problema = validarComprobante(elegido);
-    if (problema) { alert(problema); return; }
+    if (problema) { avisarError(problema); return; }
     setSubiendoId(pago._id);
     try {
       await pagosProveedorApi.subirComprobante(pago._id, elegido);
       await cargar();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setSubiendoId('');
     }

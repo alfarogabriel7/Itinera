@@ -18,6 +18,7 @@ import { obtenerSesion } from './utils/sesion';
 import { TEMA_PREDETERMINADO } from '../database/catalogos/temas.js';
 import MasUSD from './components/common/MasUSD';
 import CampanaViajes from './components/common/CampanaViajes';
+import Avisos from './components/common/Avisos';
 import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
 import simboloItinera from './assets/itinera-simbolo-color.svg';
 import {
@@ -293,6 +294,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-arena md:flex">
+      <Avisos />
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}

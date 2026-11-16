@@ -5,6 +5,7 @@ import {
 import { reservacionesApi } from '../api';
 import { dinero, fechaViaje, telefono } from '../utils/formato';
 import { PendientesDeRegistro } from './pendientes/Pendientes';
+import { avisarError } from '../utils/avisos';
 
 // Ficha de reservación (pantalla completa): resumen del viaje, cobro al cliente,
 // servicios y proveedores, peticiones del cliente, pendientes, checklist de
@@ -60,7 +61,7 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
 
   const accion = async (fn) => {
     setOcupado(true);
-    try { await fn(); await cargar(); } catch (err) { alert(err.message); } finally { setOcupado(false); }
+    try { await fn(); await cargar(); } catch (err) { avisarError(err.message); } finally { setOcupado(false); }
   };
 
   if (error) {

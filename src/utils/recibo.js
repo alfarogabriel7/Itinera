@@ -4,6 +4,7 @@
 import { dinero, fechaViajeLarga } from './formato';
 import { empresasApi } from '../api';
 import { TEMAS, TEMA_PREDETERMINADO } from '../../database/catalogos/temas.js';
+import { avisarError } from './avisos';
 
 // El logo se incrusta como data URL para que la ventana del recibo no dependa
 // de la sesión (la ruta del logo pide token) y salga también al guardar en PDF.
@@ -90,7 +91,7 @@ export async function imprimirRecibo(resumen, pago) {
   // la bloquee; el contenido se escribe cuando ya se tiene el logo.
   const ventana = window.open('', '_blank');
   if (!ventana) {
-    alert('El navegador bloqueó la ventana del recibo. Permite las ventanas emergentes para este sitio.');
+    avisarError('El navegador bloqueó la ventana del recibo. Permite las ventanas emergentes para este sitio.');
     return;
   }
   ventana.document.write('<p style="font-family:system-ui;padding:32px;color:#64748b">Generando recibo…</p>');

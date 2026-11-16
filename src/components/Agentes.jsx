@@ -7,6 +7,7 @@ import SelectorRemoto from './common/SelectorRemoto';
 import IndicadorPassword, { CoincidenciaPassword } from './common/IndicadorPassword';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { UserCog, Plus, X, Save, Search, Pencil, Trash2, Lock, Eye, EyeOff, AtSign } from 'lucide-react';
+import { avisarExito, avisarError } from '../utils/avisos';
 
 const EMPTY_FORM = { _id: null, nombre: '', userId: '', rol: 'Agente', empresa: '', empresaNombre: '', estatus: 'Activo', password: '', confirmPassword: '' };
 
@@ -62,19 +63,19 @@ export default function Agentes() {
     e.preventDefault();
 
     if (!esEdicion && !form.password) {
-      alert('La contraseña es obligatoria para un nuevo agente.');
+      avisarError('La contraseña es obligatoria para un nuevo agente.');
       return;
     }
     if (form.password && !PASSWORD_REGEX.test(form.password)) {
-      alert('La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.');
+      avisarError('La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.');
       return;
     }
     if (form.password !== form.confirmPassword) {
-      alert('Las contraseñas no coinciden.');
+      avisarError('Las contraseñas no coinciden.');
       return;
     }
     if (!esEdicion && esSuperAdmin && !form.empresa) {
-      alert('Selecciona la empresa para el administrador.');
+      avisarError('Selecciona la empresa para el administrador.');
       return;
     }
 
@@ -90,9 +91,9 @@ export default function Agentes() {
       }
       resetForm();
       await cargarAgentes();
-      alert('Se guardaron correctamente los datos.');
+      avisarExito(_id ? 'Datos del usuario actualizados correctamente.' : 'Usuario registrado correctamente.');
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
@@ -115,7 +116,7 @@ export default function Agentes() {
       await agentesApi.remove(agente._id);
       await cargarAgentes();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 

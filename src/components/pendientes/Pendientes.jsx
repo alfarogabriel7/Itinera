@@ -5,6 +5,7 @@ import { TIPOS_PENDIENTE } from '../../../database/catalogos/tiposPendiente.js';
 import { SelectorFecha, aTexto, aFecha } from '../common/Calendario';
 import SelectorRemoto from '../common/SelectorRemoto';
 import { fechaViaje } from '../../utils/formato';
+import { avisarError } from '../../utils/avisos';
 
 // Piezas del módulo de pendientes ("Mi día"): chip de tipo, captura, fila y el
 // panel de pendientes de un registro (cliente o prospecto).
@@ -66,7 +67,7 @@ export function FilaPendiente({ p, hoy, onCambio, mostrarResponsable = false, co
   const accion = async (fn) => {
     setOcupado(true);
     setMenu(false);
-    try { await fn(); await onCambio(); } catch (err) { alert(err.message); } finally { setOcupado(false); }
+    try { await fn(); await onCambio(); } catch (err) { avisarError(err.message); } finally { setOcupado(false); }
   };
 
   return (
@@ -164,7 +165,7 @@ export function FormPendiente({ ligas = null, elegirLiga = false, responsables =
       await onCreado?.();
       titulo.current?.focus();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
