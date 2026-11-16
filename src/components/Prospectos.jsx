@@ -53,6 +53,7 @@ export default function Prospectos() {
   const [filtroAgente, setFiltroAgente] = useState('');
 
   const listado = useListadoRemoto(params => prospectosApi.list(params), {
+    porPaginaInicial: 10,
     filtros: filtroAgente === 'mios' ? { mios: 1 } : filtroAgente ? { agente: filtroAgente } : {},
   });
   const cargarProspectos = listado.recargar;

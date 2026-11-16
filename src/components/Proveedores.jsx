@@ -31,7 +31,7 @@ export default function Proveedores() {
   const [form, setForm] = useState(EMPTY_FORM);
 
   // Listado paginado y filtrado en el servidor.
-  const listado = useListadoRemoto(params => proveedoresApi.list(params));
+  const listado = useListadoRemoto(params => proveedoresApi.list(params), { porPaginaInicial: 10 });
   const cargarProveedores = listado.recargar;
 
   const handleSubmit = async (e) => {

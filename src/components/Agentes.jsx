@@ -37,7 +37,7 @@ export default function Agentes() {
   const esEdicion = Boolean(form._id);
 
   // Listado paginado y filtrado en el servidor.
-  const listado = useListadoRemoto(params => agentesApi.list(params));
+  const listado = useListadoRemoto(params => agentesApi.list(params), { porPaginaInicial: 10 });
   const cargarAgentes = listado.recargar;
   const { error } = listado;
 
