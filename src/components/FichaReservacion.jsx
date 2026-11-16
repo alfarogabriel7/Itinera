@@ -212,30 +212,38 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
           {/* Servicios */}
           <section className={tarjeta}>
             <h2 className="mb-3 text-base font-bold text-slate-800">Servicios y proveedores</h2>
-            <div className="overflow-x-auto rounded-xl border border-slate-100">
-              <table className="w-full min-w-[560px] border-collapse text-left text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                <thead><tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                  <th className="p-3 font-semibold">Proveedor · clave</th>
-                  <th className="p-3 text-right font-semibold">Base</th>
-                  <th className="p-3 text-right font-semibold">Comisión</th>
-                  <th className="p-3 text-right font-semibold">A pagar</th>
-                  <th className="p-3 text-right font-semibold">Pagado</th>
-                  <th className="p-3 text-right font-semibold">Saldo</th>
-                </tr></thead>
-                <tbody className="divide-y divide-slate-100">
-                  {f.servicios.map(s => (
-                    <tr key={s._id}>
-                      <td className="p-3"><div className="font-medium text-slate-700">{s.proveedor}</div><div className="text-xs text-slate-400">{s.clave}</div></td>
-                      <td className="p-3 text-right text-slate-600">{dinero(s.montoBase)}</td>
-                      <td className="p-3 text-right text-slate-600">{dinero(s.comision)}</td>
-                      <td className="p-3 text-right text-slate-700">{dinero(s.total)}</td>
-                      <td className="p-3 text-right text-emerald-700">{dinero(s.pagado)}</td>
-                      <td className="p-3 text-right font-semibold">{s.saldo > 0.005 ? <span className="text-red-600">{dinero(s.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}</td>
-                    </tr>
-                  ))}
-                  {f.servicios.length === 0 && <tr><td colSpan={6} className="p-4 text-center text-slate-400">Sin servicios registrados.</td></tr>}
-                </tbody>
-              </table>
+            {/* Un bloque por servicio (no tabla): esta columna es angosta y una tabla de 6 columnas hacía scroll. */}
+            <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {f.servicios.map(s => {
+                const liquidado = !(s.saldo > 0.005);
+                return (
+                  <div key={s._id} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-700 break-words">{s.proveedor}</div>
+                        <div className="font-mono text-xs text-slate-400 break-all">{s.clave}</div>
+                      </div>
+                      {liquidado
+                        ? <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Liquidado</span>
+                        : <span className="shrink-0 text-right"><span className="block text-2xs uppercase tracking-wide text-slate-400">Saldo</span><span className="font-semibold text-red-600">{dinero(s.saldo)}</span></span>}
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-4">
+                      {[
+                        ['Base', s.montoBase, 'text-slate-600'],
+                        ['Comisión', s.comision, 'text-slate-600'],
+                        ['A pagar', s.total, 'text-slate-700'],
+                        ['Pagado', s.pagado, 'text-emerald-700'],
+                      ].map(([etiqueta, monto, color]) => (
+                        <div key={etiqueta}>
+                          <dt className="text-2xs uppercase tracking-wide text-slate-400">{etiqueta}</dt>
+                          <dd className={color}>{dinero(monto)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                );
+              })}
+              {f.servicios.length === 0 && <p className="p-4 text-center text-slate-400">Sin servicios registrados.</p>}
             </div>
           </section>
         </div>
