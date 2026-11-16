@@ -52,6 +52,7 @@ export default function Clientes({ onGenerarReservacion }) {
   const [filtroAgente, setFiltroAgente] = useState('');
 
   const listado = useListadoRemoto(params => clientesApi.list(params), {
+    porPaginaInicial: 10,
     filtros: filtroAgente === 'mios' ? { mios: 1 } : filtroAgente ? { agente: filtroAgente } : {},
   });
   const cargarClientes = listado.recargar;

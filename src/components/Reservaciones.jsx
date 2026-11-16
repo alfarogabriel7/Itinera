@@ -69,6 +69,7 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
   const [filtroEstatus, setFiltroEstatus] = useState('Activa');
 
   const listado = useListadoRemoto(params => reservacionesApi.list(params), {
+    porPaginaInicial: 10,
     filtros: {
       ...(filtroAgente === 'mios' ? { mios: 1 } : filtroAgente ? { agente: filtroAgente } : {}),
       ...(filtroEstatus ? { estatus: filtroEstatus } : {}),

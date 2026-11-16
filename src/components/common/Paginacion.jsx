@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-export const OPCIONES_POR_PAGINA = [25, 50, 100];
+export const OPCIONES_POR_PAGINA = [10, 25, 50, 100];
 
 // Selector "Mostrar N" ligado a un listado de useListadoRemoto.
 export function SelectorPorPagina({ listado }) {
