@@ -10,6 +10,7 @@ import { Compass, Plus, Send, Search, Eye, X, Pencil, Save, Ban, CreditCard } fr
 import { fechaViaje, dinero } from '../utils/formato';
 import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
 import FichaReservacion from './FichaReservacion';
+import { avisarExito, avisarError } from '../utils/avisos';
 
 const COLOR_ESTATUS = {
   Activa: 'bg-emerald-100 text-emerald-700',
@@ -133,7 +134,7 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
   const guardarTodo = async (e) => {
     e.preventDefault();
     if (!maestro.idCliente || detalles.length === 0) {
-      alert('Completa los datos maestros y añade al menos un servicio en el detalle.');
+      avisarError('Completa los datos maestros y añade al menos un servicio en el detalle.');
       return;
     }
     setGuardando(true);
@@ -150,9 +151,9 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
       else await reservacionesApi.create(datos);
       limpiarFormulario();
       await cargarReservaciones();
-      alert(editando ? 'Se actualizó la reservación.' : 'Se guardaron correctamente los datos.');
+      avisarExito(editando ? 'Reservación actualizada correctamente.' : 'Reservación registrada correctamente.');
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
@@ -204,7 +205,7 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
       await cargarReservaciones();
       return true;
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
       return false;
     }
   };

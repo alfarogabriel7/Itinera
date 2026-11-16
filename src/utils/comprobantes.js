@@ -1,3 +1,4 @@
+import { avisarError } from './avisos';
 // Utilidades de comprobantes (cobros a clientes y pagos a proveedores).
 // Mismo límite y tipos que valida el servidor (allá se revisa el contenido real del archivo).
 export const LIMITE_COMPROBANTE = 4 * 1024 * 1024;
@@ -21,6 +22,6 @@ export async function abrirComprobante(descargar) {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   } catch (err) {
     ventana?.close();
-    alert(err.message);
+    avisarError(err.message);
   }
 }

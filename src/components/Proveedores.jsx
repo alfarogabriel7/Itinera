@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { proveedoresApi } from '../api';
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
@@ -6,8 +6,11 @@ import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Truck, Plus, X, Save, Search, Eye, Pencil, Trash2 } from 'lucide-react';
 import { obtenerSesion } from '../utils/sesion';
 import { telefono, cuentaBancaria } from '../utils/formato';
+import FichaDetalle from './common/FichaDetalle';
 import { soloTelefono, soloNumeros } from '../utils/validadores';
 import { limpiar as limpiarMonto } from './common/CampoMonto';
+import { avisarExito, avisarError } from '../utils/avisos';
+import { irAlFormulario } from '../utils/irAlFormulario';
 
 const EMPTY_FORM = {
   _id: null, nombreProveedor: '', telefono1: '', telefono2: '',
@@ -44,9 +47,9 @@ export default function Proveedores() {
       }
       resetForm();
       await cargarProveedores();
-      alert('Se guardaron correctamente los datos.');
+      avisarExito(_id ? 'Datos del proveedor actualizados correctamente.' : 'Proveedor registrado correctamente.');
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
@@ -60,7 +63,10 @@ export default function Proveedores() {
     setEstatusOriginal('Activo');
   };
 
+  const formRef = useRef(null);
+
   const handleEditar = (proveedor) => {
+    irAlFormulario(formRef.current);
     setForm({ ...EMPTY_FORM, ...proveedor, porcentajeComision: proveedor.porcentajeComision ? String(proveedor.porcentajeComision) : '' });
     setEstatusOriginal(proveedor.estatus);
   };
@@ -73,16 +79,33 @@ export default function Proveedores() {
       await proveedoresApi.update(proveedor._id, { estatus: 'Baja' });
       await cargarProveedores();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 
-  const handleVer = (proveedor) => {
-    alert(`${proveedor.nombreProveedor} (${proveedor.estatus})\nTeléfono: ${telefono(proveedor.telefono1)}\nCuenta: ${cuentaBancaria(proveedor.numeroCuenta1)}\n% Comisión: ${porcentajeVisible(proveedor)}`);
-  };
+  const [viendo, setViendo] = useState(null);
+  const handleVer = (proveedor) => setViendo(proveedor);
 
   return (
     <div className="flex flex-col gap-6">
+      {viendo && (
+        <FichaDetalle icono={Truck} titulo={viendo.nombreProveedor} onCerrar={() => setViendo(null)}
+          estatus={{ texto: viendo.estatus, tono: viendo.estatus === 'Activo' ? 'ok' : 'baja' }}
+          subtitulo={`Comisión ${porcentajeVisible(viendo)}`}
+          secciones={[
+            { titulo: 'Contacto', campos: [
+              { etiqueta: 'Teléfono principal', valor: viendo.telefono1 && telefono(viendo.telefono1), mono: true },
+              { etiqueta: 'Teléfono secundario', valor: viendo.telefono2 && telefono(viendo.telefono2), mono: true },
+            ] },
+            { titulo: 'Datos bancarios', campos: [
+              { etiqueta: 'Cuenta / CLABE 1', valor: viendo.numeroCuenta1 && cuentaBancaria(viendo.numeroCuenta1), mono: true },
+              { etiqueta: 'Cuenta / CLABE 2', valor: viendo.numeroCuenta2 && cuentaBancaria(viendo.numeroCuenta2), mono: true },
+            ] },
+            { titulo: 'Condiciones', campos: [
+              { etiqueta: '% Comisión', valor: porcentajeVisible(viendo) },
+            ] },
+          ]} />
+      )}
       <PageHeader
         icon={Truck}
         title="Proveedores"
@@ -101,12 +124,12 @@ export default function Proveedores() {
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{listado.error}</div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <div data-tarjeta-formulario className="scroll-mt-24 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center gap-2 mb-6">
           <Truck size={18} className="text-brand-petroleo" />
           <h2 className="text-base font-bold text-brand-noche">Información del Proveedor</h2>
         </div>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div className="md:col-span-2">
             <label className={labelClass}>Nombre o Razón Social *</label>
             <input type="text" maxLength={100} required placeholder="Ej. Aeroméxico" className={inputClass} value={form.nombreProveedor} onChange={e => setForm({ ...form, nombreProveedor: e.target.value })} />

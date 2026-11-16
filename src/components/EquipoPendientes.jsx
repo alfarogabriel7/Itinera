@@ -3,6 +3,7 @@ import { CalendarCheck, ClipboardList, Plus } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { pendientesApi } from '../api';
 import { FormPendiente, FilaPendiente } from './pendientes/Pendientes';
+import { avisarError } from '../utils/avisos';
 
 // "Pendientes del equipo" (solo Administrador): carga de pendientes por agente,
 // pendientes sin responsable activo, vencidos más antiguos y ventas sin próximo
@@ -56,7 +57,7 @@ export default function EquipoPendientes({ onVerDia, onCambioPendientes }) {
   useEffect(() => { cargar(); }, []);
 
   const ejecutar = async (fn) => {
-    try { await fn(); await cargar(); } catch (err) { alert(err.message); }
+    try { await fn(); await cargar(); } catch (err) { avisarError(err.message); }
   };
 
   const agregarPara = (v) => {

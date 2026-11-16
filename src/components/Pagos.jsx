@@ -10,6 +10,7 @@ import CampoMonto from './common/CampoMonto';
 import PagosProveedor from './PagosProveedor';
 import { dinero, fechaCorta, fechaViaje } from '../utils/formato';
 import { DollarSign, CreditCard, Ban, CheckCircle2, Paperclip, Upload, Printer, FileCheck, Users, Truck } from 'lucide-react';
+import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 
 const etiquetaReservacion = (r) => `${r.idCliente?.nombreCompleto || 'Cliente'} — ${r.destino}`;
 
@@ -44,7 +45,7 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
     try {
       setResumen(await pagosApi.resumen(id));
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 
@@ -76,7 +77,7 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
     const elegido = e.target.files[0] || null;
     const problema = elegido && validarComprobante(elegido);
     if (problema) {
-      alert(problema);
+      avisarError(problema);
       e.target.value = '';
       setArchivo(null);
       return;
@@ -88,29 +89,31 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
     e.preventDefault();
     const monto = Math.round(parseFloat(montoPago) * 100) / 100;
     if (!(monto > 0)) {
-      alert('El monto del abono debe ser mayor a cero.');
+      avisarError('El monto del abono debe ser mayor a cero.');
       return;
     }
     if (monto > resumen.saldo) {
-      alert(`El monto capturado (${dinero(monto)}) excede el saldo pendiente (${dinero(resumen.saldo)}) de la reservación.`);
+      avisarError(`El monto capturado (${dinero(monto)}) excede el saldo pendiente (${dinero(resumen.saldo)}) de la reservación.`);
       return;
     }
     setGuardando(true);
     try {
       const pago = await pagosApi.create({ idReservacion: selectedReservaId, monto, formaPago, referencia, fecha: fechaPago });
       let aviso = 'Pago registrado correctamente.';
+      let archivoFallo = false;
       if (archivo) {
         try {
           await pagosApi.subirComprobante(pago._id, archivo);
         } catch (err) {
+          archivoFallo = true;
           aviso = `El pago se registró, pero no se pudo subir el comprobante: ${err.message}\nPuedes adjuntarlo desde el historial de abonos.`;
         }
       }
-      alert(aviso);
+      (archivoFallo ? avisarAdvertencia : avisarExito)(aviso);
       limpiarCaptura();
       await cargarResumen(selectedReservaId);
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
@@ -120,14 +123,14 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
     const motivo = window.prompt(`Cancelar el abono de ${dinero(pago.monto)} del ${fechaCorta(pago.fecha)}.\n\nEscribe el motivo de la cancelación:`);
     if (motivo === null) return;
     if (!motivo.trim()) {
-      alert('El motivo de la cancelación es obligatorio.');
+      avisarError('El motivo de la cancelación es obligatorio.');
       return;
     }
     try {
       await pagosApi.cancelar(pago._id, motivo.trim());
       await cargarResumen(selectedReservaId);
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 
@@ -144,13 +147,13 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
     const pago = pagoParaAdjuntar.current;
     if (!elegido || !pago) return;
     const problema = validarComprobante(elegido);
-    if (problema) { alert(problema); return; }
+    if (problema) { avisarError(problema); return; }
     setSubiendoId(pago._id);
     try {
       await pagosApi.subirComprobante(pago._id, elegido);
       await cargarResumen(selectedReservaId);
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setSubiendoId('');
     }

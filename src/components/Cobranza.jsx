@@ -7,6 +7,7 @@ import MasUSD from './common/MasUSD';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { Wallet, Search, AlarmClock, AlertTriangle, ListChecks, CreditCard, MessageCircle, Download } from 'lucide-react';
+import { avisarError } from '../utils/avisos';
 
 const URGENCIAS = [
   { key: 'todas', label: 'Todas' },
@@ -137,7 +138,7 @@ export default function Cobranza({ onAbonar }) {
       const r = await pagosApi.cobranza({ ...filtros, q: listado.busqueda.trim(), exportar: 1, porPagina: 5000 });
       exportarCSV(r.datos, true);
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setExportando(false);
     }

@@ -2,12 +2,15 @@ import React, { useRef, useState } from 'react';
 import { empresasApi } from '../api';
 import PageHeader from './common/PageHeader';
 import { Building2, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, ImagePlus } from 'lucide-react';
+import FichaDetalle from './common/FichaDetalle';
+import { telefono } from '../utils/formato';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloLetrasYNumeros, soloTelefono, soloCorreo, soloDireccion, soloCodigoPostal, soloRFC } from '../utils/validadores';
 import SelectorRemoto from './common/SelectorRemoto';
 import { ESTADOS_MEXICO } from '../../database/catalogos/estados.js';
 import { TEMAS, TEMA_PREDETERMINADO } from '../../database/catalogos/temas.js';
+import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 
 
 const EMPTY_FORM = {
@@ -69,12 +72,12 @@ export default function Empresas() {
     const archivo = e.target.files[0];
     if (!archivo) return;
     if (!/\.(png|jpe?g|webp)$/i.test(archivo.name)) {
-      alert('El logo debe ser una imagen PNG, JPG o WEBP.');
+      avisarError('El logo debe ser una imagen PNG, JPG o WEBP.');
       e.target.value = '';
       return;
     }
     if (archivo.size > LIMITE_LOGO) {
-      alert('El logo no puede pesar más de 1 MB.');
+      avisarError('El logo no puede pesar más de 1 MB.');
       e.target.value = '';
       return;
     }
@@ -107,9 +110,9 @@ export default function Empresas() {
       }
       resetForm();
       await cargarEmpresas();
-      alert(`Se guardaron correctamente los datos.${avisoLogo}`);
+      if (avisoLogo) avisarAdvertencia(avisoLogo.trim()); else avisarExito(_id ? 'Datos de la empresa actualizados correctamente.' : 'Empresa registrada correctamente.');
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     } finally {
       setGuardando(false);
     }
@@ -135,16 +138,36 @@ export default function Empresas() {
       await empresasApi.update(empresa._id, { estatus: 'Baja' });
       await cargarEmpresas();
     } catch (err) {
-      alert(err.message);
+      avisarError(err.message);
     }
   };
 
-  const handleVer = (empresa) => {
-    alert(`${empresa.nombreEmpresa} (${empresa.estatus})\nTitular: ${empresa.nombreTitular || ''}\nRFC: ${empresa.rfc}\n${empresa.correo || ''}\n${empresa.telefonoPrincipal}\n${[empresa.direccion, empresa.colonia && `Col. ${empresa.colonia}`, empresa.codigoPostal && `C.P. ${empresa.codigoPostal}`, empresa.ciudad, empresa.estado, empresa.pais].filter(Boolean).join(', ')}`);
-  };
+  const [viendo, setViendo] = useState(null);
+  const handleVer = (empresa) => setViendo(empresa);
 
   return (
     <div className="flex flex-col gap-6">
+      {viendo && (
+        <FichaDetalle icono={Building2} titulo={viendo.nombreEmpresa} onCerrar={() => setViendo(null)}
+          estatus={{ texto: viendo.estatus, tono: viendo.estatus === 'Activo' ? 'ok' : 'baja' }}
+          subtitulo={viendo.rfc ? `RFC ${viendo.rfc}` : null}
+          secciones={[
+            { titulo: 'Titular y contacto', columnas: 4, campos: [
+              { etiqueta: 'Titular', valor: viendo.nombreTitular },
+              { etiqueta: 'Correo', valor: viendo.correo },
+              { etiqueta: 'Teléfono principal', valor: viendo.telefonoPrincipal && telefono(viendo.telefonoPrincipal), mono: true },
+              { etiqueta: 'Teléfono secundario', valor: viendo.telefonoSecundario && telefono(viendo.telefonoSecundario), mono: true },
+            ] },
+            { titulo: 'Domicilio', columnas: 4, campos: [
+              { etiqueta: 'Dirección', valor: viendo.direccion, doble: true },
+              { etiqueta: 'Colonia', valor: viendo.colonia },
+              { etiqueta: 'Código postal', valor: viendo.codigoPostal, mono: true },
+              { etiqueta: 'Ciudad', valor: viendo.ciudad },
+              { etiqueta: 'Estado', valor: viendo.estado },
+              { etiqueta: 'País', valor: viendo.pais },
+            ] },
+          ]} />
+      )}
       <PageHeader
         icon={Building2}
         title="Empresas"
