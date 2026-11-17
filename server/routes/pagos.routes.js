@@ -216,6 +216,7 @@ router.get('/resumen/:idReservacion', async (req, res, next) => {
       cliente: reservacion.idCliente?.nombreCompleto,
       telefonoCliente: reservacion.idCliente?.telefono,
       destino: reservacion.destino,
+      descripcion: reservacion.descripcion || '',
       fechaEntrada: reservacion.fechaEntrada,
       fechaSalida: reservacion.fechaSalida,
       estatusReservacion: reservacion.estatus,
