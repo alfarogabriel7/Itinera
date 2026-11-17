@@ -169,6 +169,7 @@ export async function imprimirRecibo(resumen, pago) {
   <h2>Concepto</h2>
   <table>
     <tr><td>Viaje</td><td>${escapar(resumen.destino)}</td></tr>
+    ${resumen.descripcion ? `<tr><td>Descripción</td><td style="white-space:pre-line">${escapar(resumen.descripcion)}</td></tr>` : ''}
     <tr><td>Fechas</td><td>${escapar(fechaViajeLarga(resumen.fechaEntrada))} al ${escapar(fechaViajeLarga(resumen.fechaSalida))}</td></tr>
   </table>
 
