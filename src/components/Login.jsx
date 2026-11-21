@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { authApi } from '../api';
-import logo from '../assets/itinera-horizontal-color.svg';
-import simbolo from '../assets/itinera-simbolo-color.svg';
+import RutanaLogo from './common/RutanaLogo';
+import isotipoBlanco from '../assets/rutana-isotipo-blanco.svg';
 import { AtSign, Eye, EyeOff, LogIn } from 'lucide-react';
 
 export default function Login({ onSuccess }) {
@@ -27,12 +27,12 @@ export default function Login({ onSuccess }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-noche to-brand-petroleo p-4 relative overflow-hidden">
-      {/* Motivo del símbolo de Itinera (origen → ruta → destino) como fondo. */}
-      <img src={simbolo} alt="" aria-hidden="true" className="absolute -bottom-16 -right-16 w-96 opacity-10 pointer-events-none select-none" />
+      {/* La «R de ruta» de Rutana (trayecto punteado → destino coral) como fondo. */}
+      <img src={isotipoBlanco} alt="" aria-hidden="true" className="absolute -bottom-16 -right-16 w-96 opacity-10 pointer-events-none select-none" />
 
       <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
         <div className="flex justify-center mb-6">
-          <img src={logo} alt="Itinera" className="h-14 w-auto" />
+          <RutanaLogo alto={44} />
         </div>
 
         <h1 className="text-xl font-bold text-brand-noche text-center">Iniciar sesión</h1>

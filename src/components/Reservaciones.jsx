@@ -10,6 +10,7 @@ import { Compass, Plus, Send, Search, Eye, X, Pencil, Save, Ban, CreditCard } fr
 import { fechaViaje, dinero } from '../utils/formato';
 import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
 import FichaReservacion from './FichaReservacion';
+import ListadoAdaptable from './common/ListadoAdaptable';
 import { avisarExito, avisarError } from '../utils/avisos';
 
 const COLOR_ESTATUS = {
@@ -17,11 +18,41 @@ const COLOR_ESTATUS = {
   Completada: 'bg-slate-100 text-slate-600',
   Cancelada: 'bg-red-100 text-red-700',
 };
+const estatusReservacion = (r) => (
+  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${COLOR_ESTATUS[r.estatus] || COLOR_ESTATUS.Activa}`}>{r.estatus}</span>
+);
+const totalVenta = (r) => <>{dinero(r.montoTotal)} <span className="text-2xs font-semibold text-slate-400">{r.moneda || 'MXN'}</span></>;
 
 const MAESTRO_VACIO = { idCliente: '', clienteNombre: '', fechaEntrada: '', fechaSalida: '', destino: '', descripcion: '', montoTotal: '', moneda: 'MXN', notas: '' };
 
 // Catálogos con búsqueda en el servidor (pueden tener miles de registros).
 const buscarClientes = (q) => clientesApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
+const MAX_EXTRAS = 3;
+// Todo en centavos exactos (35699.20 - 3118.63 no da 32580.57 en punto flotante).
+const centavos = (n) => Math.round(n * 100) / 100;
+
+// Recalcula un servicio del detalle: su comisión, la de cada extra y el total
+// que se le debe al proveedor = (base - comisión) + Σ (extra - comisión del extra).
+// El servidor repite este mismo cálculo al guardar.
+function recalcularServicio(fila) {
+  const monto = parseFloat(fila.montoReservacion) || 0;
+  if (!fila.manual) {
+    // Automático: la comisión es monto × %. En Manual se captura a mano.
+    const porcentaje = parseFloat(fila.porcentajeReservacion) || 0;
+    fila.montoComisionable = Math.round(monto * porcentaje) / 100;
+  }
+  const totalBase = centavos(monto - (parseFloat(fila.montoComisionable) || 0));
+  const extras = (fila.extras || []).map(x => {
+    const montoExtra = parseFloat(x.monto) || 0;
+    const pct = parseFloat(x.porcentaje) || 0;
+    // Sin comisión: 0. Con %: automática. Comisionable sin %: la captura el usuario.
+    const montoComisionable = !x.comisionable ? 0 : pct > 0 ? Math.round(montoExtra * pct) / 100 : x.montoComisionable;
+    return { ...x, montoComisionable, total: centavos(montoExtra - (parseFloat(montoComisionable) || 0)) };
+  });
+  const totalExtras = centavos(extras.reduce((a, x) => a + x.total, 0));
+  return { ...fila, extras, totalBase, totalExtras, totalReservacion: centavos(totalBase + totalExtras) };
+}
+
 const buscarProveedores = (q) => proveedoresApi.list({ q, estatus: 'Activo', orden: 'nombre', porPagina: 15 }).then(r => r.datos);
 
 // clienteInicial ({ id, nombre }): cliente precargado al llegar desde Clientes ("Generar reservación").
@@ -79,7 +110,7 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
   const { error } = listado;
 
   const agregarFilaDetalle = () => {
-    setDetalles([...detalles, { key: Date.now(), manual: false, idProveedor: '', proveedorNombre: '', claveReservacion: '', montoReservacion: 0, porcentajeReservacion: 0, montoComisionable: 0, totalReservacion: 0 }]);
+    setDetalles([...detalles, { key: Date.now(), manual: false, idProveedor: '', proveedorNombre: '', claveReservacion: '', montoReservacion: 0, porcentajeReservacion: 0, montoComisionable: 0, totalReservacion: 0, extras: [] }]);
   };
 
   // Si se dio varias veces clic en "Añadir Proveedor/Servicio", esto permite
@@ -112,24 +143,30 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
       fila[field] = value;
     }
 
-    // Todo en centavos exactos (35699.20 - 3118.63 no da 32580.57 en punto flotante).
-    const centavos = (n) => Math.round(n * 100) / 100;
-    const monto = parseFloat(fila.montoReservacion) || 0;
-    if (fila.manual) {
-      // Manual: el monto calculado sale de monto base - monto comisionable.
-      const comisionable = parseFloat(fila.montoComisionable) || 0;
-      fila.totalReservacion = centavos(monto - comisionable);
-    } else {
-      // Automático: el monto comisionable es la comisión (monto × %), igual que
-      // en manual, y el total al proveedor es monto - comisión.
-      const porcentaje = parseFloat(fila.porcentajeReservacion) || 0;
-      const comision = Math.round(monto * porcentaje) / 100;
-      fila.montoComisionable = comision;
-      fila.totalReservacion = centavos(monto - comision);
-    }
-
-    nuevosDetalles[index] = fila;
+    nuevosDetalles[index] = recalcularServicio(fila);
     setDetalles(nuevosDetalles);
+  };
+
+  // Extras de un servicio (máx. 3): cambia un campo y recalcula el servicio.
+  const cambiarExtra = (index, ei, field, value) => {
+    const fila = { ...detalles[index], extras: [...(detalles[index].extras || [])] };
+    const extra = { ...fila.extras[ei], [field]: value };
+    if (field === 'comisionable' && !value) { extra.porcentaje = ''; extra.montoComisionable = 0; }
+    // Al capturar un %, la comisión vuelve a ser automática.
+    if (field === 'porcentaje' && value === '') extra.montoComisionable = 0;
+    fila.extras[ei] = extra;
+    setDetalles(detalles.map((d, i) => (i === index ? recalcularServicio(fila) : d)));
+  };
+  const agregarExtra = (index) => {
+    const fila = detalles[index];
+    if ((fila.extras || []).length >= MAX_EXTRAS) return;
+    const extras = [...(fila.extras || []), { key: Date.now(), descripcion: '', monto: 0, comisionable: false, porcentaje: '', montoComisionable: 0, total: 0 }];
+    setDetalles(detalles.map((d, i) => (i === index ? recalcularServicio({ ...fila, extras }) : d)));
+  };
+  const quitarExtra = (index, ei) => {
+    const fila = detalles[index];
+    const extras = fila.extras.filter((_, j) => j !== ei);
+    setDetalles(detalles.map((d, i) => (i === index ? recalcularServicio({ ...fila, extras }) : d)));
   };
 
   const guardarTodo = async (e) => {
@@ -137,6 +174,12 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
     if (!maestro.idCliente || detalles.length === 0) {
       avisarError('Completa los datos maestros y añade al menos un servicio en el detalle.');
       return;
+    }
+    for (const d of detalles) {
+      for (const x of d.extras || []) {
+        if (!(parseFloat(x.monto) > 0)) { avisarError(`El extra "${x.descripcion || 'sin descripción'}" debe tener un monto mayor a cero.`); return; }
+        if (x.total < 0) { avisarError(`La comisión del extra "${x.descripcion}" no puede ser mayor a su monto.`); return; }
+      }
     }
     setGuardando(true);
     try {
@@ -146,7 +189,15 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
         // Se manda totalReservacion ya calculado: en modo manual sale de
         // monto base - monto comisionable, una fórmula que el backend no conoce.
         // Los servicios existentes llevan su _id: así conservan sus pagos al proveedor.
-        detalleReservacion: detalles.map(({ key, manual, proveedorNombre, ...d }) => d),
+        detalleReservacion: detalles.map(({ key, manual, proveedorNombre, totalBase, totalExtras, extras, ...d }) => ({
+          ...d,
+          extras: (extras || []).map(({ key: _k, total, ...x }) => ({
+            ...x,
+            monto: parseFloat(x.monto) || 0,
+            porcentaje: x.comisionable ? parseFloat(x.porcentaje) || 0 : 0,
+            montoComisionable: parseFloat(x.montoComisionable) || 0,
+          })),
+        })),
       };
       if (editando) await reservacionesApi.update(editando.id, datos);
       else await reservacionesApi.create(datos);
@@ -175,7 +226,11 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
       moneda: r.moneda || 'MXN',
       notas: r.notas || '',
     });
-    setDetalles((r.detalleReservacion || []).map(d => ({
+    setDetalles((r.detalleReservacion || []).map(d => recalcularServicio({
+      extras: (d.extras || []).map(x => ({
+        key: x._id, _id: x._id, descripcion: x.descripcion || '', monto: x.monto ?? 0, comisionable: Boolean(x.comisionable),
+        porcentaje: x.porcentaje > 0 ? String(x.porcentaje) : '', montoComisionable: x.montoComisionable ?? 0,
+      })),
       key: d._id,
       _id: d._id,
       manual: !(d.porcentajeReservacion > 0) && d.montoComisionable > 0,
@@ -368,6 +423,80 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
                         <input type="text" disabled className="w-full p-1.5 border border-slate-200 rounded bg-slate-100 font-bold text-xs text-brand-noche text-right tabular-nums" value={dinero(d.totalReservacion)} />
                       </div>
                     </div>
+
+                    {/* Extras del servicio (ej. "Desayuno a la llegada"), máx. 3. Su total se suma al Total Calculado. */}
+                    {(d.extras || []).length > 0 && (
+                      <div className="mt-3 space-y-2 border-t border-brand-petroleo/20 pt-3">
+                        {d.extras.map((x, ei) => {
+                          const pctCapturado = parseFloat(x.porcentaje) > 0;
+                          return (
+                            <div key={x.key} className="rounded-lg border border-slate-200 bg-white p-2">
+                              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                                <div className="md:col-span-3">
+                                  <label className="block text-2xs uppercase text-slate-500 font-bold">Extra {ei + 1} *</label>
+                                  <input type="text" required maxLength={100} placeholder="Ej. Desayuno a la llegada" className="w-full p-1.5 border border-slate-300 rounded text-xs"
+                                    value={x.descripcion} onChange={e => cambiarExtra(index, ei, 'descripcion', e.target.value)} />
+                                </div>
+                                <div className="md:col-span-2">
+                                  <label className="block text-2xs uppercase text-slate-500 font-bold">Monto ($) *</label>
+                                  <div className="relative">
+                                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                    <CampoMonto required min={0.01} className="w-full p-1.5 pl-5 border border-slate-300 rounded text-xs"
+                                      valor={x.monto} onCambio={v => cambiarExtra(index, ei, 'monto', v)} />
+                                  </div>
+                                </div>
+                                <div className="md:col-span-2">
+                                  <span className="block text-2xs uppercase text-slate-500 font-bold">¿Comisionable?</span>
+                                  <div className="mt-0.5 flex rounded border border-slate-300 overflow-hidden text-xs font-semibold">
+                                    {[[false, 'No'], [true, 'Sí']].map(([valor, texto]) => (
+                                      <button key={texto} type="button" onClick={() => cambiarExtra(index, ei, 'comisionable', valor)}
+                                        className={`flex-1 py-1.5 ${x.comisionable === valor ? 'bg-brand-petroleo text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                                        {texto}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="md:col-span-1">
+                                  <label className="block text-2xs uppercase text-slate-500 font-bold" title="Déjalo vacío para capturar la comisión en pesos">% Com.</label>
+                                  <input type="text" inputMode="decimal" autoComplete="off" disabled={!x.comisionable} placeholder="—"
+                                    className="w-full p-1.5 border border-slate-300 rounded text-xs text-right tabular-nums disabled:bg-slate-100 disabled:text-slate-400"
+                                    value={x.comisionable ? x.porcentaje : ''}
+                                    onChange={e => { const v = limpiarMonto(e.target.value); cambiarExtra(index, ei, 'porcentaje', Number(v) > 100 ? '100' : v); }} />
+                                </div>
+                                <div className="md:col-span-2">
+                                  <label className="block text-2xs uppercase text-slate-500 font-bold">Comisión ($)</label>
+                                  <div className="relative">
+                                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                    {/* Se captura a mano solo si es comisionable y no se puso %. */}
+                                    <CampoMonto min={0} disabled={!x.comisionable || pctCapturado} required={x.comisionable && !pctCapturado}
+                                      className="w-full p-1.5 pl-5 border border-slate-300 rounded text-xs disabled:bg-slate-100 disabled:text-slate-400"
+                                      valor={x.montoComisionable} onCambio={v => cambiarExtra(index, ei, 'montoComisionable', v)} />
+                                  </div>
+                                </div>
+                                <div className="md:col-span-2 flex items-end gap-2">
+                                  <div className="flex-1">
+                                    <label className="block text-2xs uppercase text-slate-500 font-bold">Total extra ($)</label>
+                                    <input type="text" disabled className={`w-full p-1.5 border border-slate-200 rounded bg-slate-100 font-semibold text-xs text-right tabular-nums ${x.total < 0 ? 'text-red-600' : 'text-brand-noche'}`} value={dinero(x.total)} />
+                                  </div>
+                                  <button type="button" onClick={() => quitarExtra(index, ei)} title="Quitar este extra" className="mb-1.5 text-slate-400 hover:text-red-600">
+                                    <X size={15} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <p className="text-right text-2xs text-slate-500 tabular-nums">
+                          Servicio {dinero(d.totalBase ?? 0)} + extras {dinero(d.totalExtras ?? 0)} = <span className="font-bold text-brand-noche">{dinero(d.totalReservacion)}</span>
+                        </p>
+                      </div>
+                    )}
+                    {(d.extras || []).length < MAX_EXTRAS && (
+                      <button type="button" onClick={() => agregarExtra(index)}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-petroleo hover:text-brand-noche">
+                        <Plus size={13} /> Agregar extra ({(d.extras || []).length}/{MAX_EXTRAS})
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -418,40 +547,29 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Cliente</th>
-                <th className="p-3 font-semibold">Destino</th>
-                <th className="p-3 font-semibold">Entrada</th>
-                <th className="p-3 font-semibold">Salida</th>
-                <th className="p-3 font-semibold">Agente</th>
-                <th className="p-3 font-semibold">Total venta</th>
-                <th className="p-3 font-semibold">Estatus</th>
-                <th className="p-3 font-semibold text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {listado.cargando && listado.datos.length === 0 && (
-                <tr><td colSpan={8} className="p-6 text-center text-slate-400 text-sm">Cargando reservaciones...</td></tr>
-              )}
-              {listado.datos.map(r => (
-                <tr key={r._id} className="text-sm hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-700">{r.idCliente?.nombreCompleto || '—'}</td>
-                  <td className="p-3 text-slate-600">{r.destino}</td>
-                  <td className="p-3 text-slate-600">{fechaViaje(r.fechaEntrada)}</td>
-                  <td className="p-3 text-slate-600">{fechaViaje(r.fechaSalida)}</td>
-                  <td className="p-3 text-slate-600">{r.agente?.nombre || '—'}</td>
-                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">
-                    {/* Precio de venta al público (lo que paga el cliente), no el costo con proveedores. */}
-                    {dinero(r.montoTotal)} <span className="text-2xs font-semibold text-slate-400">{r.moneda || 'MXN'}</span>
-                  </td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${COLOR_ESTATUS[r.estatus] || COLOR_ESTATUS.Activa}`}>{r.estatus}</span>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
+        <ListadoAdaptable
+          filas={listado.datos}
+          cargando={listado.cargando && listado.datos.length === 0} textoCargando="Cargando reservaciones..."
+          vacio={!listado.cargando && listado.total === 0} textoVacio="No se encontraron reservaciones."
+          columnas={[
+            { titulo: 'Cliente', celda: r => <span className="font-medium text-slate-700">{r.idCliente?.nombreCompleto || '—'}</span> },
+            { titulo: 'Destino', celda: r => r.destino },
+            { titulo: 'Fechas', celda: r => <><div className="whitespace-nowrap">{fechaViaje(r.fechaEntrada)}</div><div className="whitespace-nowrap text-xs text-slate-400">al {fechaViaje(r.fechaSalida)}</div></> },
+            { titulo: 'Agente', celda: r => r.agente?.nombre || '—' },
+            // Precio de venta al público (lo que paga el cliente), no el costo con proveedores.
+            { titulo: 'Total venta', className: 'whitespace-nowrap tabular-nums', celda: r => totalVenta(r) },
+            { titulo: 'Estatus', celda: r => estatusReservacion(r) },
+          ]}
+          tarjeta={r => ({
+            titulo: r.idCliente?.nombreCompleto || '—', subtitulo: r.destino, estatus: estatusReservacion(r),
+            campos: [
+              { etiqueta: 'Fechas', valor: `${fechaViaje(r.fechaEntrada)} al ${fechaViaje(r.fechaSalida)}` },
+              { etiqueta: 'Total venta', valor: totalVenta(r) },
+              { etiqueta: 'Agente', valor: r.agente?.nombre },
+            ],
+          })}
+          acciones={r => (
+                    <>
                       <button onClick={() => handleVer(r)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
@@ -473,18 +591,8 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
                           <Ban size={14} />
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!listado.cargando && listado.total === 0 && (
-                <tr>
-                  <td colSpan={8} className="p-6 text-center text-slate-400 text-sm">No se encontraron reservaciones.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </>
+          )} />
 
         <Paginacion listado={listado} etiqueta="reservaciones" />
       </div>

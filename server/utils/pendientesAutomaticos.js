@@ -33,7 +33,7 @@ export const REGLAS = {
   cumpleVentana: 2, // días de atraso permitidos (si nadie entró ese día)
 };
 
-const SISTEMA = { userId: 'sistema', nombre: 'Itinera (automático)' };
+const SISTEMA = { userId: 'sistema', nombre: 'Rutana (automático)' };
 const DIA = 24 * 60 * 60 * 1000;
 const TOLERANCIA = 0.005;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -347,16 +347,31 @@ async function reglaCumpleanos(ctx) {
   }
 }
 
+// Al registrar o cancelar un abono: el pendiente automático de cobro abierto de
+// esa reservación refleja el saldo nuevo al momento (o se cierra si ya se liquidó),
+// sin esperar a la siguiente revisión.
+export async function refrescarCobroAutomatico(idReservacion) {
+  const r = await Reservacion.findById(idReservacion).select('estatus montoTotal abonado destino moneda').lean();
+  if (!r) return;
+  const filtro = { reservacion: r._id, 'automatico.regla': 'cobro', estatus: 'pendiente' };
+  const saldo = r.montoTotal - (r.abonado || 0);
+  if (r.estatus !== 'Activa' || saldo <= TOLERANCIA) {
+    await Pendiente.updateMany(filtro, { $set: { estatus: 'hecho', completadoEn: new Date(), completadoPor: SISTEMA } });
+  } else {
+    await Pendiente.updateMany(filtro, { $set: { detalle: `Saldo de ${dinero(saldo, r.moneda)} (${r.destino}).` } });
+  }
+}
+
 // Cierra los automáticos cuya condición ya se resolvió.
 async function cerrarResueltos(ctx) {
   const abiertos = await Pendiente.find({
     empresa: ctx.empresa, estatus: 'pendiente', 'automatico.regla': { $in: ['cobro', 'proveedor', 'documentos', 'prospecto', 'recompra'] },
-  }).select('automatico reservacion prospecto cliente createdAt').lean();
+  }).select('automatico reservacion prospecto cliente createdAt detalle').lean();
   if (!abiertos.length) return;
 
   const ids = (campo) => [...new Set(abiertos.map((p) => p[campo]).filter(Boolean).map(String))];
   const [reservaciones, prospectos] = await Promise.all([
-    Reservacion.find({ _id: { $in: ids('reservacion') } }).select('estatus montoTotal abonado detalleReservacion documentos').lean(),
+    Reservacion.find({ _id: { $in: ids('reservacion') } }).select('estatus montoTotal abonado detalleReservacion documentos destino moneda').lean(),
     Prospecto.find({ _id: { $in: ids('prospecto') } }).select('estatus').lean(),
   ]);
   const res = new Map(reservaciones.map((r) => [String(r._id), r]));
@@ -400,4 +415,25 @@ async function cerrarResueltos(ctx) {
   if (cerrar.length) {
     await Pendiente.updateMany({ _id: { $in: cerrar }, estatus: 'pendiente' }, { $set: { estatus: 'hecho', completadoEn: new Date(), completadoPor: SISTEMA } });
   }
+
+  // Los que siguen abiertos muestran el saldo ACTUAL: el texto se escribió al
+  // crearlos y el cliente (o la agencia con el proveedor) pudo abonar después.
+  const cerrados = new Set(cerrar.map(String));
+  const actualizar = [];
+  for (const p of abiertos) {
+    if (cerrados.has(String(p._id))) continue;
+    const r = p.reservacion && res.get(String(p.reservacion));
+    if (!r) continue;
+    let detalle = null;
+    if (p.automatico.regla === 'cobro') {
+      detalle = `Saldo de ${dinero(r.montoTotal - (r.abonado || 0), r.moneda)} (${r.destino}).`;
+    } else if (p.automatico.regla === 'proveedor') {
+      const d = r.detalleReservacion?.find((x) => String(x._id) === String(p.automatico.detalleId));
+      if (d) detalle = `Saldo con el proveedor: ${dinero(saldoDe(d), r.moneda)}.`;
+    }
+    if (detalle && detalle !== p.detalle) {
+      actualizar.push({ updateOne: { filter: { _id: p._id, estatus: 'pendiente' }, update: { $set: { detalle } } } });
+    }
+  }
+  if (actualizar.length) await Pendiente.bulkWrite(actualizar, { ordered: false });
 }

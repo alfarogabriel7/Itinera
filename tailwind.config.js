@@ -2,7 +2,7 @@ import plugin from 'tailwindcss/plugin';
 import { TEMAS, TEMA_PREDETERMINADO } from './database/catalogos/temas.js';
 
 // Los colores `brand-*` son variables CSS para poder cambiar de tema al iniciar
-// sesión sin recompilar: Itinera en :root (login, superAdmin y empresas sin
+// sesión sin recompilar: Rutana en :root (login, superAdmin y empresas sin
 // grupo) y cada grupo bajo <html data-tema="...">. Las paletas viven en
 // database/catalogos/temas.js; aquí solo se convierten a variables.
 const TOKENS = Object.keys(TEMAS[TEMA_PREDETERMINADO].colores);

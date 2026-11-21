@@ -3,13 +3,32 @@ import { empresasApi } from '../api';
 import PageHeader from './common/PageHeader';
 import { Building2, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, ImagePlus } from 'lucide-react';
 import FichaDetalle from './common/FichaDetalle';
+import ListadoAdaptable from './common/ListadoAdaptable';
+
+const estatusEmpresa = (e) => (
+  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${e.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+    {e.estatus}
+  </span>
+);
+// "Con logo" y el grupo de colores (si no es el predeterminado).
+const etiquetasEmpresa = (e) => {
+  const tema = normalizarTema(e.tema);
+  return (
+    <>
+      {e.logo?.tipo && <span className="px-1.5 py-0.5 rounded text-2xs font-semibold bg-brand-petroleo/5 text-brand-noche">Con logo</span>}
+      {tema !== TEMA_PREDETERMINADO && (
+        <span className="px-1.5 py-0.5 rounded text-2xs font-semibold text-white" style={{ backgroundColor: TEMAS[tema].colores.noche }}>{TEMAS[tema].nombre}</span>
+      )}
+    </>
+  );
+};
 import { telefono } from '../utils/formato';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { soloLetras, soloLetrasYNumeros, soloTelefono, soloCorreo, soloDireccion, soloCodigoPostal, soloRFC } from '../utils/validadores';
 import SelectorRemoto from './common/SelectorRemoto';
 import { ESTADOS_MEXICO } from '../../database/catalogos/estados.js';
-import { TEMAS, TEMA_PREDETERMINADO } from '../../database/catalogos/temas.js';
+import { TEMAS, TEMA_PREDETERMINADO, normalizarTema } from '../../database/catalogos/temas.js';
 import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 
 
@@ -119,7 +138,7 @@ export default function Empresas() {
   };
 
   const handleEditar = async (empresa) => {
-    setForm({ ...EMPTY_FORM, ...empresa });
+    setForm({ ...EMPTY_FORM, ...empresa, tema: normalizarTema(empresa.tema) });
     limpiarLogo();
     if (empresa.logo?.tipo) {
       try {
@@ -359,43 +378,27 @@ export default function Empresas() {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Empresa</th>
-                <th className="p-3 font-semibold">RFC</th>
-                <th className="p-3 font-semibold">Titular</th>
-                <th className="p-3 font-semibold">Correo</th>
-                <th className="p-3 font-semibold">Teléfono</th>
-                <th className="p-3 font-semibold">Estatus</th>
-                <th className="p-3 font-semibold text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {listado.cargando && listado.datos.length === 0 && (
-                <tr><td colSpan={7} className="p-6 text-center text-slate-400 text-sm">Cargando empresas...</td></tr>
-              )}
-              {listado.datos.map(e => (
-                <tr key={e._id} className="text-sm hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-700">
-                    {e.nombreEmpresa}
-                    {e.logo?.tipo && <span className="ml-2 px-1.5 py-0.5 rounded text-2xs font-semibold bg-brand-petroleo/5 text-brand-noche">Con logo</span>}
-                    {e.tema && e.tema !== TEMA_PREDETERMINADO && TEMAS[e.tema] && (
-                      <span className="ml-2 px-1.5 py-0.5 rounded text-2xs font-semibold text-white" style={{ backgroundColor: TEMAS[e.tema].colores.noche }}>{TEMAS[e.tema].nombre}</span>
-                    )}
-                  </td>
-                  <td className="p-3 text-slate-600 font-mono text-xs">{e.rfc}</td>
-                  <td className="p-3 text-slate-600">{e.nombreTitular}</td>
-                  <td className="p-3 text-slate-600">{e.correo}</td>
-                  <td className="p-3 text-slate-600">{e.telefonoPrincipal}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${e.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                      {e.estatus}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
+        <ListadoAdaptable
+          filas={listado.datos}
+          cargando={listado.cargando && listado.datos.length === 0} textoCargando="Cargando empresas..."
+          vacio={!listado.cargando && listado.total === 0} textoVacio="No se encontraron empresas."
+          columnas={[
+            { titulo: 'Empresa', celda: e => <><div className="font-medium text-slate-700">{e.nombreEmpresa}</div><div className="mt-0.5 flex flex-wrap gap-1">{etiquetasEmpresa(e)}</div><div className="font-mono text-xs text-slate-500">{e.rfc}</div></> },
+            { titulo: 'Titular', celda: e => <><div>{e.nombreTitular}</div>{e.correo && <div className="text-xs text-slate-500 break-all">{e.correo}</div>}</> },
+            { titulo: 'Teléfono', className: 'whitespace-nowrap tabular-nums', celda: e => telefono(e.telefonoPrincipal) },
+            { titulo: 'Estatus', celda: e => estatusEmpresa(e) },
+          ]}
+          tarjeta={e => ({
+            titulo: e.nombreEmpresa, subtitulo: e.rfc, estatus: estatusEmpresa(e),
+            campos: [
+              { etiqueta: 'Titular', valor: e.nombreTitular },
+              { etiqueta: 'Correo', valor: e.correo },
+              { etiqueta: 'Teléfono', valor: telefono(e.telefonoPrincipal) },
+              { etiqueta: 'Grupo / logo', valor: <span className="flex flex-wrap gap-1">{etiquetasEmpresa(e)}</span> },
+            ],
+          })}
+          acciones={e => (
+                    <>
                       <button onClick={() => handleVer(e)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
@@ -405,18 +408,8 @@ export default function Empresas() {
                       <button onClick={() => handleEliminar(e)} title="Dar de baja" className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center">
                         <Trash2 size={14} />
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!listado.cargando && listado.total === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-6 text-center text-slate-400 text-sm">No se encontraron empresas.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </>
+          )} />
 
         <Paginacion listado={listado} etiqueta="empresas" />
       </div>

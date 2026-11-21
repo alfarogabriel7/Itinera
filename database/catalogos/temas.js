@@ -1,6 +1,6 @@
 // Temas de color (look and feel) por grupo de empresas. Cada empresa elige uno
 // en su ficha (campo `tema`); al iniciar sesión, sus Administradores y Agentes
-// ven la app con esa paleta. El login y el superAdmin siempre usan Itinera.
+// ven la app con esa paleta. El login y el superAdmin siempre usan Rutana.
 // Solo cambian los colores: el logo es el de cada empresa y la tipografía es fija.
 //
 // Las claves de `colores` son los tokens `brand-*` de Tailwind (tailwind.config.js),
@@ -8,15 +8,15 @@
 // Para agregar un grupo: añadir su entrada aquí; el selector de Empresas y la
 // validación del servidor lo toman automáticamente.
 export const TEMAS = {
-  itinera: {
-    nombre: 'Ninguno (Itinera)',
+  rutana: {
+    nombre: 'Ninguno (Rutana)',
     colores: {
-      noche: '#0B2A33', // barra lateral, encabezados de tablas, títulos
-      petroleo: '#0F4C5C', // botones principales, foco, íconos
-      petroleoMedio: '#3E7A88', // barras de gráficas
-      coral: '#E36414', // acciones destacadas (registrar abono, guardar pago)
-      coralClaro: '#F28B44', // botones de editar, trofeos
-      arena: '#F4F1EA', // fondo general
+      noche: '#0F2A4A', // azul marino de la marca: barra lateral, encabezados de tablas, títulos
+      petroleo: '#1F4E79', // botones principales, foco, íconos
+      petroleoMedio: '#5B7FA6', // barras de gráficas
+      coral: '#F26B4F', // coral de la marca (punto de destino): acciones destacadas
+      coralClaro: '#F79A86', // botones de editar, trofeos
+      arena: '#F4F6F9', // fondo general
     },
   },
   felizviaje: {
@@ -32,5 +32,9 @@ export const TEMAS = {
   },
 };
 
-export const TEMA_PREDETERMINADO = 'itinera';
+export const TEMA_PREDETERMINADO = 'rutana';
 export const CLAVES_TEMAS = Object.keys(TEMAS);
+
+// La plataforma antes se llamaba Itinera: las empresas guardadas con
+// tema 'itinera' se leen como el tema predeterminado.
+export const normalizarTema = (clave) => (clave === 'itinera' || !TEMAS[clave] ? TEMA_PREDETERMINADO : clave);

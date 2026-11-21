@@ -3,6 +3,26 @@ import { campoMoneda } from '../catalogos/monedas.js';
 
 const { Schema } = mongoose;
 
+const centavos = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// Extra sobre un servicio (ej. "Desayuno a la llegada"). Puede o no comisionar:
+//  - no comisionable: todo su monto se le paga al proveedor;
+//  - comisionable con %: comisión = monto × % / 100;
+//  - comisionable sin %: la comisión se captura a mano (montoComisionable).
+// total = monto - comisión, y se suma al totalReservacion del servicio.
+export const MAX_EXTRAS = 3;
+const ExtraServicioSchema = new Schema(
+  {
+    descripcion: { type: String, required: [true, 'Describe el extra (ej. Desayuno a la llegada).'], trim: true, maxlength: 100 },
+    monto: { type: Number, required: [true, 'Captura el monto del extra.'], min: [0.01, 'El monto del extra debe ser mayor a cero.'] },
+    comisionable: { type: Boolean, default: false },
+    porcentaje: { type: Number, default: 0, min: 0, max: 100 },
+    montoComisionable: { type: Number, default: 0, min: 0 },
+    total: { type: Number, min: 0 },
+  },
+  { _id: true }
+);
+
 const DetalleReservacionSchema = new Schema(
   {
     idProveedor: { type: Schema.Types.ObjectId, ref: 'Proveedor', required: true },
@@ -10,7 +30,13 @@ const DetalleReservacionSchema = new Schema(
     montoReservacion: { type: Number, required: true, min: 0 },
     porcentajeReservacion: { type: Number, default: 0, min: 0, max: 100 },
     montoComisionable: { type: Number, required: true, min: 0 },
+    // Lo que se le debe al proveedor: (monto base - comisión) + total de los extras.
     totalReservacion: { type: Number, min: 0 },
+    extras: {
+      type: [ExtraServicioSchema],
+      default: [],
+      validate: { validator: (v) => !v || v.length <= MAX_EXTRAS, message: `Un servicio admite máximo ${MAX_EXTRAS} extras.` },
+    },
     // Acumulado de pagos aplicados al proveedor por este servicio. Lo mantiene
     // el servidor con $inc atómicos (ver database/utils/saldos.js); nunca se
     // toma del body.
@@ -24,6 +50,28 @@ DetalleReservacionSchema.pre('validate', function () {
   if (this.totalReservacion == null) {
     //this.totalReservacion = this.montoReservacion * (1 + this.porcentajeReservacion / 100);
     this.totalReservacion = ( this.montoReservacion - ( (this.montoReservacion * this.porcentajeReservacion ) / 100) );
+  }
+  // Con extras, el servidor recalcula comisión y total de cada extra y el total
+  // del servicio (no se confía en lo que manda la pantalla).
+  if (this.extras?.length) {
+    let sumaExtras = 0;
+    for (const x of this.extras) {
+      x.monto = centavos(x.monto);
+      if (!x.comisionable) {
+        x.porcentaje = 0;
+        x.montoComisionable = 0;
+      } else if (x.porcentaje > 0) {
+        x.montoComisionable = Math.round(x.monto * x.porcentaje) / 100;
+      } else {
+        x.montoComisionable = centavos(x.montoComisionable);
+      }
+      if (x.montoComisionable > x.monto) {
+        this.invalidate('extras', `La comisión del extra "${x.descripcion}" no puede ser mayor a su monto.`);
+      }
+      x.total = centavos(x.monto - x.montoComisionable);
+      sumaExtras += x.total;
+    }
+    this.totalReservacion = centavos(centavos(this.montoReservacion) - centavos(this.montoComisionable) + sumaExtras);
   }
 });
 

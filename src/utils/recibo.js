@@ -106,7 +106,7 @@ export async function imprimirRecibo(resumen, pago) {
   const saldoDespues = Math.round((resumen.total - pagadoAlMomento) * 100) / 100;
 
   const e = resumen.empresa || {};
-  // Colores del recibo: los del grupo de la empresa (Itinera si no tiene).
+  // Colores del recibo: los del grupo de la empresa (Rutana si no tiene).
   const paleta = (TEMAS[e.tema] || TEMAS[TEMA_PREDETERMINADO]).colores;
   const contactoEmpresa = [e.direccion, e.colonia && `Col. ${e.colonia}`, e.codigoPostal && `C.P. ${e.codigoPostal}`, e.ciudad, e.estado, e.telefonoPrincipal && `Tel. ${e.telefonoPrincipal}`, e.correo]
     .filter(Boolean)

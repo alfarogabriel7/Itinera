@@ -8,6 +8,13 @@ import IndicadorPassword, { CoincidenciaPassword } from './common/IndicadorPassw
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
 import { UserCog, Plus, X, Save, Search, Pencil, Trash2, Lock, Eye, EyeOff, AtSign } from 'lucide-react';
 import { avisarExito, avisarError } from '../utils/avisos';
+import ListadoAdaptable from './common/ListadoAdaptable';
+
+const estatusAgente = (a) => (
+  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${a.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+    {a.estatus}
+  </span>
+);
 
 const EMPTY_FORM = { _id: null, nombre: '', userId: '', rol: 'Agente', empresa: '', empresaNombre: '', estatus: 'Activo', password: '', confirmPassword: '' };
 
@@ -257,36 +264,25 @@ export default function Agentes() {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Nombre</th>
-                <th className="p-3 font-semibold">Usuario</th>
-                <th className="p-3 font-semibold">Rol</th>
-                <th className="p-3 font-semibold">Empresa</th>
-                <th className="p-3 font-semibold">Estatus</th>
-                <th className="p-3 font-semibold text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {listado.cargando && listado.datos.length === 0 && (
-                <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">Cargando agentes...</td></tr>
-              )}
-              {listado.datos.map(a => (
-                <tr key={a._id} className="text-sm hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-700">{a.nombre}</td>
-                  <td className="p-3 text-slate-600 font-mono text-xs">{a.userId}</td>
-                  <td className="p-3 text-slate-600">{a.rol}</td>
-                  <td className="p-3 text-slate-600">{a.empresa?.nombreEmpresa || '—'}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${a.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                      {a.estatus}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    {puedeCrear ? (
-                      <div className="flex items-center justify-center gap-2">
+        <ListadoAdaptable
+          filas={listado.datos}
+          cargando={listado.cargando && listado.datos.length === 0} textoCargando="Cargando agentes..."
+          vacio={!listado.cargando && listado.total === 0} textoVacio="No se encontraron agentes."
+          columnas={[
+            { titulo: 'Nombre', celda: a => <><div className="font-medium text-slate-700">{a.nombre}</div><div className="font-mono text-xs text-slate-500">{a.userId}</div></> },
+            { titulo: 'Rol', celda: a => a.rol },
+            { titulo: 'Empresa', celda: a => a.empresa?.nombreEmpresa || '—' },
+            { titulo: 'Estatus', celda: a => estatusAgente(a) },
+          ]}
+          tarjeta={a => ({
+            titulo: a.nombre, subtitulo: a.userId, estatus: estatusAgente(a),
+            campos: [
+              { etiqueta: 'Rol', valor: a.rol },
+              { etiqueta: 'Empresa', valor: a.empresa?.nombreEmpresa },
+            ],
+          })}
+          acciones={puedeCrear ? (a => (
+                      <>
                         <button onClick={() => handleEditar(a)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
                           <Pencil size={14} />
                         </button>
@@ -295,21 +291,8 @@ export default function Agentes() {
                           className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-500">
                           <Trash2 size={14} />
                         </button>
-                      </div>
-                    ) : (
-                      <span className="block text-center text-slate-300">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!listado.cargando && listado.total === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-6 text-center text-slate-400 text-sm">No se encontraron agentes.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </>
+          )) : undefined} />
 
         <Paginacion listado={listado} etiqueta="agentes" />
       </div>

@@ -2,12 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Títulos con la tipografía del logotipo de Itinera (Sora); el resto, Manrope. */
+/* Títulos con la tipografía de títulos (Sora); el resto, Manrope. */
 @layer base {
   h1, h2, h3 {
     font-family: 'Sora', 'Manrope', system-ui, sans-serif;
     letter-spacing: -0.025em;
   }
+}
+
+/* Listados (components/common/ListadoAdaptable.jsx): tabla si el espacio
+   disponible para el listado mide 820px o más; si no, tarjetas. Se mide el
+   contenedor, no la pantalla, porque el menú y el panel lateral le quitan ancho. */
+.listado-adaptable { container-type: inline-size; }
+.listado-adaptable .vista-tabla { display: none; }
+@container (min-width: 820px) {
+  .listado-adaptable .vista-tabla { display: block; }
+  .listado-adaptable .vista-tarjetas { display: none; }
 }
 
 /* Calendario (react-day-picker): colores del tema de la empresa (variables

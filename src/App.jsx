@@ -15,12 +15,12 @@ import MiPanel from './components/MiPanel';
 import Login from './components/Login';
 import { authApi, dashboardApi, empresasApi, pendientesApi, setUnauthorizedHandler } from './api';
 import { obtenerSesion } from './utils/sesion';
-import { TEMA_PREDETERMINADO } from '../database/catalogos/temas.js';
+import { TEMA_PREDETERMINADO, normalizarTema } from '../database/catalogos/temas.js';
 import MasUSD from './components/common/MasUSD';
 import CampanaViajes from './components/common/CampanaViajes';
 import Avisos from './components/common/Avisos';
-import logoItineraBlanco from './assets/itinera-horizontal-blanco.svg';
-import simboloItinera from './assets/itinera-simbolo-color.svg';
+import RutanaLogo, { RutanaIsotipo } from './components/common/RutanaLogo';
+import isotipoBlanco from './assets/rutana-isotipo-blanco.svg';
 import {
   Users, Truck, Compass, DollarSign, ChevronDown, HandCoins, CalendarCheck, ClipboardList,
   Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen,
@@ -187,10 +187,10 @@ export default function App() {
   }, []);
 
   // Colores del grupo de la empresa (database/catalogos/temas.js). Sin sesión
-  // (login) o con superAdmin se queda Itinera, que es el tema de :root.
+  // (login) o con superAdmin se queda Rutana, que es el tema de :root.
   useEffect(() => {
     const raiz = document.documentElement;
-    const tema = auth && auth.rol !== 'superAdmin' ? auth.tema : null;
+    const tema = auth && auth.rol !== 'superAdmin' ? normalizarTema(auth.tema) : null;
     if (tema && tema !== TEMA_PREDETERMINADO) raiz.dataset.tema = tema;
     else delete raiz.dataset.tema;
   }, [auth]);
@@ -212,9 +212,9 @@ export default function App() {
   }, [activeTab, auth]);
 
   // Logo de la empresa del usuario para la barra lateral. El superAdmin y las
-  // empresas sin logo ven el de la plataforma (Itinera). Los colores no cambian
-  // por empresa: son siempre los de Itinera.
-  // undefined = descargando (no se muestra nada para que no parpadee el de Itinera).
+  // empresas sin logo ven el de la plataforma (Rutana). Los colores son los del
+  // grupo de la empresa (ver el efecto del tema, arriba).
+  // undefined = descargando (no se muestra nada para que no parpadee el de Rutana).
   const [logoEmpresa, setLogoEmpresa] = useState(undefined);
   useEffect(() => {
     if (!auth?.empresa) { setLogoEmpresa(null); return undefined; }
@@ -307,7 +307,7 @@ export default function App() {
           <div className="hidden md:flex justify-center py-6">
             {logoEmpresa
               ? <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center overflow-hidden p-1"><img src={logoEmpresa} alt="Logo de la empresa" className="max-w-full max-h-full object-contain" /></div>
-              : <img src={simboloItinera} alt="Itinera" className="h-10 w-10" />}
+              : <RutanaIsotipo size={40} color="#FFFFFF" />}
           </div>
         )}
         <div className={`flex items-center justify-between gap-3 px-6 py-6 ${menuCompacto ? 'md:hidden' : ''}`}>
@@ -320,7 +320,7 @@ export default function App() {
             </div>
           ) : (
             <div className="flex-1 min-w-0 h-24 flex items-center">
-              <img src={logoItineraBlanco} alt="Itinera" className="h-10 w-auto" />
+              <RutanaLogo variante="blanco" alto={40} />
             </div>
           )}
           <button className="md:hidden text-white/80" onClick={() => setSidebarOpen(false)}>
@@ -360,7 +360,7 @@ export default function App() {
         <div className={`px-6 py-5 min-h-[64px] shrink-0 flex items-end ${menuCompacto ? 'md:hidden' : ''}`}>
           {logoEmpresa && (
             <div className="flex items-center gap-2 text-2xs uppercase tracking-wider text-white/50">
-              con tecnología de <img src={logoItineraBlanco} alt="Itinera" className="h-4 w-auto opacity-80" />
+              con tecnología de <RutanaLogo variante="blanco" slogan={false} alto={16} className="opacity-80 normal-case tracking-normal" />
             </div>
           )}
         </div>
@@ -412,7 +412,7 @@ export default function App() {
           {/* Right panel: promo + resumen */}
           <aside className={`w-full xl:w-72 shrink-0 flex-col gap-6 ${PANTALLA_COMPLETA.has(activeTab) ? 'hidden' : 'flex'}`}>
             <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-brand-noche to-brand-petroleo p-6 min-h-[220px] flex flex-col justify-between shadow-sm">
-              <img src={simboloItinera} alt="" aria-hidden="true" className="absolute -bottom-6 -left-6 w-36 opacity-20 pointer-events-none select-none" />
+              <img src={isotipoBlanco} alt="" aria-hidden="true" className="absolute -bottom-6 -left-6 w-36 opacity-20 pointer-events-none select-none" />
               <div />
               <p className="relative text-white text-center italic font-medium leading-snug">
                 "Viajar es la única cosa que compras y te hace más rico."
