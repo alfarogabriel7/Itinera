@@ -101,7 +101,7 @@ export async function imprimirRecibo(resumen, pago) {
   // registrados hasta ese momento (los cancelados no cuentan).
   const momento = new Date(pago.createdAt || pago.fecha).getTime();
   const pagadoAlMomento = resumen.pagos
-    .filter((p) => p.estatus !== 'Cancelado' && new Date(p.createdAt || p.fecha).getTime() <= momento)
+    .filter((p) => p.estatus !== 'Cancelado' && p.estatus !== 'Pendiente' && new Date(p.createdAt || p.fecha).getTime() <= momento)
     .reduce((acc, p) => acc + p.monto, 0);
   const saldoDespues = Math.round((resumen.total - pagadoAlMomento) * 100) / 100;
 

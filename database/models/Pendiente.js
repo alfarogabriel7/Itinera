@@ -37,6 +37,9 @@ const PendienteSchema = new Schema(
     // cobro, proveedor, documentos, regreso, prospecto, recompra o cumpleanos.
     // detalleId: servicio de la reservación (regla de proveedor).
     automatico: { regla: String, detalleId: Schema.Types.ObjectId },
+    // Seguimiento para que el Administrador autorice un pago (regla 'autorizacion'):
+    // tipo 'cliente' (Pago) o 'proveedor' (PagoProveedor). Se cierra al autorizarlo o rechazarlo.
+    autorizacion: { tipo: { type: String, enum: ['cliente', 'proveedor'] }, pago: Schema.Types.ObjectId },
   },
   { timestamps: true }
 );
@@ -48,6 +51,7 @@ PendienteSchema.index({ empresa: 1, estatus: 1, fecha: 1 });
 PendienteSchema.index({ prospecto: 1, estatus: 1 });
 PendienteSchema.index({ cliente: 1, estatus: 1 });
 PendienteSchema.index({ reservacion: 1, estatus: 1 });
+PendienteSchema.index({ 'autorizacion.pago': 1 }, { partialFilterExpression: { 'autorizacion.pago': { $exists: true } } });
 // Cierre automático: los abiertos de cada regla.
 PendienteSchema.index({ empresa: 1, 'automatico.regla': 1, estatus: 1 }, { partialFilterExpression: { 'automatico.regla': { $exists: true } } });
 

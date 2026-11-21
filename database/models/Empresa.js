@@ -4,7 +4,7 @@ import { CLAVES_TEMAS, TEMA_PREDETERMINADO, normalizarTema } from '../catalogos/
 
 const EmpresaSchema = new mongoose.Schema(
   {
-    nombreEmpresa: { type: String, required: true, trim: true, maxlength: 150 },
+    nombreEmpresa: { type: String, required: [true, 'El nombre de la empresa es obligatorio.'], trim: true, maxlength: 150 },
     correo: {
       type: String,
       trim: true,
@@ -15,7 +15,7 @@ const EmpresaSchema = new mongoose.Schema(
     codigoPostal: { type: String, trim: true, match: [/^\d{5}$/, 'El código postal debe tener 5 dígitos'] },
     direccion: { type: String, trim: true },
     colonia: { type: String, trim: true, maxlength: 100 },
-    telefonoPrincipal: { type: String, required: true, trim: true },
+    telefonoPrincipal: { type: String, required: [true, 'El teléfono principal es obligatorio.'], trim: true },
     telefonoSecundario: { type: String, trim: true },
     rfc: { type: String, required: true, trim: true, uppercase: true, maxlength: 13 },
     ciudad: { type: String, trim: true },
@@ -39,6 +39,13 @@ const EmpresaSchema = new mongoose.Schema(
       tipo: String,
       tamano: Number,
       actualizado: Date,
+    },
+    // Parámetros que el Administrador ajusta en "Mi agencia".
+    //   autorizarPagos*: los pagos que registra un Agente quedan "Pendiente" y no
+    //   cuentan para el saldo hasta que el Administrador los autoriza (módulo Autorizaciones).
+    configuracion: {
+      autorizarPagosClientes: { type: Boolean, default: false },
+      autorizarPagosProveedores: { type: Boolean, default: false },
     },
   },
   { timestamps: true }

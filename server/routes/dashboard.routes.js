@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { Reservacion, Pago, Agente, Cliente, Proveedor } from '../../database/index.js';
+import { Reservacion, Pago, Agente, Cliente, Proveedor, PAGO_CONTABLE } from '../../database/index.js';
 import { bloquearSuperAdmin } from '../middleware/tenant.js';
 import { MONEDAS, MONEDA_PREDETERMINADA, monedaDe, filtroMoneda } from '../../database/catalogos/monedas.js';
 import { completarTerminadas } from '../utils/estatusReservacion.js';
@@ -23,7 +23,8 @@ const VENTA_VALIDA = { estatus: { $ne: 'Cancelada' } };
 const FECHA_VENTA = 'fechaEntrada';
 // Meses siguientes que muestra "Ventas a futuro".
 const MESES_FUTURO = 6;
-const PAGO_APLICADO = { estatus: { $ne: 'Cancelado' } };
+// Ni cancelados ni pendientes de autorizar.
+const PAGO_APLICADO = PAGO_CONTABLE;
 
 const aCentavos = (n) => Math.round(Number(n || 0) * 100) / 100;
 

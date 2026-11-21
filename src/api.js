@@ -112,6 +112,23 @@ export const comisionesApi = {
   revertir: (id) => request(`/comisiones/${id}/revertir`, { method: 'POST' }),
 };
 
+// Mi agencia (solo Administrador): datos de contacto, logo y parámetros de su empresa.
+export const miAgenciaApi = {
+  get: () => request('/mi-agencia'),
+  update: (data) => request('/mi-agencia', { method: 'PUT', body: JSON.stringify(data) }),
+  configuracion: (data) => request('/mi-agencia/configuracion', { method: 'PUT', body: JSON.stringify(data) }),
+  subirLogo: (archivo) => requestArchivo('/mi-agencia/logo', { method: 'PUT', archivo }),
+  quitarLogo: () => request('/mi-agencia/logo', { method: 'DELETE' }),
+};
+
+// Pagos que esperan autorización del Administrador. tipo: 'cliente' | 'proveedor'.
+export const autorizacionesApi = {
+  list: () => request('/autorizaciones'),
+  resumen: () => request('/autorizaciones/resumen'),
+  autorizar: (tipo, id) => request(`/autorizaciones/${tipo}/${id}/autorizar`, { method: 'POST' }),
+  rechazar: (tipo, id, motivo) => request(`/autorizaciones/${tipo}/${id}/rechazar`, { method: 'POST', body: JSON.stringify({ motivo }) }),
+};
+
 export const pendientesApi = {
   miDia: (params) => request(conParametros('/pendientes/mi-dia', params)),
   resumen: () => request('/pendientes/resumen'),

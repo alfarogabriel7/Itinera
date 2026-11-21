@@ -28,7 +28,9 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
 
   const cargar = async () => {
     try {
-      setEstado(await pagosProveedorApi.estadoReservacion(idReservacion));
+      const r = await pagosProveedorApi.estadoReservacion(idReservacion);
+      // disponible: lo que aún se puede registrar (los pagos por autorizar ya ocupan saldo).
+      setEstado({ ...r, detalles: r.detalles.map(d => ({ ...d, disponible: Math.round((d.saldo - (d.porAutorizar || 0)) * 100) / 100 })) });
       setError('');
     } catch (err) {
       setError(err.message);
@@ -66,11 +68,13 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
     const monto = Math.round(parseFloat(form.monto) * 100) / 100;
     if (!detalle) { avisarError('Selecciona el servicio que se le paga al proveedor.'); return; }
     if (!(monto > 0)) { avisarError('El monto debe ser mayor a cero.'); return; }
-    if (monto > detalle.saldo) { avisarError(`El monto excede el saldo pendiente con el proveedor (${dinero(detalle.saldo)}).`); return; }
+    if (monto > detalle.disponible) { avisarError(`El monto excede el saldo pendiente con el proveedor (${dinero(detalle.disponible)}).`); return; }
     setGuardando(true);
     try {
       const pago = await pagosProveedorApi.create({ idReservacion, ...form, monto });
-      let aviso = 'Pago al proveedor registrado correctamente.';
+      let aviso = pago.estatus === 'Pendiente'
+        ? 'Pago registrado. Queda pendiente de que el Administrador lo autorice; hasta entonces no se descuenta del saldo con el proveedor.'
+        : 'Pago al proveedor registrado correctamente.';
       let archivoFallo = false;
       if (archivo) {
         try {
@@ -143,7 +147,11 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
   if (error) return <div className="mt-6 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>;
   if (!estado) return <p className="mt-6 text-sm text-slate-400">Cargando pagos a proveedores...</p>;
 
-  const pendientes = estado.detalles.filter(d => d.saldo > 0);
+  const pendientes = estado.detalles.filter(d => d.disponible > 0);
+  const porAutorizarTotal = estado.totales.porAutorizar || 0;
+  const textoPorAutorizar = (d) => d.porAutorizar > 0 && (
+    <div className="text-2xs font-semibold text-amber-700" title="Pagos registrados que esperan autorización del Administrador">{dinero(d.porAutorizar)} por autorizar</div>
+  );
   const servicioElegido = estado.detalles.find(d => d.idDetalle === form.idDetalle);
   const admitePagos = estado.estatusReservacion !== 'Cancelada';
   const porcentaje = estado.totales.total > 0 ? Math.min(100, Math.round((estado.totales.pagado / estado.totales.total) * 100)) : 0;
@@ -174,8 +182,13 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
       <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Cancelado</span>
       <div className="mt-1 text-xs text-slate-500">{p.canceladoPor?.nombre} · {fechaCorta(p.fechaCancelacion)}<div className="italic break-words">"{p.motivoCancelacion}"</div></div>
     </div>
+  ) : p.estatus === 'Pendiente' ? (
+    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800" title="Espera autorización del Administrador; aún no se descuenta del saldo">Por autorizar</span>
   ) : (
-    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aplicado</span>
+    <div>
+      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aplicado</span>
+      {p.autorizadoPor?.nombre && <div className="mt-1 text-xs text-slate-500">Autorizó: {p.autorizadoPor.nombre}</div>}
+    </div>
   ));
 
   const accionesDelPago = (p, alineacion) => {
@@ -205,7 +218,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
     );
   };
 
-  const botonPagarServicio = (d) => admitePagos && d.saldo > 0 && (
+  const botonPagarServicio = (d) => admitePagos && d.disponible > 0 && (
     <button type="button" onClick={() => pagarServicio(d)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-coral hover:brightness-90">
       <Send size={13} /> Pagar
     </button>
@@ -223,6 +236,9 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
           {estado.totales.saldo <= 0
             ? <div className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><CheckCircle2 size={14} /> Liquidado</div>
             : <div className="font-bold text-red-600 text-lg">{dinero(estado.totales.saldo)}</div>}
+          {porAutorizarTotal > 0 && (
+            <div className="mt-1 inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">{dinero(porAutorizarTotal)} por autorizar</div>
+          )}
         </div>
         <div className="md:col-span-3">
           <div className="flex justify-between text-xs text-slate-500 mb-1"><span>Avance de pago a proveedores</span><span className="font-semibold text-slate-700">{porcentaje}%</span></div>
@@ -250,7 +266,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
                 <td className="p-3 font-mono text-xs text-slate-500">{d.claveReservacion}</td>
                 <td className="p-3 text-right text-slate-600">{dinero(d.total)}</td>
                 <td className="p-3 text-right text-emerald-700">{dinero(d.pagado)}</td>
-                <td className="p-3 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}</td>
+                <td className="p-3 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}{textoPorAutorizar(d)}</td>
                 <td className="p-3 text-right">{botonPagarServicio(d)}</td>
               </tr>
             ))}
@@ -271,7 +287,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
                 <div className="font-medium text-slate-700 break-words">{d.proveedor?.nombre || '—'}</div>
                 <div className="font-mono text-xs text-slate-500 break-all">{d.claveReservacion}</div>
               </div>
-              <div className="shrink-0 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}</div>
+              <div className="shrink-0 text-right font-semibold">{d.saldo > 0 ? <span className="text-red-600">{dinero(d.saldo)}</span> : <span className="text-emerald-700">Liquidado</span>}{textoPorAutorizar(d)}</div>
             </div>
             <div className="mt-2 flex items-end justify-between gap-3">
               <div className="text-xs">
@@ -296,22 +312,22 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
             <select required className="mt-1 w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
               value={form.idDetalle} onChange={e => { const d = pendientes.find(x => x.idDetalle === e.target.value); d ? elegirServicio(d) : setForm({ ...form, idDetalle: '' }); }}>
               <option value="">-- Selecciona el servicio --</option>
-              {pendientes.map(d => <option key={d.idDetalle} value={d.idDetalle}>{d.proveedor?.nombre} · {d.claveReservacion} · saldo {dinero(d.saldo)}</option>)}
+              {pendientes.map(d => <option key={d.idDetalle} value={d.idDetalle}>{d.proveedor?.nombre} · {d.claveReservacion} · saldo {dinero(d.disponible)}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600">Monto ($) *</label>
             <div className="relative mt-1">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
-              <CampoMonto id="monto-pago-proveedor" required min={0.01} max={servicioElegido?.saldo}
+              <CampoMonto id="monto-pago-proveedor" required min={0.01} max={servicioElegido?.disponible}
                 className="w-full p-2.5 pl-6 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
                 valor={form.monto} onCambio={monto => setForm(f => ({ ...f, monto }))} />
             </div>
             {servicioElegido && (
-              <p className={`mt-1 text-xs ${Number(form.monto) > servicioElegido.saldo ? 'font-semibold text-red-600' : 'text-slate-500'}`}>
-                {Number(form.monto) > servicioElegido.saldo
-                  ? `Excede el saldo pendiente con el proveedor (${dinero(servicioElegido.saldo)}).`
-                  : `Saldo pendiente: ${dinero(servicioElegido.saldo)}`}
+              <p className={`mt-1 text-xs ${Number(form.monto) > servicioElegido.disponible ? 'font-semibold text-red-600' : 'text-slate-500'}`}>
+                {Number(form.monto) > servicioElegido.disponible
+                  ? `Excede el saldo pendiente con el proveedor (${dinero(servicioElegido.disponible)}).`
+                  : `Saldo pendiente: ${dinero(servicioElegido.disponible)}${servicioElegido.porAutorizar > 0 ? ` (descontando ${dinero(servicioElegido.porAutorizar)} por autorizar)` : ''}`}
               </p>
             )}
           </div>

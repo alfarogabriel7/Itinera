@@ -9,7 +9,7 @@ import { SelectorFecha, aTexto } from './common/Calendario';
 import CampoMonto from './common/CampoMonto';
 import PagosProveedor from './PagosProveedor';
 import { dinero, fechaCorta, fechaViaje } from '../utils/formato';
-import { DollarSign, CreditCard, Ban, CheckCircle2, Paperclip, Upload, Printer, FileCheck, Users, Truck } from 'lucide-react';
+import { DollarSign, CreditCard, Ban, CheckCircle2, Paperclip, Upload, Printer, FileCheck, Users, Truck, Clock } from 'lucide-react';
 import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 import { confirmar, pedirTexto } from '../utils/confirmar';
 
@@ -93,14 +93,16 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
       avisarError('El monto del abono debe ser mayor a cero.');
       return;
     }
-    if (monto > resumen.saldo) {
-      avisarError(`El monto capturado (${dinero(monto)}) excede el saldo pendiente (${dinero(resumen.saldo)}) de la reservación.`);
+    if (monto > disponible) {
+      avisarError(`El monto capturado (${dinero(monto)}) excede el saldo pendiente (${dinero(disponible)}) de la reservación${porAutorizar > 0 ? `, descontando ${dinero(porAutorizar)} en pagos por autorizar` : ''}.`);
       return;
     }
     setGuardando(true);
     try {
       const pago = await pagosApi.create({ idReservacion: selectedReservaId, monto, formaPago, referencia, fecha: fechaPago });
-      let aviso = 'Pago registrado correctamente.';
+      let aviso = pago.estatus === 'Pendiente'
+        ? 'Pago registrado. Queda pendiente de que el Administrador lo autorice; hasta entonces no se suma al saldo.'
+        : 'Pago registrado correctamente.';
       let archivoFallo = false;
       if (archivo) {
         try {
@@ -172,6 +174,9 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
   const verComprobante = (pago) => abrirComprobante(() => pagosApi.descargarComprobante(pago._id));
 
   const liquidada = resumen && resumen.saldo <= 0;
+  // Lo registrado que espera autorización ya ocupa saldo: no se puede volver a cobrar.
+  const porAutorizar = resumen?.porAutorizar || 0;
+  const disponible = resumen ? Math.round((resumen.saldo - porAutorizar) * 100) / 100 : 0;
   const porcentaje = resumen && resumen.total > 0
     ? Math.min(100, Math.round((resumen.pagado / resumen.total) * 100))
     : 0;
@@ -225,6 +230,11 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
                   {liquidada
                     ? <div className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><CheckCircle2 size={14} /> Liquidada</div>
                     : <div className="font-bold text-red-600 text-lg">{dinero(resumen.saldo)}</div>}
+                  {porAutorizar > 0 && (
+                    <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800" title="Pagos registrados que esperan autorización del Administrador">
+                      <Clock size={12} /> {dinero(porAutorizar)} por autorizar
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="md:col-span-3">
@@ -244,14 +254,20 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
               </div>
             )}
 
-            {!liquidada && resumen.estatusReservacion === 'Activa' && (
+            {!liquidada && resumen.estatusReservacion === 'Activa' && disponible <= 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Todo el saldo está cubierto con pagos por autorizar. Cuando el Administrador los revise, se aplicarán o se podrá registrar otro.
+              </div>
+            )}
+
+            {!liquidada && resumen.estatusReservacion === 'Activa' && disponible > 0 && (
               <form onSubmit={handleLiquidacion} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-100 rounded-xl">
                 <div className="md:col-span-2 font-semibold text-slate-700 text-xs uppercase tracking-wider">Captura de Pago</div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600">Monto a Abonar ($) *</label>
                   <div className="relative mt-1">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
-                    <CampoMonto required min={0.01} max={resumen.saldo}
+                    <CampoMonto required min={0.01} max={disponible}
                       className="w-full p-2.5 pl-6 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-petroleo"
                       valor={montoPago} onCambio={setMontoPago} />
                   </div>
@@ -306,6 +322,7 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
                     )}
                     {resumen.pagos.map(p => {
                       const cancelado = p.estatus === 'Cancelado';
+                      const porAutorizarPago = p.estatus === 'Pendiente';
                       const puedeAdjuntar = !cancelado && (!p.comprobante?.id || esAdministrador);
                       return (
                         <tr key={p._id} className={`text-sm ${cancelado ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
@@ -332,8 +349,13 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
                                   <div className="italic">"{p.motivoCancelacion}"</div>
                                 </div>
                               </div>
+                            ) : porAutorizarPago ? (
+                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800" title="Espera autorización del Administrador; aún no se suma al saldo">Por autorizar</span>
                             ) : (
-                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aplicado</span>
+                              <div>
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aplicado</span>
+                                {p.autorizadoPor?.nombre && <div className="mt-1 text-xs text-slate-500">Autorizó: {p.autorizadoPor.nombre}</div>}
+                              </div>
                             )}
                           </td>
                           <td className="p-3">
@@ -349,13 +371,13 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
                                   {subiendoId === p._id ? 'Subiendo...' : p.comprobante?.id ? 'Reemplazar' : 'Adjuntar'}
                                 </button>
                               )}
-                              {!cancelado && (
+                              {!cancelado && !porAutorizarPago && (
                                 <button onClick={() => imprimirRecibo(resumen, p)} title="Imprimir recibo" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-coral border border-brand-coral/30 hover:bg-brand-coral/5">
                                   <Printer size={14} /> Recibo
                                 </button>
                               )}
                               {esAdministrador && !cancelado && (
-                                <button onClick={() => handleCancelar(p)} title="Cancelar abono" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50">
+                                <button onClick={() => handleCancelar(p)} title={porAutorizarPago ? 'Rechazar abono (no se aplicó)' : 'Cancelar abono'} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50">
                                   <Ban size={14} /> Cancelar
                                 </button>
                               )}

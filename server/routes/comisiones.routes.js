@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { Reservacion, Agente, Pago, Cliente, registrarEvento } from '../../database/index.js';
+import { Reservacion, Agente, Pago, Cliente, registrarEvento, PAGO_CONTABLE } from '../../database/index.js';
 import { usuarioDeLaSesion, errorHttp } from '../middleware/tenant.js';
 
 // Pago de comisiones a agentes (solo el Administrador de la empresa).
@@ -59,7 +59,7 @@ router.get('/', async (req, res, next) => {
           $lookup: {
             from: Pago.collection.name, let: { r: '$_id' }, as: 'liq',
             pipeline: [
-              { $match: { $expr: { $eq: ['$idReservacion', '$$r'] }, estatus: { $ne: 'Cancelado' } } },
+              { $match: { $expr: { $eq: ['$idReservacion', '$$r'] }, ...PAGO_CONTABLE } },
               { $group: { _id: null, ultimo: { $max: '$fecha' } } },
             ],
           },
@@ -123,7 +123,7 @@ router.post('/pagar', async (req, res, next) => {
 
     // Fecha de liquidación de cada una (último abono aplicado), para el registro.
     const ultimos = await Pago.aggregate([
-      { $match: { idReservacion: { $in: ids }, estatus: { $ne: 'Cancelado' } } },
+      { $match: { idReservacion: { $in: ids }, ...PAGO_CONTABLE } },
       { $group: { _id: '$idReservacion', ultimo: { $max: '$fecha' } } },
     ]);
     const liquidacionDe = new Map(ultimos.map((u) => [String(u._id), u.ultimo]));

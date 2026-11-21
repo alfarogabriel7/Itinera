@@ -33,7 +33,15 @@ const PagoSchema = new Schema(
     // Los abonos nunca se borran: un abono capturado por error se cancela
     // (solo el Administrador de la empresa) y deja de contar para el saldo,
     // pero se conserva con quién, cuándo y por qué lo canceló.
-    estatus: { type: String, enum: ['Aplicado', 'Cancelado'], default: 'Aplicado' },
+    // 'Pendiente': la empresa pide autorizar los pagos (Mi agencia) y el
+    // Administrador aún no lo autoriza; no cuenta para el saldo. Si lo rechaza, queda Cancelado.
+    estatus: { type: String, enum: ['Aplicado', 'Pendiente', 'Cancelado'], default: 'Aplicado' },
+    autorizadoPor: {
+      id: { type: Schema.Types.ObjectId, ref: 'Agente' },
+      userId: String,
+      nombre: String,
+    },
+    fechaAutorizacion: { type: Date },
     motivoCancelacion: { type: String, trim: true, maxlength: 300 },
     fechaCancelacion: { type: Date },
     canceladoPor: {
@@ -48,5 +56,7 @@ const PagoSchema = new Schema(
 PagoSchema.index({ idReservacion: 1, estatus: 1 });
 PagoSchema.index({ empresa: 1, fecha: -1 });
 PagoSchema.index({ empresa: 1, agente: 1, fecha: -1 });
+// Bandeja de Autorizaciones.
+PagoSchema.index({ empresa: 1, estatus: 1, createdAt: 1 }, { partialFilterExpression: { estatus: 'Pendiente' } });
 
 export default mongoose.model('Pago', PagoSchema);

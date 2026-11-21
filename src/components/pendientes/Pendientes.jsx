@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Clock, MessageCircle, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, MessageCircle, Plus, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { pendientesApi, clientesApi, prospectosApi, reservacionesApi } from '../../api';
 import { TIPOS_PENDIENTE } from '../../../database/catalogos/tiposPendiente.js';
 import { SelectorFecha, aTexto, aFecha } from '../common/Calendario';
@@ -56,7 +56,7 @@ export function FilaPendiente({ p, hoy, onCambio, mostrarResponsable = false, co
   const ref = useRef(null);
   const hecho = p.estatus === 'hecho';
   const vence = textoVence(p, hoy);
-  const wa = !hecho && whatsapp(p);
+  const wa = !hecho && !p.autorizacion && whatsapp(p);
 
   useEffect(() => {
     if (!menu) return undefined;
@@ -98,6 +98,13 @@ export function FilaPendiente({ p, hoy, onCambio, mostrarResponsable = false, co
       </div>
       <span className={`whitespace-nowrap text-xs font-semibold ${vence.clase}`}>{vence.texto}</span>
       <div className="flex items-center gap-1.5">
+        {/* Seguimiento de un pago por autorizar: lleva a Autorizaciones con ese pago. */}
+        {p.autorizacion && !hecho && (
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('rutana:ir-autorizacion', { detail: p.autorizacion }))}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-petroleo px-3 text-xs font-semibold text-white hover:bg-brand-noche">
+            <ShieldCheck size={15} /> Ir a autorizar
+          </button>
+        )}
         {wa && (
           <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`Escribir a ${p.contacto.nombre} por WhatsApp`} title="WhatsApp"
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-emerald-700 hover:bg-emerald-50">
@@ -208,7 +215,8 @@ export function FormPendiente({ ligas = null, elegirLiga = false, responsables =
       <div className="md:col-span-3">
         <label className="block text-xs font-bold text-slate-600">Tipo</label>
         <select className={`${inputClass} mt-1`} value={f.tipo} onChange={e => setF({ ...f, tipo: e.target.value })}>
-          {Object.entries(TIPOS_PENDIENTE).map(([clave, t]) => <option key={clave} value={clave}>{t.nombre}</option>)}
+          {/* "Autorización" solo la crea Rutana (pagos por autorizar). */}
+          {Object.entries(TIPOS_PENDIENTE).filter(([clave]) => clave !== 'autorizacion').map(([clave, t]) => <option key={clave} value={clave}>{t.nombre}</option>)}
         </select>
       </div>
       <div className="md:col-span-3">

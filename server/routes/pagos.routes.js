@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { Pago, Reservacion, Empresa, Cliente, Agente, registrarCambios, registrarEvento } from '../../database/index.js';
+import { Pago, Reservacion, Empresa, Cliente, Agente, registrarCambios, registrarEvento, PAGO_CONTABLE } from '../../database/index.js';
+import { requiereAutorizacion, porAutorizarCliente, crearSeguimientoAutorizacion, rechazarPago } from '../utils/autorizaciones.js';
 import {
   alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, regexBusqueda, usuarioDeLaSesion,
 } from '../middleware/tenant.js';
@@ -23,9 +24,8 @@ router.use(sinSuperAdmin('El rol superAdmin no puede consultar ni registrar pago
 // responsable no esté). Cada abono guarda quién lo capturó (`agente`) y queda
 // en la bitácora; cancelarlo es exclusivo del Administrador.
 
-// Los abonos cancelados se conservan pero no cuentan para el saldo.
-// Se usa $ne (y no 'Aplicado') para que los pagos anteriores al campo estatus sigan contando.
-const SOLO_APLICADOS = { estatus: { $ne: 'Cancelado' } };
+// Los abonos cancelados y los pendientes de autorizar no cuentan para el saldo.
+const SOLO_APLICADOS = PAGO_CONTABLE;
 
 // Redondeo a centavos para que la suma de decimales no deje saldos como 0.0000001.
 const aCentavos = (n) => Math.round(Number(n) * 100) / 100;
@@ -210,6 +210,7 @@ router.get('/resumen/:idReservacion', async (req, res, next) => {
     }
 
     const { total, pagado, saldo } = await calcularSaldo(reservacion);
+    const porAutorizar = await porAutorizarCliente(reservacion._id);
     const pagos = await Pago.find({ idReservacion: reservacion._id })
       .populate('agente', 'nombre userId')
       .sort({ fecha: -1 });
@@ -231,6 +232,8 @@ router.get('/resumen/:idReservacion', async (req, res, next) => {
       total,
       pagado,
       saldo,
+      // Abonos registrados que esperan autorización del Administrador (no restan al saldo todavía).
+      porAutorizar,
       pagos,
     });
   } catch (err) {
@@ -260,9 +263,33 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: `No se pueden registrar abonos en una reservación ${reservacion.estatus.toLowerCase()}.` });
     }
 
-    const { saldo } = await calcularSaldo(reservacion);
+    // Lo que ya está registrado y espera autorización también ocupa saldo.
+    const { saldo: saldoAplicado } = await calcularSaldo(reservacion);
+    const porAutorizar = await porAutorizarCliente(reservacion._id);
+    const saldo = aCentavos(saldoAplicado - porAutorizar);
     if (monto > saldo) {
-      return res.status(400).json({ error: `El monto excede el saldo pendiente de la reservación ($${saldo.toFixed(2)}).` });
+      return res.status(400).json({
+        error: porAutorizar > 0
+          ? `El monto excede el saldo pendiente de la reservación ($${saldo.toFixed(2)}; hay $${porAutorizar.toFixed(2)} en pagos por autorizar).`
+          : `El monto excede el saldo pendiente de la reservación ($${saldo.toFixed(2)}).`,
+      });
+    }
+
+    // La empresa pide autorizar los abonos que registran los agentes: queda
+    // Pendiente, no sube el acumulado y se avisa al Administrador.
+    if (await requiereAutorizacion(req, 'cliente')) {
+      const pendiente = await Pago.create({
+        idReservacion, monto, moneda: reservacion.moneda || 'MXN', formaPago, referencia, fecha,
+        empresa: reservacion.empresa, agente: req.agente.id, estatus: 'Pendiente',
+      });
+      await registrarEvento({
+        entidad: 'Pago', entidadId: pendiente._id, empresa: pendiente.empresa, evento: 'abono del cliente por autorizar',
+        detalle: `$${monto.toFixed(2)} ${pendiente.moneda} · pagado el ${fechaCortaMx(fecha)} ·${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
+        usuario: usuarioDeLaSesion(req),
+      });
+      await crearSeguimientoAutorizacion({ tipo: 'cliente', pago: pendiente, reservacion, capturista: req.agente })
+        .catch((err) => console.error('No se pudo crear el seguimiento de autorización:', err.message));
+      return res.status(201).json(await pendiente.populate('agente', 'nombre userId'));
     }
 
     // Aplicación atómica: el acumulado solo sube si con este abono no se rebasa
@@ -330,6 +357,10 @@ router.patch('/:id/cancelar', async (req, res, next) => {
     if (pago.estatus === 'Cancelado') {
       return res.status(400).json({ error: 'Este abono ya estaba cancelado.' });
     }
+    // Uno que espera autorización nunca se aplicó: cancelarlo es rechazarlo.
+    if (pago.estatus === 'Pendiente') {
+      return res.json(await rechazarPago(req, 'cliente', pago._id, motivo));
+    }
 
     const usuario = usuarioDeLaSesion(req);
     const anterior = { estatus: pago.estatus || 'Aplicado', motivoCancelacion: pago.motivoCancelacion };
@@ -337,7 +368,7 @@ router.patch('/:id/cancelar', async (req, res, next) => {
     // Atómico: solo cancela si sigue aplicado, así dos cancelaciones simultáneas
     // no restan el monto dos veces del acumulado de la reservación.
     const cancelado = await Pago.findOneAndUpdate(
-      { _id: pago._id, estatus: { $ne: 'Cancelado' } },
+      { _id: pago._id, ...PAGO_CONTABLE },
       { $set: { estatus: 'Cancelado', motivoCancelacion: motivo, fechaCancelacion: new Date(), canceladoPor: usuario } },
       { returnDocument: 'after' }
     );
