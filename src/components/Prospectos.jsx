@@ -4,6 +4,7 @@ import { obtenerSesion } from '../utils/sesion';
 import { telefono, fechaViaje } from '../utils/formato';
 import FichaDetalle from './common/FichaDetalle';
 import ListadoAdaptable from './common/ListadoAdaptable';
+import { confirmar } from '../utils/confirmar';
 
 const fechaRegistro = (p) => (p.fechaRegistro ? new Date(p.fechaRegistro).toLocaleDateString('es-MX') : '—');
 import PageHeader from './common/PageHeader';
@@ -122,7 +123,11 @@ export default function Prospectos() {
   const handleVer = (p) => setViendo(p);
 
   const handleConvertir = async (prospecto) => {
-    if (!confirm(`¿Convertir a ${prospecto.nombreCompleto} en cliente?`)) return;
+    if (!(await confirmar({
+      titulo: `¿Convertir a ${prospecto.nombreCompleto} en cliente?`,
+      mensaje: 'Se dará de alta como cliente con sus datos, y sus acciones de seguimiento abiertas pasarán al cliente.',
+      textoAceptar: 'Convertir en cliente',
+    }))) return;
     try {
       await prospectosApi.convertir(prospecto._id);
       await cargarProspectos();

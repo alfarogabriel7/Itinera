@@ -129,6 +129,20 @@ const ReservacionSchema = new Schema(
     estatus: { type: String, enum: ['Activa', 'Cancelada', 'Completada'], default: 'Activa' },
     // Acumulado de abonos aplicados del cliente (lo mantiene el servidor con $inc atómicos).
     abonado: { type: Number, default: 0 },
+    // Pago de comisiones (solo Administrador): true cuando ya se le pagó al
+    // agente que vendió su comisión por esta venta. Lo cambia únicamente
+    // server/routes/comisiones.routes.js; nunca se toma del formulario.
+    pagadalagente: { type: Boolean, default: false },
+    pagoComision: {
+      monto: Number, // lo pagado al agente
+      porcentaje: Number, // % del agente al pagar (referencia)
+      especial: Boolean, // monto capturado a mano en lugar de venta × %
+      base: Number, // venta al público usada para el cálculo
+      moneda: String,
+      fechaLiquidacion: Date, // último abono del cliente
+      fecha: Date, // cuándo se pagó la comisión
+      pagadoPor: { id: { type: Schema.Types.ObjectId, ref: 'Agente' }, userId: String, nombre: String },
+    },
     // Ficha de reservación: peticiones del cliente y checklist de documentos.
     peticiones: { type: [PeticionSchema], default: [] },
     documentos: { type: [DocumentoSchema], default: undefined },
@@ -141,6 +155,7 @@ const ReservacionSchema = new Schema(
 // Índices pensados para las consultas reales (siempre filtradas por empresa):
 // listados por agente, cobranza por estatus y fecha de viaje, ventas por fecha.
 ReservacionSchema.index({ empresa: 1, agente: 1, createdAt: -1 });
+ReservacionSchema.index({ empresa: 1, agente: 1, pagadalagente: 1 });
 ReservacionSchema.index({ empresa: 1, estatus: 1, fechaEntrada: 1 });
 ReservacionSchema.index({ empresa: 1, createdAt: -1 });
 ReservacionSchema.index({ idCliente: 1 });

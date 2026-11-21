@@ -8,6 +8,7 @@ import PagoProveedores from './components/PagoProveedores';
 import MiDia from './components/MiDia';
 import EquipoPendientes from './components/EquipoPendientes';
 import Agentes from './components/Agentes';
+import PagoComisiones from './components/PagoComisiones';
 import Empresas from './components/Empresas';
 import Prospectos from './components/Prospectos';
 import Dashboard from './components/Dashboard';
@@ -19,11 +20,12 @@ import { TEMA_PREDETERMINADO, normalizarTema } from '../database/catalogos/temas
 import MasUSD from './components/common/MasUSD';
 import CampanaViajes from './components/common/CampanaViajes';
 import Avisos from './components/common/Avisos';
+import Confirmaciones from './components/common/Confirmaciones';
 import RutanaLogo, { RutanaIsotipo } from './components/common/RutanaLogo';
 import isotipoBlanco from './assets/rutana-isotipo-blanco.svg';
 import {
   Users, Truck, Compass, DollarSign, ChevronDown, HandCoins, CalendarCheck, ClipboardList,
-  Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen,
+  Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen, BadgePercent,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -52,6 +54,7 @@ const NAV_ITEMS = [
   { key: 'pagoProveedores', label: 'Pago a Proveedores', icon: HandCoins, visible: (rol) => rol !== 'superAdmin' },
   // Un Agente no puede ver el módulo de Agentes en absoluto.
   { key: 'agentes', label: 'Agentes', icon: UserCog, visible: (rol) => rol !== 'Agente' },
+  { key: 'comisiones', label: 'Pago de comisiones', icon: BadgePercent, visible: (rol) => rol === 'Administrador' },
 ];
 
 // Pantalla con la que arranca cada rol al iniciar sesión.
@@ -60,7 +63,7 @@ const TAB_INICIAL = { Administrador: 'midia', Agente: 'midia', superAdmin: 'empr
 const tabInicial = (rol) => TAB_INICIAL[rol] || 'inicio';
 
 // Pantallas que ocupan todo el ancho (sin el panel lateral de frase + resumen).
-const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio', 'midia', 'equipo']);
+const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio', 'midia', 'equipo', 'comisiones']);
 
 const PAGE_TITLES = {
   dashboard: 'Panel de Control',
@@ -259,9 +262,18 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
+  // Desde Agentes: abrir Pago de comisiones con ese agente ya elegido.
+  const [comisionesDe, setComisionesDe] = useState('');
+  const pagarComisionesDe = (idAgente) => {
+    setComisionesDe(idAgente);
+    setActiveTab('comisiones');
+    window.scrollTo({ top: 0 });
+  };
+
   const goTo = (key) => {
     setActiveTab(key);
     setDiaDe('');
+    setComisionesDe('');
     setReservaParaAbonar('');
     setPestanaPagos('cobros');
     setClienteParaReservar(null);
@@ -295,6 +307,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-arena md:flex">
       <Avisos />
+      <Confirmaciones />
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -406,7 +419,8 @@ export default function App() {
             {activeTab === 'pagoProveedores' && auth.rol !== 'superAdmin' && <PagoProveedores onPagar={pagarProveedorDesde} />}
             {activeTab === 'midia' && auth.rol !== 'superAdmin' && <MiDia key={diaDe} agenteInicial={diaDe} onCambioPendientes={cargarPendientesUrgentes} onIr={goTo} />}
             {activeTab === 'equipo' && auth.rol === 'Administrador' && <EquipoPendientes onVerDia={verDiaDe} onCambioPendientes={cargarPendientesUrgentes} />}
-            {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes />}
+            {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes onPagarComisiones={pagarComisionesDe} />}
+            {activeTab === 'comisiones' && auth.rol === 'Administrador' && <PagoComisiones key={comisionesDe} agenteInicial={comisionesDe} />}
           </main>
 
           {/* Right panel: promo + resumen */}
@@ -420,14 +434,14 @@ export default function App() {
             </div>
 
             <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-5 ${auth.rol === 'superAdmin' ? 'hidden' : ''}`}>
-              <h3 className="text-sm font-bold text-slate-700 mb-4">Resumen</h3>
+              <h3 className="text-sm font-bold text-slate-700 mb-4">{resumen.alcance === 'cartera' ? 'Mi resumen' : 'Resumen de la agencia'}</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-brand-petroleo text-white flex items-center justify-center shrink-0">
                     <Users2 size={18} />
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500">Clientes registrados</div>
+                    <div className="text-xs text-slate-500">{resumen.alcance === 'cartera' ? 'Mis clientes' : 'Clientes registrados'}</div>
                     <div className="text-lg font-bold text-slate-800">{resumen.clientesRegistrados}</div>
                   </div>
                 </div>
@@ -437,7 +451,7 @@ export default function App() {
                     <Compass size={18} />
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500">Reservaciones activas</div>
+                    <div className="text-xs text-slate-500">{resumen.alcance === 'cartera' ? 'Mis reservaciones activas' : 'Reservaciones activas'}</div>
                     <div className="text-lg font-bold text-slate-800">{resumen.reservacionesActivas}</div>
                   </div>
                 </div>
@@ -446,7 +460,7 @@ export default function App() {
                     <DollarSign size={18} />
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500">Pagos este mes</div>
+                    <div className="text-xs text-slate-500">{resumen.alcance === 'cartera' ? 'Cobrado este mes (mi cartera)' : 'Pagos este mes'}</div>
                     <div className="text-lg font-bold text-slate-800">
                       ${resumen.pagosDelMes.toLocaleString('es-MX', { maximumFractionDigits: 0 })} MXN
                     </div>

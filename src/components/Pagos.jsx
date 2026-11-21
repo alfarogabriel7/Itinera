@@ -11,6 +11,7 @@ import PagosProveedor from './PagosProveedor';
 import { dinero, fechaCorta, fechaViaje } from '../utils/formato';
 import { DollarSign, CreditCard, Ban, CheckCircle2, Paperclip, Upload, Printer, FileCheck, Users, Truck } from 'lucide-react';
 import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
+import { confirmar, pedirTexto } from '../utils/confirmar';
 
 const etiquetaReservacion = (r) => `${r.idCliente?.nombreCompleto || 'Cliente'} — ${r.destino}`;
 
@@ -120,12 +121,17 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
   };
 
   const handleCancelar = async (pago) => {
-    const motivo = window.prompt(`Cancelar el abono de ${dinero(pago.monto)} del ${fechaCorta(pago.fecha)}.\n\nEscribe el motivo de la cancelación:`);
+    const motivo = await pedirTexto({
+      titulo: 'Cancelar abono del cliente',
+      detalles: [
+        { etiqueta: 'Monto', valor: dinero(pago.monto), destacado: true },
+        { etiqueta: 'Fecha del abono', valor: fechaCorta(pago.fecha) },
+      ],
+      etiqueta: 'Motivo de la cancelación', placeholder: 'Ej. se capturó dos veces', requerido: true,
+      nota: 'El abono no se borra: queda como cancelado y deja de contar en el saldo del cliente.',
+      textoAceptar: 'Cancelar abono', textoCancelar: 'Volver', tono: 'peligro',
+    });
     if (motivo === null) return;
-    if (!motivo.trim()) {
-      avisarError('El motivo de la cancelación es obligatorio.');
-      return;
-    }
     try {
       await pagosApi.cancelar(pago._id, motivo.trim());
       await cargarResumen(selectedReservaId);
@@ -135,8 +141,12 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
   };
 
   // Un solo <input type="file"> oculto para todas las filas del historial.
-  const elegirComprobante = (pago) => {
-    if (pago.comprobante?.id && !window.confirm(`Este abono ya tiene el comprobante "${pago.comprobante.nombreArchivo}". ¿Reemplazarlo?`)) return;
+  const elegirComprobante = async (pago) => {
+    if (pago.comprobante?.id && !(await confirmar({
+      titulo: '¿Reemplazar el comprobante?',
+      mensaje: `Este abono ya tiene el comprobante "${pago.comprobante.nombreArchivo}". Si eliges otro archivo, sustituye al actual.`,
+      textoAceptar: 'Elegir otro archivo',
+    }))) return;
     pagoParaAdjuntar.current = pago;
     inputArchivoFila.current.value = '';
     inputArchivoFila.current.click();

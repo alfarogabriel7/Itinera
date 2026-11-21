@@ -105,6 +105,13 @@ export const pagosApi = {
 };
 
 // Pagos de la agencia a sus proveedores, por servicio de cada reservación.
+// Pago de comisiones a agentes (solo Administrador).
+export const comisionesApi = {
+  listar: ({ agente, desde, hasta, pagadas }) => request(conParametros('/comisiones', { agente, desde, hasta, pagadas: pagadas ? 1 : 0 })),
+  pagar: (agente, reservaciones) => request('/comisiones/pagar', { method: 'POST', body: JSON.stringify({ agente, reservaciones }) }),
+  revertir: (id) => request(`/comisiones/${id}/revertir`, { method: 'POST' }),
+};
+
 export const pendientesApi = {
   miDia: (params) => request(conParametros('/pendientes/mi-dia', params)),
   resumen: () => request('/pendientes/resumen'),

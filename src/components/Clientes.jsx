@@ -9,6 +9,7 @@ import { obtenerSesion } from '../utils/sesion';
 import { telefono, fechaViaje } from '../utils/formato';
 import FichaDetalle from './common/FichaDetalle';
 import ListadoAdaptable from './common/ListadoAdaptable';
+import { confirmar } from '../utils/confirmar';
 
 const estatusCliente = (c) => (
   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -122,7 +123,11 @@ export default function Clientes({ onGenerarReservacion }) {
   // No se elimina el registro de la BD: se da de baja lógicamente (estatus = Baja)
   // para conservar el historial del cliente.
   const handleEliminar = async (cliente) => {
-    if (!confirm(`¿Deseas dar de baja a ${cliente.nombreCompleto}?`)) return;
+    if (!(await confirmar({
+      titulo: `¿Dar de baja a ${cliente.nombreCompleto}?`,
+      mensaje: 'El cliente no se borra: conserva su historial de viajes y pagos. Puedes reactivarlo editándolo.',
+      textoAceptar: 'Dar de baja', tono: 'peligro',
+    }))) return;
     try {
       await clientesApi.update(cliente._id, { estatus: 'Baja' });
       await cargarClientes();
