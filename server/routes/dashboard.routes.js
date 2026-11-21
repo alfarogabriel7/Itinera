@@ -4,6 +4,7 @@ import { Reservacion, Pago, Agente, Cliente, Proveedor } from '../../database/in
 import { bloquearSuperAdmin } from '../middleware/tenant.js';
 import { MONEDAS, MONEDA_PREDETERMINADA, monedaDe, filtroMoneda } from '../../database/catalogos/monedas.js';
 import { completarTerminadas } from '../utils/estatusReservacion.js';
+import { filtroCartera } from '../utils/cartera.js';
 
 const router = Router();
 
@@ -76,6 +77,22 @@ async function ventasPorAgente(empresa, [desde, hasta], moneda = MONEDA_PREDETER
   const filas = await Reservacion.aggregate([
     { $match: { empresa, ...VENTA_VALIDA, ...filtroMoneda(moneda), [FECHA_VENTA]: { $gte: desde, $lt: hasta } } },
     { $group: { _id: '$agente', ventas: { $sum: '$montoTotal' }, reservaciones: { $sum: 1 } } },
+  ]);
+  return new Map(filas.map((f) => [String(f._id), f]));
+}
+
+// Comisiones pagadas a cada agente (módulo Pago de comisiones) cuya fecha de
+// pago cae en el periodo. El rango viene en meses de calendario (medianoche
+// UTC); el pago es un momento real, así que se recorre a la hora de México.
+async function comisionesPagadasPorAgente(empresa, [desde, hasta], moneda = MONEDA_PREDETERMINADA) {
+  const filas = await Reservacion.aggregate([
+    {
+      $match: {
+        empresa, pagadalagente: true, 'pagoComision.moneda': moneda,
+        'pagoComision.fecha': { $gte: new Date(desde.getTime() + DESFASE_MS), $lt: new Date(hasta.getTime() + DESFASE_MS) },
+      },
+    },
+    { $group: { _id: '$agente', monto: { $sum: '$pagoComision.monto' }, reservaciones: { $sum: 1 } } },
   ]);
   return new Map(filas.map((f) => [String(f._id), f]));
 }
@@ -188,14 +205,16 @@ router.get('/admin', async (req, res, next) => {
     // --- Ranking de agentes ---
     const periodo = ['mes', '12m', 'anio', '24m'].includes(req.query.periodo) ? req.query.periodo : 'mes';
     const r = rangos(periodo, cal);
-    const [actual, previo, enOtraMoneda, agentes, ventasEnUSD] = await Promise.all([
+    const [actual, previo, enOtraMoneda, agentes, ventasEnUSD, comisiones] = await Promise.all([
       ventasPorAgente(empresa, r.actual, moneda),
       r.previo ? ventasPorAgente(empresa, r.previo, moneda) : new Map(),
       ventasPorAgente(empresa, r.actual, otraMoneda),
       Agente.find({ empresa }).select('nombre rol estatus'),
       Reservacion.exists({ empresa, ...VENTA_VALIDA, moneda: 'USD' }),
+      comisionesPagadasPorAgente(empresa, r.actual, moneda),
     ]);
     const totalPeriodo = [...actual.values()].reduce((acc, f) => acc + f.ventas, 0);
+    const totalComisiones = [...comisiones.values()].reduce((acc, f) => acc + f.monto, 0);
     const ranking = agentes
       .map((a) => {
         const f = actual.get(String(a._id));
@@ -213,10 +232,13 @@ router.get('/admin', async (req, res, next) => {
           ventasPrevio: r.previo ? aCentavos(previo.get(String(a._id))?.ventas) : null,
           // Informativo: lo que vendió en la otra moneda en el mismo periodo.
           ventasOtraMoneda: aCentavos(enOtraMoneda.get(String(a._id))?.ventas),
+          // Pagado en el periodo por el módulo Pago de comisiones (en esta moneda).
+          comisionPagada: aCentavos(comisiones.get(String(a._id))?.monto),
+          comisionesPagadas: comisiones.get(String(a._id))?.reservaciones || 0,
         };
       })
-      // Los dados de baja solo aparecen si vendieron algo en el periodo.
-      .filter((a) => a.estatus === 'Activo' || a.ventas > 0 || a.ventasOtraMoneda > 0)
+      // Los dados de baja solo aparecen si vendieron o cobraron comisión en el periodo.
+      .filter((a) => a.estatus === 'Activo' || a.ventas > 0 || a.ventasOtraMoneda > 0 || a.comisionPagada > 0)
       .sort((a, b) => b.ventas - a.ventas || a.nombre.localeCompare(b.nombre, 'es'));
 
     res.json({
@@ -236,7 +258,7 @@ router.get('/admin', async (req, res, next) => {
         porCobrar: { monto: porCobrar, reservaciones: activas.length },
         mejorMes: mejorMes && mejorMes.ventas > 0 ? { mes: mejorMes.mes, ventas: mejorMes.ventas } : null,
       },
-      ranking: { periodo, total: aCentavos(totalPeriodo), agentes: ranking },
+      ranking: { periodo, total: aCentavos(totalPeriodo), totalComisiones: aCentavos(totalComisiones), agentes: ranking },
     });
   } catch (err) {
     next(err);
@@ -378,17 +400,28 @@ router.get('/resumen', async (req, res, next) => {
     if (bloquearSuperAdmin(req, res, 'El rol superAdmin no tiene resumen de empresa.')) return;
     const empresa = new mongoose.Types.ObjectId(String(req.agente.empresa));
     const cal = calendario();
+    // El Agente ve SU cartera (sus clientes asignados y las reservaciones que
+    // vendió o de esos clientes, igual que Cobranza); el Administrador, la empresa.
+    const esAgente = req.agente.rol === 'Agente';
+    const cartera = await filtroCartera(req);
+    const filtroClientes = esAgente ? { agente: new mongoose.Types.ObjectId(String(req.agente.id)) } : {};
+    const filtroPagos = esAgente
+      ? { idReservacion: { $in: await Reservacion.distinct('_id', { empresa, ...cartera }) } }
+      : {};
     const [clientesRegistrados, reservacionesActivas, pagos] = await Promise.all([
-      Cliente.countDocuments({ empresa, estatus: 'Activo' }),
-      Reservacion.countDocuments({ empresa, estatus: 'Activa' }),
+      Cliente.countDocuments({ empresa, estatus: 'Activo', ...filtroClientes }),
+      Reservacion.countDocuments({ empresa, estatus: 'Activa', ...cartera }),
       Pago.aggregate([
-        { $match: { empresa, ...PAGO_APLICADO, fecha: { $gte: cal.inicioMes(0) } } },
+        { $match: { empresa, ...PAGO_APLICADO, fecha: { $gte: cal.inicioMes(0) }, ...filtroPagos } },
         { $group: { _id: { $ifNull: ['$moneda', MONEDA_PREDETERMINADA] }, total: { $sum: '$monto' } } },
       ]),
     ]);
     const porMoneda = Object.fromEntries(pagos.map((p) => [p._id, aCentavos(p.total)]));
     // pagosDelMes en MXN (como siempre) y aparte lo cobrado en dólares.
-    res.json({ clientesRegistrados, reservacionesActivas, pagosDelMes: porMoneda.MXN || 0, pagosDelMesUSD: porMoneda.USD || 0 });
+    res.json({
+      alcance: esAgente ? 'cartera' : 'empresa',
+      clientesRegistrados, reservacionesActivas, pagosDelMes: porMoneda.MXN || 0, pagosDelMesUSD: porMoneda.USD || 0,
+    });
   } catch (err) {
     next(err);
   }

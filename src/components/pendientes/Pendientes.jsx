@@ -6,6 +6,7 @@ import { SelectorFecha, aTexto, aFecha } from '../common/Calendario';
 import SelectorRemoto from '../common/SelectorRemoto';
 import { fechaViaje } from '../../utils/formato';
 import { avisarError } from '../../utils/avisos';
+import { confirmar } from '../../utils/confirmar';
 
 // Piezas del módulo de pendientes ("Mi día"): chip de tipo, captura, fila y el
 // panel de pendientes de un registro (cliente o prospecto).
@@ -115,7 +116,7 @@ export function FilaPendiente({ p, hoy, onCambio, mostrarResponsable = false, co
                   className="block w-full px-3 py-2 text-left text-slate-700 hover:bg-slate-50">Posponer: {etiqueta}</button>
               ))}
               <button type="button" role="menuitem"
-                onClick={() => { if (confirm(`¿Eliminar el pendiente "${p.titulo}"?`)) accion(() => pendientesApi.remove(p._id)); }}
+                onClick={async () => { if (await confirmar({ titulo: '¿Eliminar el pendiente?', mensaje: `"${p.titulo}"`, textoAceptar: 'Eliminar', tono: 'peligro' })) accion(() => pendientesApi.remove(p._id)); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50"><Trash2 size={14} /> Eliminar</button>
             </div>
           )}

@@ -6,9 +6,11 @@ import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import SelectorRemoto from './common/SelectorRemoto';
 import IndicadorPassword, { CoincidenciaPassword } from './common/IndicadorPassword';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
-import { UserCog, Plus, X, Save, Search, Pencil, Trash2, Lock, Eye, EyeOff, AtSign } from 'lucide-react';
+import { UserCog, Plus, X, Save, Search, Pencil, Trash2, Lock, Eye, EyeOff, AtSign, BadgePercent } from 'lucide-react';
 import { avisarExito, avisarError } from '../utils/avisos';
 import ListadoAdaptable from './common/ListadoAdaptable';
+import { confirmar } from '../utils/confirmar';
+import { limpiar as limpiarMonto } from './common/CampoMonto';
 
 const estatusAgente = (a) => (
   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${a.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -16,7 +18,9 @@ const estatusAgente = (a) => (
   </span>
 );
 
-const EMPTY_FORM = { _id: null, nombre: '', userId: '', rol: 'Agente', empresa: '', empresaNombre: '', estatus: 'Activo', password: '', confirmPassword: '' };
+const EMPTY_FORM = { _id: null, nombre: '', userId: '', rol: 'Agente', empresa: '', empresaNombre: '', estatus: 'Activo', password: '', confirmPassword: '', porcentajeComision: '' };
+
+const porcentaje = (n) => `${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 })} %`;
 
 // Debe reflejar la misma regla que valida el backend (database/models/Agente.js):
 // mínimo 8 caracteres, al menos una mayúscula, un número y un carácter especial.
@@ -25,7 +29,8 @@ const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 const inputClass = 'mt-1 w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-petroleo focus:border-brand-petroleo';
 const labelClass = 'block text-sm font-semibold text-slate-700';
 
-export default function Agentes() {
+// onPagarComisiones(idAgente): abre "Pago de comisiones" con ese agente (solo Administrador).
+export default function Agentes({ onPagarComisiones }) {
   const sesion = obtenerSesion();
   const esSuperAdmin = sesion?.rol === 'superAdmin';
   const esAdministrador = sesion?.rol === 'Administrador';
@@ -86,8 +91,10 @@ export default function Agentes() {
       return;
     }
 
-    const { _id, confirmPassword, password, empresaNombre, ...resto } = form;
+    const { _id, confirmPassword, password, empresaNombre, porcentajeComision, ...resto } = form;
     const payload = password ? { ...resto, password } : resto;
+    // Solo el Administrador fija el % de comisión del agente (el servidor también lo valida).
+    if (esAdministrador) payload.porcentajeComision = Number(porcentajeComision) || 0;
 
     setGuardando(true);
     try {
@@ -111,6 +118,7 @@ export default function Agentes() {
     ...agente,
     empresa: agente.empresa?._id || agente.empresa || '',
     empresaNombre: agente.empresa?.nombreEmpresa || '',
+    porcentajeComision: agente.porcentajeComision ? String(agente.porcentajeComision) : '',
     password: '',
     confirmPassword: '',
   });
@@ -118,7 +126,11 @@ export default function Agentes() {
   // Baja lógica: el servidor solo cambia el estatus a "Baja" (no borra el registro)
   // y lo deja en la bitácora. Se reactiva editándolo.
   const handleBaja = async (agente) => {
-    if (!confirm(`¿Deseas dar de baja a ${agente.nombre}?\n\nYa no podrá iniciar sesión, pero se conserva su historial. Puedes reactivarlo editándolo.`)) return;
+    if (!(await confirmar({
+      titulo: `¿Dar de baja a ${agente.nombre}?`,
+      mensaje: 'Ya no podrá iniciar sesión, pero se conserva su historial. Puedes reactivarlo editándolo.',
+      textoAceptar: 'Dar de baja', tono: 'peligro',
+    }))) return;
     try {
       await agentesApi.remove(agente._id);
       await cargarAgentes();
@@ -234,6 +246,20 @@ export default function Agentes() {
               <CoincidenciaPassword password={form.password} confirmacion={form.confirmPassword} />
             </div>
 
+            {esAdministrador && (
+              <div>
+                <label className={labelClass}>% Comisión por venta</label>
+                {/* De 0 a 100, máximo 2 decimales. Solo lo ve el Administrador. */}
+                <div className="relative">
+                  <input type="text" inputMode="decimal" autoComplete="off" placeholder="Ej. 10" className={`${inputClass} pr-8 tabular-nums`}
+                    value={form.porcentajeComision}
+                    onChange={e => { const v = limpiarMonto(e.target.value); setForm({ ...form, porcentajeComision: Number(v) > 100 ? '100' : v }); }} />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-sm text-slate-400">%</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Lo que la agencia le paga al agente por cada venta. Solo lo ve el Administrador.</p>
+              </div>
+            )}
+
             <div className="md:col-span-2 flex justify-end gap-3 mt-4">
               <button type="button" onClick={resetForm}
                 className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
@@ -272,6 +298,7 @@ export default function Agentes() {
             { titulo: 'Nombre', celda: a => <><div className="font-medium text-slate-700">{a.nombre}</div><div className="font-mono text-xs text-slate-500">{a.userId}</div></> },
             { titulo: 'Rol', celda: a => a.rol },
             { titulo: 'Empresa', celda: a => a.empresa?.nombreEmpresa || '—' },
+            ...(esAdministrador ? [{ titulo: '% Comisión', className: 'whitespace-nowrap tabular-nums text-right', celda: a => porcentaje(a.porcentajeComision) }] : []),
             { titulo: 'Estatus', celda: a => estatusAgente(a) },
           ]}
           tarjeta={a => ({
@@ -279,6 +306,7 @@ export default function Agentes() {
             campos: [
               { etiqueta: 'Rol', valor: a.rol },
               { etiqueta: 'Empresa', valor: a.empresa?.nombreEmpresa },
+              ...(esAdministrador ? [{ etiqueta: '% Comisión por venta', valor: porcentaje(a.porcentajeComision) }] : []),
             ],
           })}
           acciones={puedeCrear ? (a => (
@@ -291,6 +319,13 @@ export default function Agentes() {
                           className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-500">
                           <Trash2 size={14} />
                         </button>
+                        {/* Acción rápida: abre Pago de comisiones con este agente elegido. */}
+                        {esAdministrador && onPagarComisiones && (
+                          <button onClick={() => onPagarComisiones(a._id)} title="Pagar comisiones" aria-label={`Pagar comisiones a ${a.nombre}`}
+                            className="w-8 h-8 rounded-full bg-brand-coral hover:brightness-90 text-white flex items-center justify-center">
+                            <BadgePercent size={14} />
+                          </button>
+                        )}
                       </>
           )) : undefined} />
 

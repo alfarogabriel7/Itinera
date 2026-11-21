@@ -4,6 +4,7 @@ import PageHeader from './common/PageHeader';
 import { Building2, Plus, X, Save, Search, Eye, Pencil, Trash2, Mail, Phone, ImagePlus } from 'lucide-react';
 import FichaDetalle from './common/FichaDetalle';
 import ListadoAdaptable from './common/ListadoAdaptable';
+import { confirmar } from '../utils/confirmar';
 
 const estatusEmpresa = (e) => (
   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${e.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -152,7 +153,11 @@ export default function Empresas() {
   // No se elimina el registro de la BD: se da de baja lógicamente (estatus = Baja)
   // para conservar el historial de la empresa.
   const handleEliminar = async (empresa) => {
-    if (!confirm(`¿Deseas dar de baja a ${empresa.nombreEmpresa}?`)) return;
+    if (!(await confirmar({
+      titulo: `¿Dar de baja a ${empresa.nombreEmpresa}?`,
+      mensaje: 'Sus usuarios ya no podrán iniciar sesión. La información de la empresa se conserva y puedes reactivarla editándola.',
+      textoAceptar: 'Dar de baja', tono: 'peligro',
+    }))) return;
     try {
       await empresasApi.update(empresa._id, { estatus: 'Baja' });
       await cargarEmpresas();

@@ -30,6 +30,13 @@ const AgenteSchema = new mongoose.Schema(
     },
     // Mismos valores que Empresa. "Baja" = sin acceso, pero conserva su historial.
     estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
+    // % de cada venta que la agencia le paga al agente. Lo fija y lo ve solo el
+    // Administrador de la empresa (ver agentes.routes.js).
+    porcentajeComision: {
+      type: Number, default: 0,
+      min: [0, 'El % de comisión del agente no puede ser negativo'],
+      max: [100, 'El % de comisión del agente no puede ser mayor a 100'],
+    },
     // select: false -> nunca se incluye en find()/findById() salvo que se pida explícitamente con .select('+password')
     password: {
       type: String,

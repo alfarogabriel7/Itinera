@@ -11,6 +11,7 @@ import { fechaViaje, dinero } from '../utils/formato';
 import CampoMonto, { limpiar as limpiarMonto } from './common/CampoMonto';
 import FichaReservacion from './FichaReservacion';
 import ListadoAdaptable from './common/ListadoAdaptable';
+import { pedirTexto } from '../utils/confirmar';
 import { avisarExito, avisarError } from '../utils/avisos';
 
 const COLOR_ESTATUS = {
@@ -249,11 +250,16 @@ export default function Reservaciones({ clienteInicial = null, onAbonar, onPagar
   // estatus: los abonos y pagos a proveedores se conservan como histórico.
   const esAdministrador = sesion?.rol === 'Administrador';
   const handleCancelar = async (r) => {
-    const motivo = window.prompt(
-      `¿Cancelar la reservación de ${r.idCliente?.nombreCompleto || 'el cliente'} a ${r.destino}?\n\n` +
-      'Los abonos del cliente y los pagos a proveedores se conservan como histórico, pero la reservación ' +
-      'dejará de contar en ventas, cobranza y el acumulado de proveedores.\n\nMotivo (opcional):'
-    );
+    const motivo = await pedirTexto({
+      titulo: '¿Cancelar la reservación?',
+      detalles: [
+        { etiqueta: 'Cliente', valor: r.idCliente?.nombreCompleto || '—' },
+        { etiqueta: 'Destino', valor: r.destino },
+      ],
+      etiqueta: 'Motivo (opcional)', placeholder: 'Ej. el cliente desistió del viaje',
+      nota: 'Los abonos del cliente y los pagos a proveedores se conservan como histórico, pero la reservación deja de contar en ventas, cobranza y el acumulado de proveedores.',
+      textoAceptar: 'Cancelar reservación', textoCancelar: 'Volver', tono: 'peligro',
+    });
     if (motivo === null) return false;
     try {
       await reservacionesApi.cancelar(r._id, motivo.trim());

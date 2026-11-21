@@ -207,6 +207,7 @@ export default function Dashboard() {
                 <th className="p-3 font-semibold text-right">Participación</th>
                 <th className="p-3 font-semibold text-right">Reservaciones</th>
                 <th className="p-3 font-semibold text-right">Ticket promedio</th>
+                <th className="p-3 font-semibold text-right" title="Comisiones pagadas al agente en el periodo (módulo Pago de comisiones), por fecha de pago">Comisión pagada</th>
                 {periodoActual.previo && <th className="p-3 font-semibold">{periodoActual.previo}</th>}
               </tr>
             </thead>
@@ -249,6 +250,14 @@ export default function Dashboard() {
                     <td className="p-3 text-right text-slate-600">{a.participacion.toFixed(1)}%</td>
                     <td className="p-3 text-right text-slate-600">{a.reservaciones}</td>
                     <td className="p-3 text-right text-slate-600">{a.reservaciones ? dinero(a.ticketPromedio) : '—'}</td>
+                    <td className="p-3 text-right">
+                      {a.comisionPagada > 0 ? (
+                        <>
+                          <div className="font-semibold text-emerald-700">{dinero(a.comisionPagada)}</div>
+                          <div className="text-2xs text-slate-400">{a.comisionesPagadas} venta(s)</div>
+                        </>
+                      ) : <span className="text-slate-400">—</span>}
+                    </td>
                     {periodoActual.previo && (
                       <td className="p-3"><Delta valor={variacion(a.ventas, a.ventasPrevio)} compacto /></td>
                     )}
@@ -256,7 +265,7 @@ export default function Dashboard() {
                 );
               })}
               {agentes.length === 0 && (
-                <tr><td colSpan={7} className="p-6 text-center text-sm text-slate-400">No hay agentes registrados.</td></tr>
+                <tr><td colSpan={8} className="p-6 text-center text-sm text-slate-400">No hay agentes registrados.</td></tr>
               )}
             </tbody>
             {ranking.agentes.length > 0 && (
@@ -266,7 +275,9 @@ export default function Dashboard() {
                   <td className="p-3 text-right">{dinero(ranking.total)} <span className="text-xs text-slate-400">{datos.moneda}</span></td>
                   <td className="p-3 text-right">100%</td>
                   <td className="p-3 text-right">{ranking.agentes.reduce((acc, a) => acc + a.reservaciones, 0)}</td>
-                  <td className="p-3" colSpan={periodoActual.previo ? 2 : 1} />
+                  <td className="p-3" />
+                  <td className="p-3 text-right text-emerald-700">{dinero(ranking.totalComisiones || 0)} <span className="text-xs text-slate-400">{datos.moneda}</span></td>
+                  {periodoActual.previo && <td className="p-3" />}
                 </tr>
               </tfoot>
             )}

@@ -6,6 +6,7 @@ import { reservacionesApi } from '../api';
 import { dinero, fechaViaje, telefono } from '../utils/formato';
 import { PendientesDeRegistro } from './pendientes/Pendientes';
 import { avisarError } from '../utils/avisos';
+import { confirmar, pedirTexto } from '../utils/confirmar';
 
 // Ficha de reservación (pantalla completa): resumen del viaje, cobro al cliente,
 // servicios y proveedores, peticiones del cliente, pendientes, checklist de
@@ -178,11 +179,18 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
                       {p.estatus === 'Solicitada' && <button onClick={() => accion(() => reservacionesApi.cambiarPeticion(id, p._id, { estatus: 'Enviada' }))} className="min-h-[34px] rounded-lg bg-brand-coral/10 px-3 text-xs font-semibold text-brand-coral hover:bg-brand-coral/20">Marcar enviada al proveedor</button>}
                       {p.estatus === 'Enviada' && <button onClick={() => accion(() => reservacionesApi.cambiarPeticion(id, p._id, { estatus: 'Confirmada' }))} className="min-h-[34px] rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">Marcar confirmada</button>}
                       {(p.estatus === 'Solicitada' || p.estatus === 'Enviada') && (
-                        <button onClick={() => { const motivo = window.prompt('¿Por qué no se pudo? (se guarda y se crea el pendiente de avisar al cliente)'); if (motivo?.trim()) accion(() => reservacionesApi.cambiarPeticion(id, p._id, { estatus: 'Rechazada', motivo: motivo.trim() })); }}
+                        <button onClick={async () => {
+                          const motivo = await pedirTexto({
+                            titulo: 'Petición rechazada', detalles: [{ etiqueta: 'Petición', valor: p.descripcion, completo: true }],
+                            etiqueta: '¿Por qué no se pudo?', placeholder: 'Ej. el hotel no tiene cunas disponibles', requerido: true,
+                            nota: 'Se guarda el motivo y se crea el pendiente de avisar al cliente.', textoAceptar: 'Marcar rechazada', textoCancelar: 'Volver',
+                          });
+                          if (motivo) accion(() => reservacionesApi.cambiarPeticion(id, p._id, { estatus: 'Rechazada', motivo }));
+                        }}
                           className="min-h-[34px] rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-700 hover:bg-red-100">Rechazada</button>
                       )}
                       {(p.estatus === 'Confirmada' || rechazada) && <button onClick={() => accion(() => reservacionesApi.cambiarPeticion(id, p._id, { estatus: 'Solicitada' }))} className="min-h-[34px] rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50">Reabrir</button>}
-                      <button onClick={() => { if (confirm(`¿Eliminar la petición "${p.descripcion}"?`)) accion(() => reservacionesApi.eliminarPeticion(id, p._id)); }} aria-label="Eliminar petición" title="Eliminar petición" className="flex h-[34px] w-[34px] items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                      <button onClick={async () => { if (await confirmar({ titulo: '¿Eliminar la petición?', mensaje: `"${p.descripcion}"`, textoAceptar: 'Eliminar', tono: 'peligro' })) accion(() => reservacionesApi.eliminarPeticion(id, p._id)); }} aria-label="Eliminar petición" title="Eliminar petición" className="flex h-[34px] w-[34px] items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                     </div>
                   )}
                 </div>
@@ -273,7 +281,7 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
                 <div className="flex items-center justify-between gap-2">
                   <span className={`text-sm font-medium ${d.estatus === 'No aplica' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{d.nombre}</span>
                   {operar && (
-                    <button onClick={() => { if (confirm(`¿Quitar "${d.nombre}" de la lista?`)) guardarDocs(f.documentos.filter((_, j) => j !== i)); }} aria-label={`Quitar ${d.nombre}`} title="Quitar" className="text-slate-300 hover:text-red-600"><X size={14} /></button>
+                    <button onClick={async () => { if (await confirmar({ titulo: `¿Quitar "${d.nombre}" de la lista?`, mensaje: 'Se quita del checklist de documentos de esta reservación.', textoAceptar: 'Quitar', tono: 'peligro' })) guardarDocs(f.documentos.filter((_, j) => j !== i)); }} aria-label={`Quitar ${d.nombre}`} title="Quitar" className="text-slate-300 hover:text-red-600"><X size={14} /></button>
                   )}
                 </div>
                 <div role="group" aria-label={`Estatus de ${d.nombre}`} className="flex flex-wrap gap-1">

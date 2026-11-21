@@ -13,6 +13,11 @@ router.use((req, res, next) => {
   next();
 });
 
+// El % de comisión que la agencia paga a cada agente es dato del Administrador:
+// los agentes (que sí consultan la lista de usuarios) y el superAdmin no lo ven.
+const OCULTAR_COMISION = '-porcentajeComision';
+const veComision = (req) => req.agente.rol === 'Administrador';
+
 // La empresa destino debe existir y estar activa.
 async function validarEmpresa(id) {
   const empresa = id && (await Empresa.findById(id).select('estatus'));
@@ -36,7 +41,7 @@ router.get('/', async (req, res, next) => {
     // agentes los da de alta y administra cada empresa.
     if (req.agente.rol === 'superAdmin') filtroBase.rol = 'Administrador';
     const orden = ordenDe(req, { nombre: { nombre: 1 } }, { createdAt: -1 });
-    res.json(await paginar(Agente, alcanceEmpresa(req, filtroBase), req, { orden, populate: [['empresa', 'nombreEmpresa']] }));
+    res.json(await paginar(Agente, alcanceEmpresa(req, filtroBase), req, { orden, populate: [['empresa', 'nombreEmpresa']], ...(veComision(req) ? {} : { select: OCULTAR_COMISION }) }));
   } catch (err) {
     next(err);
   }
@@ -44,7 +49,7 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const agente = await Agente.findById(req.params.id).populate('empresa', 'nombreEmpresa');
+    const agente = await Agente.findById(req.params.id).select(veComision(req) ? '' : OCULTAR_COMISION).populate('empresa', 'nombreEmpresa');
     if (!agente) return res.status(404).json({ error: 'Agente no encontrado' });
     if (!perteneceAlAlcance(agente, req) || (req.agente.rol === 'superAdmin' && agente.rol === 'Agente')) {
       return res.status(403).json({ error: 'No tienes permiso para ver este agente.' });
@@ -84,7 +89,8 @@ router.post('/', async (req, res, next) => {
   try {
     const { nombre, userId, rol, estatus, password, empresa } = req.body;
     const empresaFinal = await resolverEmpresaParaAlta(rol, empresa, req.agente);
-    const agente = await Agente.create({ nombre, userId, rol, estatus, password, empresa: empresaFinal });
+    const comision = veComision(req) && req.body.porcentajeComision !== undefined ? { porcentajeComision: req.body.porcentajeComision } : {};
+    const agente = await Agente.create({ nombre, userId, rol, estatus, password, empresa: empresaFinal, ...comision });
     await registrarEvento({
       entidad: 'Agente', entidadId: agente._id, empresa: empresaFinal, evento: 'alta',
       detalle: `${agente.nombre} (${agente.rol})`, usuario: usuarioDeLaSesion(req),
@@ -117,6 +123,9 @@ router.put('/:id', async (req, res, next) => {
     if (userId !== undefined) agente.userId = userId;
     if (estatus !== undefined) agente.estatus = estatus;
     if (password) agente.password = password;
+    // Solo el Administrador de la empresa fija el % que se le paga al agente.
+    const { porcentajeComision } = req.body;
+    if (porcentajeComision !== undefined && veComision(req)) agente.porcentajeComision = porcentajeComision;
 
     // Reestructurar rol/empresa es una operación sensible: solo el superAdmin
     // puede hacerlo, y se revalida la regla de "un administrador por empresa".
@@ -144,7 +153,7 @@ router.put('/:id', async (req, res, next) => {
     await agente.save();
     await registrarCambios({
       entidad: 'Agente', entidadId: agente._id, empresa: agente.empresa,
-      anterior, nuevo: { nombre, userId, rol, estatus, empresa }, usuario: usuarioDeLaSesion(req),
+      anterior, nuevo: { nombre, userId, rol, estatus, empresa, ...(veComision(req) ? { porcentajeComision } : {}) }, usuario: usuarioDeLaSesion(req),
     });
     if (password) {
       await registrarEvento({
