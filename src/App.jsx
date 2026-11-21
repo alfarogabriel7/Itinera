@@ -14,7 +14,7 @@ import Prospectos from './components/Prospectos';
 import Dashboard from './components/Dashboard';
 import MiPanel from './components/MiPanel';
 import Login from './components/Login';
-import { authApi, dashboardApi, empresasApi, pendientesApi, setUnauthorizedHandler } from './api';
+import { authApi, dashboardApi, empresasApi, pendientesApi, autorizacionesApi, setUnauthorizedHandler } from './api';
 import { obtenerSesion } from './utils/sesion';
 import { TEMA_PREDETERMINADO, normalizarTema } from '../database/catalogos/temas.js';
 import MasUSD from './components/common/MasUSD';
@@ -26,15 +26,21 @@ import isotipoBlanco from './assets/rutana-isotipo-blanco.svg';
 import {
   Users, Truck, Compass, DollarSign, ChevronDown, HandCoins, CalendarCheck, ClipboardList,
   Menu, X, LogOut, Users2, UserCog, Building2, UserPlus, Wallet, LayoutDashboard, Home, PanelLeftClose, PanelLeftOpen, BadgePercent,
+  Building, ShieldCheck,
 } from 'lucide-react';
+import MiAgencia from './components/MiAgencia';
+import Autorizaciones from './components/Autorizaciones';
 
 const NAV_ITEMS = [
   // Primera opción: los pendientes del usuario (vencidos, de hoy y próximos), con contador.
-  { key: 'midia', label: 'Mi día', icon: CalendarCheck, visible: (rol) => rol !== 'superAdmin', contador: true },
+  { key: 'midia', label: 'Mi día', icon: CalendarCheck, visible: (rol) => rol !== 'superAdmin', contador: 'pendientes' },
   // Carga de pendientes del equipo, vencidos y ventas sin próximo paso (solo Administrador).
   { key: 'equipo', label: 'Pendientes del equipo', icon: ClipboardList, visible: (rol) => rol === 'Administrador' },
   // Tablero de ventas: solo el Administrador (dueño) de cada empresa.
   { key: 'dashboard', label: 'Tablero de Ventas', icon: LayoutDashboard, visible: (rol) => rol === 'Administrador' },
+  // Datos, logo y parámetros de la empresa; y la bandeja de pagos por autorizar (con contador).
+  { key: 'miAgencia', label: 'Mi agencia', icon: Building, visible: (rol) => rol === 'Administrador' },
+  { key: 'autorizaciones', label: 'Autorizaciones', icon: ShieldCheck, visible: (rol) => rol === 'Administrador', contador: 'autorizaciones' },
   // Panel inicial con los pendientes del agente.
   { key: 'inicio', label: 'Mi Panel', icon: Home, visible: (rol) => rol === 'Agente' },
   // Prospectos antes que Clientes: sigue el orden del embudo (prospecto → cliente).
@@ -63,7 +69,7 @@ const TAB_INICIAL = { Administrador: 'midia', Agente: 'midia', superAdmin: 'empr
 const tabInicial = (rol) => TAB_INICIAL[rol] || 'inicio';
 
 // Pantallas que ocupan todo el ancho (sin el panel lateral de frase + resumen).
-const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio', 'midia', 'equipo', 'comisiones']);
+const PANTALLA_COMPLETA = new Set(['dashboard', 'inicio', 'midia', 'equipo', 'comisiones', 'miAgencia', 'autorizaciones']);
 
 const PAGE_TITLES = {
   dashboard: 'Panel de Control',
@@ -79,6 +85,9 @@ const PAGE_TITLES = {
   midia: 'Panel de Control',
   equipo: 'Panel de Control',
   agentes: 'Panel de Control',
+  comisiones: 'Panel de Control',
+  miAgencia: 'Panel de Control',
+  autorizaciones: 'Panel de Control',
 };
 
 function iniciales(nombre) {
@@ -219,6 +228,13 @@ export default function App() {
   // grupo de la empresa (ver el efecto del tema, arriba).
   // undefined = descargando (no se muestra nada para que no parpadee el de Rutana).
   const [logoEmpresa, setLogoEmpresa] = useState(undefined);
+  // "Mi agencia" avisa cuando el Administrador cambia o quita el logo.
+  const [versionLogo, setVersionLogo] = useState(0);
+  useEffect(() => {
+    const alCambiar = () => setVersionLogo(v => v + 1);
+    window.addEventListener('rutana:logo-actualizado', alCambiar);
+    return () => window.removeEventListener('rutana:logo-actualizado', alCambiar);
+  }, []);
   useEffect(() => {
     if (!auth?.empresa) { setLogoEmpresa(null); return undefined; }
     setLogoEmpresa(undefined);
@@ -235,7 +251,7 @@ export default function App() {
       cancelado = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [auth?.empresa]);
+  }, [auth?.empresa, versionLogo]);
 
   // Contador del menú "Mi día": pendientes vencidos + de hoy del usuario.
   const [pendientesUrgentes, setPendientesUrgentes] = useState(0);
@@ -246,6 +262,30 @@ export default function App() {
     if (!auth || auth.rol === 'superAdmin') { setPendientesUrgentes(0); return; }
     cargarPendientesUrgentes();
   }, [auth, activeTab]);
+
+  // Contador del menú "Autorizaciones": pagos esperando autorización (solo Administrador).
+  const [porAutorizar, setPorAutorizar] = useState(0);
+  const cargarPorAutorizar = () => {
+    autorizacionesApi.resumen().then(r => setPorAutorizar(r.total)).catch(() => {});
+  };
+  useEffect(() => {
+    if (auth?.rol !== 'Administrador') { setPorAutorizar(0); return; }
+    cargarPorAutorizar();
+  }, [auth, activeTab]);
+  const contadores = { pendientes: pendientesUrgentes, autorizaciones: porAutorizar };
+
+  // Desde el seguimiento de un pago por autorizar (Mi día): abrir Autorizaciones con ese pago.
+  const [autorizacionDe, setAutorizacionDe] = useState(null);
+  useEffect(() => {
+    const alPedir = (e) => {
+      setAutorizacionDe(e.detail || null);
+      setActiveTab('autorizaciones');
+      setSidebarOpen(false);
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener('rutana:ir-autorizacion', alPedir);
+    return () => window.removeEventListener('rutana:ir-autorizacion', alPedir);
+  }, []);
 
   // Reservación que Cobranza manda preseleccionada al abrir Registro de Pagos,
   // y la pestaña con la que abre ('cobros' o 'proveedores').
@@ -274,6 +314,7 @@ export default function App() {
     setActiveTab(key);
     setDiaDe('');
     setComisionesDe('');
+    setAutorizacionDe(null);
     setReservaParaAbonar('');
     setPestanaPagos('cobros');
     setClienteParaReservar(null);
@@ -343,8 +384,8 @@ export default function App() {
 
         <nav className={`flex-1 py-2 space-y-1 ${menuCompacto ? 'px-4 md:px-3' : 'px-4'}`}>
           {navItemsVisibles.map(({ key, label, icon: Icon, contador }) => {
-            const n = contador ? pendientesUrgentes : 0;
-            const etiqueta = n ? `${label} · ${n} vencido(s) o para hoy` : label;
+            const n = contador ? contadores[contador] : 0;
+            const etiqueta = !n ? label : contador === 'autorizaciones' ? `${label} · ${n} por autorizar` : `${label} · ${n} vencido(s) o para hoy`;
             return (
             <button
               key={key}
@@ -421,6 +462,10 @@ export default function App() {
             {activeTab === 'equipo' && auth.rol === 'Administrador' && <EquipoPendientes onVerDia={verDiaDe} onCambioPendientes={cargarPendientesUrgentes} />}
             {activeTab === 'agentes' && auth.rol !== 'Agente' && <Agentes onPagarComisiones={pagarComisionesDe} />}
             {activeTab === 'comisiones' && auth.rol === 'Administrador' && <PagoComisiones key={comisionesDe} agenteInicial={comisionesDe} />}
+            {activeTab === 'miAgencia' && auth.rol === 'Administrador' && <MiAgencia />}
+            {activeTab === 'autorizaciones' && auth.rol === 'Administrador' && (
+              <Autorizaciones key={autorizacionDe?.pago || 'todas'} pagoInicial={autorizacionDe} onCambio={() => { cargarPorAutorizar(); cargarPendientesUrgentes(); }} />
+            )}
           </main>
 
           {/* Right panel: promo + resumen */}

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { PagoProveedor, Reservacion, Cliente, Agente, Proveedor, registrarCambios, registrarEvento } from '../../database/index.js';
+import { PagoProveedor, Reservacion, Cliente, Agente, Proveedor, registrarCambios, registrarEvento, PAGO_CONTABLE } from '../../database/index.js';
+import { requiereAutorizacion, porAutorizarPorDetalle, crearSeguimientoAutorizacion, rechazarPago } from '../utils/autorizaciones.js';
 import {
   alcanceEmpresa, perteneceAlAlcance, sinSuperAdmin, filtroPorAgente, usuarioDeLaSesion, errorHttp, regexBusqueda,
 } from '../middleware/tenant.js';
@@ -18,7 +19,8 @@ const router = Router();
 
 router.use(sinSuperAdmin('El rol superAdmin no puede consultar ni registrar pagos de las empresas.'));
 
-const SOLO_APLICADOS = { estatus: { $ne: 'Cancelado' } };
+// Ni cancelados ni pendientes de autorizar.
+const SOLO_APLICADOS = PAGO_CONTABLE;
 const aCentavos = (n) => Math.round(Number(n || 0) * 100) / 100;
 
 // Lo pagado por renglón del detalle (solo pagos aplicados).
@@ -152,8 +154,9 @@ router.get('/pendientes', async (req, res, next) => {
 router.get('/reservacion/:idReservacion', async (req, res, next) => {
   try {
     const reservacion = await cargarReservacion(req, req.params.idReservacion);
-    const [pagado, pagos] = await Promise.all([
+    const [pagado, porAutorizar, pagos] = await Promise.all([
       pagadoPorDetalle(reservacion._id),
+      porAutorizarPorDetalle(reservacion._id),
       PagoProveedor.find({ idReservacion: reservacion._id, empresa: reservacion.empresa })
         .populate('agente', 'nombre userId')
         .populate('idProveedor', 'nombreProveedor')
@@ -170,6 +173,8 @@ router.get('/reservacion/:idReservacion', async (req, res, next) => {
         total,
         pagado: abonado,
         saldo: aCentavos(total - abonado),
+        // Pagos registrados que esperan autorización (todavía no restan al saldo).
+        porAutorizar: porAutorizar.get(String(d._id)) || 0,
       };
     });
     const suma = (campo) => aCentavos(detalles.reduce((acc, d) => acc + d[campo], 0));
@@ -179,7 +184,7 @@ router.get('/reservacion/:idReservacion', async (req, res, next) => {
       destino: reservacion.destino,
       estatusReservacion: reservacion.estatus,
       moneda: reservacion.moneda || 'MXN',
-      totales: { total: suma('total'), pagado: suma('pagado'), saldo: suma('saldo') },
+      totales: { total: suma('total'), pagado: suma('pagado'), saldo: suma('saldo'), porAutorizar: suma('porAutorizar') },
       detalles,
       pagos,
     });
@@ -221,8 +226,35 @@ router.post('/', async (req, res, next) => {
     if (!detalle) throw errorHttp(400, 'El servicio seleccionado no pertenece a esta reservación.');
 
     const pagado = (await pagadoPorDetalle(reservacion._id)).get(String(detalle._id)) || 0;
-    const saldo = aCentavos(detalle.totalReservacion - pagado);
-    if (monto > saldo) throw errorHttp(400, `El monto excede el saldo pendiente con el proveedor ($${saldo.toFixed(2)}).`);
+    // Lo registrado que espera autorización también ocupa saldo.
+    const porAutorizar = (await porAutorizarPorDetalle(reservacion._id)).get(String(detalle._id)) || 0;
+    const saldo = aCentavos(detalle.totalReservacion - pagado - porAutorizar);
+    if (monto > saldo) {
+      throw errorHttp(400, porAutorizar > 0
+        ? `El monto excede el saldo pendiente con el proveedor ($${saldo.toFixed(2)}; hay $${porAutorizar.toFixed(2)} en pagos por autorizar).`
+        : `El monto excede el saldo pendiente con el proveedor ($${saldo.toFixed(2)}).`);
+    }
+
+    // La empresa pide autorizar los pagos a proveedores que registran los agentes.
+    if (await requiereAutorizacion(req, 'proveedor')) {
+      const pendiente = await PagoProveedor.create({
+        empresa: reservacion.empresa, idReservacion: reservacion._id, idDetalle: detalle._id,
+        idProveedor: detalle.idProveedor._id, monto, moneda: reservacion.moneda || 'MXN',
+        formaPago, referencia, fecha, agente: req.agente.id, estatus: 'Pendiente',
+      });
+      await registrarEvento({
+        entidad: 'PagoProveedor', entidadId: pendiente._id, empresa: pendiente.empresa, evento: 'pago a proveedor por autorizar',
+        detalle: `$${monto.toFixed(2)} ${pendiente.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · ${detalle.idProveedor.nombreProveedor} (${detalle.claveReservacion}) · reservación ${reservacion._id} (${reservacion.destino})`,
+        usuario: usuarioDeLaSesion(req),
+      });
+      await crearSeguimientoAutorizacion({
+        tipo: 'proveedor', pago: pendiente, reservacion, capturista: req.agente, proveedor: detalle.idProveedor.nombreProveedor,
+      }).catch((err) => console.error('No se pudo crear el seguimiento de autorización:', err.message));
+      return res.status(201).json(await pendiente.populate([
+        { path: 'agente', select: 'nombre userId' },
+        { path: 'idProveedor', select: 'nombreProveedor' },
+      ]));
+    }
 
     // Aplicación atómica sobre el renglón del servicio: el acumulado solo sube si
     // con este pago no se rebasa lo que se le debe al proveedor (protege contra
@@ -293,12 +325,14 @@ router.patch('/:id/cancelar', async (req, res, next) => {
     if (!pago) throw errorHttp(404, 'Pago no encontrado');
     if (!perteneceAlAlcance(pago, req)) throw errorHttp(403, 'No tienes permiso para cancelar este pago.');
     if (pago.estatus === 'Cancelado') throw errorHttp(400, 'Este pago ya estaba cancelado.');
+    // Uno que espera autorización nunca se aplicó: cancelarlo es rechazarlo.
+    if (pago.estatus === 'Pendiente') return res.json(await rechazarPago(req, 'proveedor', pago._id, motivo));
 
     const usuario = usuarioDeLaSesion(req);
     const anterior = { estatus: pago.estatus, motivoCancelacion: pago.motivoCancelacion };
     // Atómico: solo cancela si sigue aplicado (evita restar dos veces el acumulado).
     const cancelado = await PagoProveedor.findOneAndUpdate(
-      { _id: pago._id, estatus: { $ne: 'Cancelado' } },
+      { _id: pago._id, ...PAGO_CONTABLE },
       { $set: { estatus: 'Cancelado', motivoCancelacion: motivo, fechaCancelacion: new Date(), canceladoPor: usuario } },
       { returnDocument: 'after' }
     );

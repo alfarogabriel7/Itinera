@@ -35,7 +35,14 @@ const PagoProveedorSchema = new Schema(
       fechaSubida: Date,
     },
     // Igual que los cobros: nunca se borran; el Administrador los cancela.
-    estatus: { type: String, enum: ['Aplicado', 'Cancelado'], default: 'Aplicado' },
+    // 'Pendiente': esperando autorización del Administrador (no cuenta para el saldo).
+    estatus: { type: String, enum: ['Aplicado', 'Pendiente', 'Cancelado'], default: 'Aplicado' },
+    autorizadoPor: {
+      id: { type: Schema.Types.ObjectId, ref: 'Agente' },
+      userId: String,
+      nombre: String,
+    },
+    fechaAutorizacion: { type: Date },
     motivoCancelacion: { type: String, trim: true, maxlength: 300 },
     fechaCancelacion: { type: Date },
     canceladoPor: {
@@ -50,5 +57,6 @@ const PagoProveedorSchema = new Schema(
 PagoProveedorSchema.index({ idReservacion: 1, idDetalle: 1, estatus: 1 });
 PagoProveedorSchema.index({ empresa: 1, fecha: -1 });
 PagoProveedorSchema.index({ empresa: 1, idProveedor: 1, fecha: -1 });
+PagoProveedorSchema.index({ empresa: 1, estatus: 1, createdAt: 1 }, { partialFilterExpression: { estatus: 'Pendiente' } });
 
 export default mongoose.model('PagoProveedor', PagoProveedorSchema, 'pagosproveedores');

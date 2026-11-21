@@ -97,6 +97,8 @@ function aFila(p) {
     completadoEn: p.completadoEn || null,
     pospuesto: p.pospuesto || 0,
     automatico: Boolean(p.automatico?.regla),
+    // Seguimiento de un pago por autorizar: la pantalla ofrece ir a Autorizaciones.
+    autorizacion: p.autorizacion?.pago ? { tipo: p.autorizacion.tipo, pago: p.autorizacion.pago } : null,
     agente: p.agente ? { id: p.agente._id, nombre: p.agente.nombre } : null,
     prospecto: p.prospecto ? { id: p.prospecto._id, nombre: p.prospecto.nombreCompleto, estatus: p.prospecto.estatus } : null,
     cliente: p.cliente ? { id: p.cliente._id, nombre: p.cliente.nombreCompleto } : null,

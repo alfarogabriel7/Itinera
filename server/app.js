@@ -15,6 +15,8 @@ import pagosProveedorRouter from './routes/pagosProveedor.routes.js';
 import pendientesRouter from './routes/pendientes.routes.js';
 import comisionesRouter from './routes/comisiones.routes.js';
 import fichaReservacionRouter from './routes/fichaReservacion.routes.js';
+import miAgenciaRouter from './routes/miAgencia.routes.js';
+import autorizacionesRouter from './routes/autorizaciones.routes.js';
 import authRouter from './routes/auth.routes.js';
 import { requireAuth } from './middleware/auth.js';
 
@@ -79,6 +81,8 @@ app.use('/api/bitacora', bitacoraRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/pendientes', pendientesRouter);
 app.use('/api/comisiones', comisionesRouter); // pago de comisiones a agentes (solo Administrador)
+app.use('/api/mi-agencia', miAgenciaRouter); // datos, logo y parámetros de la empresa (solo Administrador)
+app.use('/api/autorizaciones', autorizacionesRouter); // pagos por autorizar (solo Administrador)
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 

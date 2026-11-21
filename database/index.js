@@ -14,4 +14,4 @@ export { default as IntentoLogin } from './models/IntentoLogin.js';
 export { default as Pendiente } from './models/Pendiente.js';
 export { default as PendienteAutomatico } from './models/PendienteAutomatico.js';
 export { registrarCambios, registrarEvento } from './utils/bitacora.js';
-export { recalcularSaldos } from './utils/saldos.js';
+export { recalcularSaldos, PAGO_CONTABLE } from './utils/saldos.js';

@@ -8,6 +8,8 @@ export const TIPOS_PENDIENTE = {
   peticion: { nombre: 'Petición del cliente', color: '#C2410C', fondo: '#FDEDE4' },
   proveedor: { nombre: 'Proveedor', color: '#0F766E', fondo: '#E1F3F1' },
   viaje: { nombre: 'Viaje', color: '#4B5563', fondo: '#ECEEF1' },
+  // Lo crea Rutana cuando un Agente registra un pago que requiere autorización.
+  autorizacion: { nombre: 'Autorización', color: '#B45309', fondo: '#FEF3C7' },
   otro: { nombre: 'Seguimiento', color: '#334155', fondo: '#F1F5F9' },
 };
 

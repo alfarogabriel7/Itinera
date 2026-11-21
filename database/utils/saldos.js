@@ -10,6 +10,11 @@ import PagoProveedor from '../models/PagoProveedor.js';
 // Los documentos Pago / PagoProveedor siguen siendo la fuente de verdad; esta
 // función recalcula los acumulados a partir de ellos (migración, seed, o para
 // reconciliar si alguna vez un proceso se interrumpe entre el $inc y el alta).
+// Pagos que cuentan para saldos, ventas y reportes: ni cancelados ni pendientes
+// de autorizar. Se usa $nin (y no 'Aplicado') para que los pagos anteriores al
+// campo estatus sigan contando.
+export const PAGO_CONTABLE = { estatus: { $nin: ['Cancelado', 'Pendiente'] } };
+
 export async function recalcularSaldos(filtroReservaciones = {}) {
   const reservaciones = await Reservacion.find(filtroReservaciones).select('_id detalleReservacion._id').lean();
   if (reservaciones.length === 0) return 0;
@@ -17,11 +22,11 @@ export async function recalcularSaldos(filtroReservaciones = {}) {
 
   const [cobros, pagosProv] = await Promise.all([
     Pago.aggregate([
-      { $match: { idReservacion: { $in: ids }, estatus: { $ne: 'Cancelado' } } },
+      { $match: { idReservacion: { $in: ids }, ...PAGO_CONTABLE } },
       { $group: { _id: '$idReservacion', total: { $sum: '$monto' } } },
     ]),
     PagoProveedor.aggregate([
-      { $match: { idReservacion: { $in: ids }, estatus: { $ne: 'Cancelado' } } },
+      { $match: { idReservacion: { $in: ids }, ...PAGO_CONTABLE } },
       { $group: { _id: '$idDetalle', total: { $sum: '$monto' } } },
     ]),
   ]);
