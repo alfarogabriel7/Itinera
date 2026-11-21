@@ -7,6 +7,13 @@ import { Truck, Plus, X, Save, Search, Eye, Pencil, Trash2 } from 'lucide-react'
 import { obtenerSesion } from '../utils/sesion';
 import { telefono, cuentaBancaria } from '../utils/formato';
 import FichaDetalle from './common/FichaDetalle';
+import ListadoAdaptable from './common/ListadoAdaptable';
+
+const estatusProveedor = (p) => (
+  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+    {p.estatus}
+  </span>
+);
 import { soloTelefono, soloNumeros } from '../utils/validadores';
 import { limpiar as limpiarMonto } from './common/CampoMonto';
 import { avisarExito, avisarError } from '../utils/avisos';
@@ -200,35 +207,27 @@ export default function Proveedores() {
             <SelectorPorPagina listado={listado} />
           </div>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Proveedor</th>
-                <th className="p-3 font-semibold">Teléfono</th>
-                <th className="p-3 font-semibold">Cuenta Principal</th>
-                <th className="p-3 font-semibold text-right">% Comisión</th>
-                <th className="p-3 font-semibold">Estatus</th>
-                <th className="p-3 font-semibold text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {listado.cargando && listado.datos.length === 0 && (
-                <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">Cargando proveedores...</td></tr>
-              )}
-              {listado.datos.map(p => (
-                <tr key={p._id} className="text-sm hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-700">{p.nombreProveedor}</td>
-                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(p.telefono1)}</td>
-                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{cuentaBancaria(p.numeroCuenta1)}</td>
-                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums text-right">{porcentajeVisible(p)}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                      {p.estatus}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
+        <ListadoAdaptable
+          filas={listado.datos}
+          cargando={listado.cargando && listado.datos.length === 0} textoCargando="Cargando proveedores..."
+          vacio={!listado.cargando && listado.total === 0} textoVacio="No se encontraron proveedores."
+          columnas={[
+            { titulo: 'Proveedor', celda: p => <span className="font-medium text-slate-700">{p.nombreProveedor}</span> },
+            { titulo: 'Teléfono', className: 'whitespace-nowrap tabular-nums', celda: p => telefono(p.telefono1) },
+            { titulo: 'Cuenta principal', className: 'whitespace-nowrap tabular-nums', celda: p => cuentaBancaria(p.numeroCuenta1) },
+            { titulo: '% Comisión', className: 'whitespace-nowrap tabular-nums text-right', celda: p => porcentajeVisible(p) },
+            { titulo: 'Estatus', celda: p => estatusProveedor(p) },
+          ]}
+          tarjeta={p => ({
+            titulo: p.nombreProveedor, estatus: estatusProveedor(p),
+            campos: [
+              { etiqueta: 'Teléfono', valor: telefono(p.telefono1) },
+              { etiqueta: 'Cuenta principal', valor: cuentaBancaria(p.numeroCuenta1) },
+              { etiqueta: '% Comisión', valor: porcentajeVisible(p) },
+            ],
+          })}
+          acciones={p => (
+                    <>
                       <button onClick={() => handleVer(p)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
@@ -240,16 +239,8 @@ export default function Proveedores() {
                           <Trash2 size={14} />
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!listado.cargando && listado.total === 0 && (
-                <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-sm">No se encontraron proveedores.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </>
+          )} />
 
         <Paginacion listado={listado} etiqueta="proveedores" />
       </div>

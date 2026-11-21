@@ -45,6 +45,17 @@ function redondearDetalle(detalle) {
     if (!d || typeof d !== 'object') return d;
     const limpio = { ...d };
     for (const campo of CAMPOS_MONTO_DETALLE) if (limpio[campo] !== undefined && limpio[campo] !== '') limpio[campo] = aCentavos(limpio[campo]);
+    // Extras: solo los campos que captura la pantalla; comisión y total los recalcula el modelo.
+    if (Array.isArray(limpio.extras)) {
+      limpio.extras = limpio.extras.map((x) => ({
+        ...(x?._id ? { _id: x._id } : {}),
+        descripcion: x?.descripcion,
+        monto: aCentavos(x?.monto),
+        comisionable: Boolean(x?.comisionable),
+        porcentaje: Number(x?.porcentaje) || 0,
+        montoComisionable: aCentavos(x?.montoComisionable),
+      }));
+    }
     return limpio;
   });
 }

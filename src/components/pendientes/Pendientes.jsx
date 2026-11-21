@@ -85,7 +85,7 @@ export function FilaPendiente({ p, hoy, onCambio, mostrarResponsable = false, co
           <ChipTipo tipo={p.tipo} />
           {p.automatico && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-1.5 py-0.5 text-2xs font-semibold text-slate-500"
-              title="Lo creó Itinera automáticamente; se cierra solo cuando se resuelve (cobro, pago a proveedor, documentos)">
+              title="Lo creó Rutana automáticamente; se cierra solo cuando se resuelve (cobro, pago a proveedor, documentos)">
               <Sparkles size={11} aria-hidden="true" /> Automático
             </span>
           )}

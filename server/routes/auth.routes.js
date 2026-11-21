@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Agente, Empresa, IntentoLogin } from '../../database/index.js';
 import { signToken, revokeToken } from '../middleware/auth.js';
-import { TEMA_PREDETERMINADO } from '../../database/catalogos/temas.js';
+import { TEMA_PREDETERMINADO, normalizarTema } from '../../database/catalogos/temas.js';
 
 const router = Router();
 
@@ -55,14 +55,14 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Este usuario está dado de baja. Contacta a un administrador.' });
     }
     // Tema de colores de la app: el del grupo de su empresa. El superAdmin no
-    // pertenece a ninguna empresa y siempre ve Itinera.
+    // pertenece a ninguna empresa y siempre ve Rutana.
     let tema = TEMA_PREDETERMINADO;
     if (agente.rol !== 'superAdmin') {
       const empresa = await Empresa.findById(agente.empresa).select('estatus tema');
       if (!empresa || empresa.estatus !== 'Activo') {
         return res.status(403).json({ error: 'La empresa de este usuario no está activa. Contacta al administrador de la plataforma.' });
       }
-      tema = empresa.tema || TEMA_PREDETERMINADO;
+      tema = normalizarTema(empresa.tema);
     }
 
     // Inicio de sesión correcto: se limpian los intentos de este usuario en este equipo.

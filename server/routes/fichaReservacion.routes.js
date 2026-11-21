@@ -73,16 +73,28 @@ router.get('/:id/ficha', async (req, res, next) => {
     const bitacora = await Bitacora.find({ empresa: r.empresa, entidadId: { $in: [r._id, ...idsPagos, ...idsPagosProv, ...idsPendientes] } })
       .sort({ fecha: -1 }).limit(80).lean();
 
-    const servicios = r.detalleReservacion.map((d) => ({
-      _id: d._id,
-      proveedor: d.idProveedor?.nombreProveedor || 'Proveedor',
-      clave: d.claveReservacion,
-      montoBase: aCentavos(d.montoReservacion),
-      comision: aCentavos(d.montoComisionable),
-      total: aCentavos(d.totalReservacion),
-      pagado: aCentavos(d.pagado),
-      saldo: aCentavos(d.totalReservacion - (d.pagado || 0)),
-    }));
+    // Base y comisión incluyen los extras, para que siempre cuadre: A pagar = Base - Comisión.
+    const servicios = r.detalleReservacion.map((d) => {
+      const extras = (d.extras || []).map((x) => ({
+        descripcion: x.descripcion,
+        monto: aCentavos(x.monto),
+        comisionable: Boolean(x.comisionable),
+        porcentaje: x.porcentaje || 0,
+        comision: aCentavos(x.montoComisionable),
+        total: aCentavos(x.total),
+      }));
+      return {
+        _id: d._id,
+        proveedor: d.idProveedor?.nombreProveedor || 'Proveedor',
+        clave: d.claveReservacion,
+        montoBase: aCentavos(d.montoReservacion + extras.reduce((a, x) => a + x.monto, 0)),
+        comision: aCentavos(d.montoComisionable + extras.reduce((a, x) => a + x.comision, 0)),
+        total: aCentavos(d.totalReservacion),
+        pagado: aCentavos(d.pagado),
+        saldo: aCentavos(d.totalReservacion - (d.pagado || 0)),
+        extras,
+      };
+    });
     const suma = (c) => aCentavos(servicios.reduce((a, s) => a + s[c], 0));
     const esMio = idDe(r.agente) === String(req.agente.id);
     const activa = r.estatus === 'Activa';

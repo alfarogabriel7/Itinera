@@ -8,6 +8,13 @@ import { soloLetras, soloTelefono, soloCorreo, soloDireccion } from '../utils/va
 import { obtenerSesion } from '../utils/sesion';
 import { telefono, fechaViaje } from '../utils/formato';
 import FichaDetalle from './common/FichaDetalle';
+import ListadoAdaptable from './common/ListadoAdaptable';
+
+const estatusCliente = (c) => (
+  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+    {c.estatus}
+  </span>
+);
 import { SelectorFecha } from './common/Calendario';
 import { PendientesDeRegistro } from './pendientes/Pendientes';
 import NotasSeguimiento, { notasDesdeServidor, notasParaServidor } from './common/NotasSeguimiento';
@@ -35,7 +42,6 @@ export default function Clientes({ onGenerarReservacion }) {
   // el Administrador asigna/reasigna el agente responsable.
   const esAdministrador = sesion?.rol === 'Administrador';
   const [agentes, setAgentes] = useState([]);
-  const columnas = 7;
 
   // Los agentes de una empresa son pocos: una sola página de 100 basta para el filtro y el selector.
   useEffect(() => {
@@ -324,37 +330,28 @@ export default function Clientes({ onGenerarReservacion }) {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Nombre</th>
-                <th className="p-3 font-semibold">Correo electrónico</th>
-                <th className="p-3 font-semibold">Teléfono</th>
-                <th className="p-3 font-semibold">Ciudad</th>
-                <th className="p-3 font-semibold">Agente responsable</th>
-                <th className="p-3 font-semibold">Estatus</th>
-                <th className="p-3 font-semibold text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {listado.cargando && listado.datos.length === 0 && (
-                <tr><td colSpan={columnas} className="p-6 text-center text-slate-400 text-sm">Cargando clientes...</td></tr>
-              )}
-              {listado.datos.map(c => (
-                <tr key={c._id} className="text-sm hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-700">{c.nombreCompleto}</td>
-                  <td className="p-3 text-slate-600">{c.correo}</td>
-                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(c.telefono)}</td>
-                  <td className="p-3 text-slate-600">{c.ciudad}</td>
-                  <td className="p-3 text-slate-600">{c.agente?.nombre || '—'}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.estatus === 'Activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                      {c.estatus}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
+        <ListadoAdaptable
+          filas={listado.datos}
+          cargando={listado.cargando && listado.datos.length === 0} textoCargando="Cargando clientes..."
+          vacio={!listado.cargando && listado.total === 0} textoVacio="No se encontraron clientes."
+          columnas={[
+            { titulo: 'Cliente', celda: c => <><div className="font-medium text-slate-700">{c.nombreCompleto}</div>{c.correo && <div className="text-xs text-slate-500 break-all">{c.correo}</div>}</> },
+            { titulo: 'Teléfono', className: 'whitespace-nowrap tabular-nums', celda: c => telefono(c.telefono) },
+            { titulo: 'Ciudad', celda: c => c.ciudad },
+            { titulo: 'Agente responsable', celda: c => c.agente?.nombre || '—' },
+            { titulo: 'Estatus', celda: c => estatusCliente(c) },
+          ]}
+          tarjeta={c => ({
+            titulo: c.nombreCompleto, estatus: estatusCliente(c),
+            campos: [
+              { etiqueta: 'Teléfono', valor: telefono(c.telefono) },
+              { etiqueta: 'Correo', valor: c.correo },
+              { etiqueta: 'Ciudad', valor: c.ciudad },
+              { etiqueta: 'Agente responsable', valor: c.agente?.nombre },
+            ],
+          })}
+          acciones={c => (
+                    <>
                       <button onClick={() => handleVer(c)} title="Ver" className="w-8 h-8 rounded-full bg-brand-petroleo hover:bg-brand-noche text-white flex items-center justify-center">
                         <Eye size={14} />
                       </button>
@@ -372,18 +369,8 @@ export default function Clientes({ onGenerarReservacion }) {
                           <Trash2 size={14} />
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!listado.cargando && listado.total === 0 && (
-                <tr>
-                  <td colSpan={columnas} className="p-6 text-center text-slate-400 text-sm">No se encontraron clientes.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </>
+          )} />
 
         <Paginacion listado={listado} etiqueta="clientes" />
       </div>

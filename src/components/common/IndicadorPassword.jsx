@@ -14,7 +14,7 @@ const PATRONES_DEBILES = [
   /(.)\1\1/, // el mismo carácter 3 veces seguidas: "aaa", "111"
   /(012|123|234|345|456|567|678|789|890)/,
   /(abc|bcd|cde|def|qwe|wer|asd|sdf|zxc)/i,
-  /(password|contrase|admin|qwerty|itinera|viaje|agencia|12345)/i,
+  /(password|contrase|admin|qwerty|itinera|rutana|viaje|agencia|12345)/i,
 ];
 
 const NIVELES = [

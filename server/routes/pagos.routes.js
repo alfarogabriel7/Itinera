@@ -8,6 +8,11 @@ import { completarTerminadas, reactivarSiTieneSaldo } from '../utils/estatusRese
 import { filtroCartera } from '../utils/cartera.js';
 import { paginar, leerPaginacion, sobre } from '../utils/paginacion.js';
 import { rutasComprobante } from '../utils/comprobantes.js';
+import { refrescarCobroAutomatico } from '../utils/pendientesAutomaticos.js';
+
+// El pendiente automático de cobro es secundario: si falla, el abono ya quedó.
+const refrescarCobro = (idReservacion) =>
+  refrescarCobroAutomatico(idReservacion).catch((err) => console.error('No se pudo refrescar el pendiente de cobro:', err.message));
 
 const router = Router();
 
@@ -299,6 +304,7 @@ router.post('/', async (req, res, next) => {
       detalle: `$${monto.toFixed(2)} ${pago.moneda} · pagado el ${fechaCortaMx(fecha)} ·${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
       usuario: usuarioDeLaSesion(req),
     });
+    await refrescarCobro(reservacion._id);
     res.status(201).json(await pago.populate('agente', 'nombre userId'));
   } catch (err) {
     next(err);
@@ -339,6 +345,7 @@ router.patch('/:id/cancelar', async (req, res, next) => {
     await Reservacion.updateOne({ _id: pago.idReservacion }, { $inc: { abonado: -pago.monto, __v: 1 } });
     // Si ya estaba completada, vuelve a tener saldo: regresa a Activa.
     await reactivarSiTieneSaldo(pago.idReservacion, usuario);
+    await refrescarCobro(pago.idReservacion);
 
     await registrarCambios({
       entidad: 'Pago',

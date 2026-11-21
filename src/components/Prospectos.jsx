@@ -3,6 +3,9 @@ import { prospectosApi, agentesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
 import { telefono, fechaViaje } from '../utils/formato';
 import FichaDetalle from './common/FichaDetalle';
+import ListadoAdaptable from './common/ListadoAdaptable';
+
+const fechaRegistro = (p) => (p.fechaRegistro ? new Date(p.fechaRegistro).toLocaleDateString('es-MX') : '—');
 import PageHeader from './common/PageHeader';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
@@ -322,33 +325,28 @@ export default function Prospectos() {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-noche text-white text-sm">
-                <th className="p-3 font-semibold">Nombre</th>
-                <th className="p-3 font-semibold">Correo</th>
-                <th className="p-3 font-semibold">Teléfono</th>
-                <th className="p-3 font-semibold">Ciudad</th>
-                <th className="p-3 font-semibold">Agente</th>
-                <th className="p-3 font-semibold">Fecha Registro</th>
-                <th className="p-3 font-semibold text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {listado.cargando && listado.datos.length === 0 && (
-                <tr><td colSpan={7} className="p-6 text-center text-slate-400 text-sm">Cargando prospectos...</td></tr>
-              )}
-              {listado.datos.map(p => (
-                <tr key={p._id} className="text-sm hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-700">{p.nombreCompleto}</td>
-                  <td className="p-3 text-slate-600">{p.correo}</td>
-                  <td className="p-3 text-slate-600 whitespace-nowrap tabular-nums">{telefono(p.telefono)}</td>
-                  <td className="p-3 text-slate-600">{p.ciudad}</td>
-                  <td className="p-3 text-slate-600">{p.agente?.nombre || '—'}</td>
-                  <td className="p-3 text-slate-600">{new Date(p.fechaRegistro).toLocaleDateString('es-MX')}</td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
+        <ListadoAdaptable
+          filas={listado.datos}
+          cargando={listado.cargando && listado.datos.length === 0} textoCargando="Cargando prospectos..."
+          vacio={!listado.cargando && listado.total === 0} textoVacio="No se encontraron prospectos."
+          columnas={[
+            { titulo: 'Prospecto', celda: p => <><div className="font-medium text-slate-700">{p.nombreCompleto}</div>{p.correo && <div className="text-xs text-slate-500 break-all">{p.correo}</div>}</> },
+            { titulo: 'Teléfono', className: 'whitespace-nowrap tabular-nums', celda: p => telefono(p.telefono) },
+            { titulo: 'Ciudad', celda: p => p.ciudad },
+            { titulo: 'Agente', celda: p => p.agente?.nombre || '—' },
+            { titulo: 'Registro', className: 'whitespace-nowrap', celda: p => fechaRegistro(p) },
+          ]}
+          tarjeta={p => ({
+            titulo: p.nombreCompleto, subtitulo: `Registrado el ${fechaRegistro(p)}`,
+            campos: [
+              { etiqueta: 'Teléfono', valor: telefono(p.telefono) },
+              { etiqueta: 'Correo', valor: p.correo },
+              { etiqueta: 'Ciudad', valor: p.ciudad },
+              { etiqueta: 'Agente', valor: p.agente?.nombre },
+            ],
+          })}
+          acciones={p => (
+                    <>
                       {puedeGestionar(p) ? (
                         <>
                           <button onClick={() => handleEditar(p)} title="Editar" className="w-8 h-8 rounded-full bg-brand-coralClaro hover:brightness-95 text-brand-noche flex items-center justify-center">
@@ -363,18 +361,8 @@ export default function Prospectos() {
                           <Eye size={14} />
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!listado.cargando && listado.total === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-6 text-center text-slate-400 text-sm">No se encontraron prospectos.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </>
+          )} />
 
         <Paginacion listado={listado} etiqueta="prospectos" />
       </div>

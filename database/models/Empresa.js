@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { NOMBRES_ESTADOS } from '../catalogos/estados.js';
-import { CLAVES_TEMAS, TEMA_PREDETERMINADO } from '../catalogos/temas.js';
+import { CLAVES_TEMAS, TEMA_PREDETERMINADO, normalizarTema } from '../catalogos/temas.js';
 
 const EmpresaSchema = new mongoose.Schema(
   {
@@ -29,7 +29,8 @@ const EmpresaSchema = new mongoose.Schema(
     estatus: { type: String, enum: ['Activo', 'Baja'], default: 'Activo' },
     // Grupo al que pertenece la empresa: define los colores de la app para sus
     // usuarios (catálogo en database/catalogos/temas.js).
-    tema: { type: String, enum: { values: CLAVES_TEMAS, message: 'Grupo inválido' }, default: TEMA_PREDETERMINADO },
+    // 'itinera' (nombre anterior de la plataforma) se convierte al predeterminado al guardar.
+    tema: { type: String, enum: { values: CLAVES_TEMAS, message: 'Grupo inválido' }, default: TEMA_PREDETERMINADO, set: normalizarTema },
     // Logo que se imprime en los recibos al cliente. Se guarda en Mongo (en Vercel
     // no hay disco persistente); los bytes no se cargan salvo que se pidan con
     // .select('+logo.datos'), así listar empresas no arrastra las imágenes.
@@ -44,5 +45,11 @@ const EmpresaSchema = new mongoose.Schema(
 );
 
 EmpresaSchema.index({ nombreEmpresa: 'text', rfc: 'text' });
+
+// Empresas guardadas con el tema 'itinera' (nombre anterior): al leerlas el
+// setter no corre, así que se corrige antes de validar para que puedan guardarse.
+EmpresaSchema.pre('validate', function () {
+  if (this.tema === 'itinera') this.tema = TEMA_PREDETERMINADO;
+});
 
 export default mongoose.model('Empresa', EmpresaSchema);

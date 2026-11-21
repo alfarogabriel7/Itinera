@@ -340,7 +340,8 @@ router.get('/proveedores', async (req, res, next) => {
           reservaciones: { $addToSet: '$_id' },
           servicios: { $sum: 1 },
           totalPagar: { $sum: '$detalleReservacion.totalReservacion' },
-          comision: { $sum: '$detalleReservacion.montoComisionable' },
+          // Comisión del servicio + la de sus extras comisionables.
+          comision: { $sum: { $add: [{ $ifNull: ['$detalleReservacion.montoComisionable', 0] }, { $sum: '$detalleReservacion.extras.montoComisionable' }] } },
           pagado: { $sum: { $ifNull: ['$detalleReservacion.pagado', 0] } },
         },
       },

@@ -240,6 +240,22 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
                         </div>
                       ))}
                     </dl>
+                    {s.extras?.length > 0 && (
+                      <ul className="mt-2 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                        <li className="text-2xs font-semibold uppercase tracking-wide text-slate-400">Incluye extras</li>
+                        {s.extras.map((x, i) => (
+                          <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                            <span className="text-slate-600 break-words">
+                              {x.descripcion} <span className="text-slate-400">· {dinero(x.monto)}</span>
+                              {x.comisionable
+                                ? <span className="ml-1 text-emerald-700">· comisión {dinero(x.comision)}{x.porcentaje > 0 ? ` (${x.porcentaje} %)` : ''}</span>
+                                : <span className="ml-1 text-slate-400">· sin comisión</span>}
+                            </span>
+                            <span className="font-medium text-slate-700">{dinero(x.total)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 );
               })}
