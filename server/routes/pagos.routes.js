@@ -284,7 +284,7 @@ router.post('/', async (req, res, next) => {
       });
       await registrarEvento({
         entidad: 'Pago', entidadId: pendiente._id, empresa: pendiente.empresa, evento: 'abono del cliente por autorizar',
-        detalle: `$${monto.toFixed(2)} ${pendiente.moneda} · pagado el ${fechaCortaMx(fecha)} ·${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
+        detalle: `$${monto.toFixed(2)} ${pendiente.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · viaje a ${reservacion.destino}`,
         usuario: usuarioDeLaSesion(req),
       });
       await crearSeguimientoAutorizacion({ tipo: 'cliente', pago: pendiente, reservacion, capturista: req.agente })
@@ -328,7 +328,7 @@ router.post('/', async (req, res, next) => {
     }
     await registrarEvento({
       entidad: 'Pago', entidadId: pago._id, empresa: pago.empresa, evento: 'abono del cliente',
-      detalle: `$${monto.toFixed(2)} ${pago.moneda} · pagado el ${fechaCortaMx(fecha)} ·${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · reservación ${reservacion._id} (${reservacion.destino})`,
+      detalle: `$${monto.toFixed(2)} ${pago.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · viaje a ${reservacion.destino}`,
       usuario: usuarioDeLaSesion(req),
     });
     await refrescarCobro(reservacion._id);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { Bitacora } from '../../database/index.js';
+import { Bitacora, textoBitacora } from '../../database/index.js';
 import { alcanceEmpresa, errorHttp } from '../middleware/tenant.js';
 import { paginar } from '../utils/paginacion.js';
 
@@ -22,7 +22,12 @@ router.get('/', async (req, res, next) => {
       if (!mongoose.isValidObjectId(entidadId)) throw errorHttp(400, 'entidadId inválido.');
       filtroBase.entidadId = entidadId;
     }
-    res.json(await paginar(Bitacora, alcanceEmpresa(req, filtroBase), req, { orden: { fecha: -1 } }));
+    const pagina = await paginar(Bitacora, alcanceEmpresa(req, filtroBase), req, { orden: { fecha: -1 } });
+    pagina.datos = pagina.datos.map((b) => {
+      const plano = b.toObject ? b.toObject() : b;
+      return { ...plano, valorAnterior: textoBitacora(plano.valorAnterior), valorNuevo: textoBitacora(plano.valorNuevo) };
+    });
+    res.json(pagina);
   } catch (err) {
     next(err);
   }

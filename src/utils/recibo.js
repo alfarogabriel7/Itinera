@@ -109,9 +109,19 @@ function abrirVentana(texto) {
 // Estado de cuenta del cliente para una reservación: datos del viaje, abonos
 // aplicados (con el saldo después de cada uno), total, abonado y saldo.
 // Los abonos cancelados y los que esperan autorización no se incluyen.
-export async function imprimirEstadoCuenta(resumen) {
+//   datos: el resumen (GET /api/pagos/resumen/:id) o una promesa que lo entrega;
+//   la ventana se abre antes de esperarla para que el navegador no la bloquee.
+export async function imprimirEstadoCuenta(datos) {
   const ventana = abrirVentana('Generando estado de cuenta…');
   if (!ventana) return;
+  let resumen;
+  try {
+    resumen = await datos;
+  } catch (err) {
+    ventana.close();
+    avisarError(err.message);
+    return;
+  }
   const logo = await logoComoDataUrl(resumen.empresa);
   const e = resumen.empresa || {};
   const { paleta, contacto } = datosEmpresa(e);

@@ -5,7 +5,7 @@ import { TIPOS_COMPROBANTE, validarComprobante, abrirComprobante } from '../util
 import CampoMonto from './common/CampoMonto';
 import { SelectorFecha, aTexto } from './common/Calendario';
 import { Truck, Send, Ban, CheckCircle2, Paperclip, Upload, FileCheck, FileSpreadsheet } from 'lucide-react';
-import { descargarExcel, nombreArchivo } from '../utils/excel';
+import { exportarPagosProveedorExcel } from '../utils/exportaciones';
 import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 import { confirmar, pedirTexto } from '../utils/confirmar';
 
@@ -151,44 +151,7 @@ export default function PagosProveedor({ idReservacion, esAdministrador, cliente
   const pendientes = estado.detalles.filter(d => d.disponible > 0);
 
   // Historial completo de pagos a proveedores (con su estatus) en Excel.
-  const exportarPagos = () => {
-    const claves = new Map(estado.detalles.map(d => [String(d.idDetalle), d.claveReservacion]));
-    const pagos = [...estado.pagos].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-    const cuentan = (p) => p.estatus !== 'Cancelado' && p.estatus !== 'Pendiente';
-    descargarExcel(nombreArchivo('pagos-proveedores', cliente, estado.destino), {
-      hoja: 'Pagos a proveedores',
-      titulo: 'Historial de pagos a proveedores',
-      datos: [
-        ...(cliente ? [['Cliente', cliente]] : []),
-        ['Viaje', estado.destino],
-        ['Moneda', estado.moneda || 'MXN'],
-        ['Total a pagar a proveedores', estado.totales.total, 'moneda'],
-        ['Pagado', estado.totales.pagado, 'moneda'],
-        ['Saldo con proveedores', estado.totales.saldo, 'moneda'],
-        ...(porAutorizarTotal > 0 ? [['Por autorizar', porAutorizarTotal, 'moneda']] : []),
-      ],
-      columnas: [
-        { titulo: 'Fecha del pago', tipo: 'fecha' },
-        { titulo: 'Proveedor', ancho: 26 },
-        { titulo: 'Clave del servicio', ancho: 18 },
-        { titulo: 'Monto', tipo: 'moneda' },
-        { titulo: 'Forma de pago', ancho: 18 },
-        { titulo: 'Referencia', ancho: 20 },
-        { titulo: 'Capturó', ancho: 22 },
-        { titulo: 'Capturado el', tipo: 'fecha' },
-        { titulo: 'Estatus', ancho: 14 },
-        { titulo: 'Autorizó', ancho: 22 },
-        { titulo: 'Motivo de cancelación', ancho: 36 },
-      ],
-      filas: pagos.map(p => [
-        new Date(p.fecha), p.idProveedor?.nombreProveedor || '', claves.get(String(p.idDetalle)) || '', p.monto, p.formaPago,
-        p.referencia || '', p.agente?.nombre || '', p.createdAt ? new Date(p.createdAt) : null,
-        p.estatus === 'Pendiente' ? 'Por autorizar' : (p.estatus || 'Aplicado'),
-        p.autorizadoPor?.nombre || '', p.estatus === 'Cancelado' ? p.motivoCancelacion || '' : '',
-      ]),
-      totales: ['Total aplicado', null, null, Math.round(pagos.filter(cuentan).reduce((a, p) => a + p.monto, 0) * 100) / 100],
-    });
-  };
+  const exportarPagos = () => exportarPagosProveedorExcel(estado, cliente);
   const porAutorizarTotal = estado.totales.porAutorizar || 0;
   const textoPorAutorizar = (d) => d.porAutorizar > 0 && (
     <div className="text-2xs font-semibold text-amber-700" title="Pagos registrados que esperan autorización del Administrador">{dinero(d.porAutorizar)} por autorizar</div>
