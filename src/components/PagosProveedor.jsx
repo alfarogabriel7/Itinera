@@ -4,7 +4,8 @@ import { dinero, fechaCorta } from '../utils/formato';
 import { TIPOS_COMPROBANTE, validarComprobante, abrirComprobante } from '../utils/comprobantes';
 import CampoMonto from './common/CampoMonto';
 import { SelectorFecha, aTexto } from './common/Calendario';
-import { Truck, Send, Ban, CheckCircle2, Paperclip, Upload, FileCheck } from 'lucide-react';
+import { Truck, Send, Ban, CheckCircle2, Paperclip, Upload, FileCheck, FileSpreadsheet } from 'lucide-react';
+import { descargarExcel, nombreArchivo } from '../utils/excel';
 import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 import { confirmar, pedirTexto } from '../utils/confirmar';
 
@@ -15,7 +16,7 @@ import { confirmar, pedirTexto } from '../utils/confirmar';
 // La fecha del pago es hoy por defecto; puede ser anterior, nunca futura.
 const formularioVacio = () => ({ idDetalle: '', monto: '', fecha: aTexto(new Date()), formaPago: 'Transferencia', referencia: '' });
 
-export default function PagosProveedor({ idReservacion, esAdministrador }) {
+export default function PagosProveedor({ idReservacion, esAdministrador, cliente = '' }) {
   const [estado, setEstado] = useState(null);
   const [error, setError] = useState('');
   const [form, setForm] = useState(formularioVacio);
@@ -148,6 +149,46 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
   if (!estado) return <p className="mt-6 text-sm text-slate-400">Cargando pagos a proveedores...</p>;
 
   const pendientes = estado.detalles.filter(d => d.disponible > 0);
+
+  // Historial completo de pagos a proveedores (con su estatus) en Excel.
+  const exportarPagos = () => {
+    const claves = new Map(estado.detalles.map(d => [String(d.idDetalle), d.claveReservacion]));
+    const pagos = [...estado.pagos].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const cuentan = (p) => p.estatus !== 'Cancelado' && p.estatus !== 'Pendiente';
+    descargarExcel(nombreArchivo('pagos-proveedores', cliente, estado.destino), {
+      hoja: 'Pagos a proveedores',
+      titulo: 'Historial de pagos a proveedores',
+      datos: [
+        ...(cliente ? [['Cliente', cliente]] : []),
+        ['Viaje', estado.destino],
+        ['Moneda', estado.moneda || 'MXN'],
+        ['Total a pagar a proveedores', estado.totales.total, 'moneda'],
+        ['Pagado', estado.totales.pagado, 'moneda'],
+        ['Saldo con proveedores', estado.totales.saldo, 'moneda'],
+        ...(porAutorizarTotal > 0 ? [['Por autorizar', porAutorizarTotal, 'moneda']] : []),
+      ],
+      columnas: [
+        { titulo: 'Fecha del pago', tipo: 'fecha' },
+        { titulo: 'Proveedor', ancho: 26 },
+        { titulo: 'Clave del servicio', ancho: 18 },
+        { titulo: 'Monto', tipo: 'moneda' },
+        { titulo: 'Forma de pago', ancho: 18 },
+        { titulo: 'Referencia', ancho: 20 },
+        { titulo: 'Capturó', ancho: 22 },
+        { titulo: 'Capturado el', tipo: 'fecha' },
+        { titulo: 'Estatus', ancho: 14 },
+        { titulo: 'Autorizó', ancho: 22 },
+        { titulo: 'Motivo de cancelación', ancho: 36 },
+      ],
+      filas: pagos.map(p => [
+        new Date(p.fecha), p.idProveedor?.nombreProveedor || '', claves.get(String(p.idDetalle)) || '', p.monto, p.formaPago,
+        p.referencia || '', p.agente?.nombre || '', p.createdAt ? new Date(p.createdAt) : null,
+        p.estatus === 'Pendiente' ? 'Por autorizar' : (p.estatus || 'Aplicado'),
+        p.autorizadoPor?.nombre || '', p.estatus === 'Cancelado' ? p.motivoCancelacion || '' : '',
+      ]),
+      totales: ['Total aplicado', null, null, Math.round(pagos.filter(cuentan).reduce((a, p) => a + p.monto, 0) * 100) / 100],
+    });
+  };
   const porAutorizarTotal = estado.totales.porAutorizar || 0;
   const textoPorAutorizar = (d) => d.porAutorizar > 0 && (
     <div className="text-2xs font-semibold text-amber-700" title="Pagos registrados que esperan autorización del Administrador">{dinero(d.porAutorizar)} por autorizar</div>
@@ -365,7 +406,14 @@ export default function PagosProveedor({ idReservacion, esAdministrador }) {
       )}
 
       <div>
-        <div className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-3">Historial de pagos a proveedores</div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="font-semibold text-slate-700 text-xs uppercase tracking-wider">Historial de pagos a proveedores</div>
+          <button type="button" onClick={exportarPagos} disabled={estado.pagos.length === 0}
+            title={estado.pagos.length === 0 ? 'Aún no hay pagos para exportar' : 'Descargar el historial de pagos a proveedores en Excel'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/30 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+            <FileSpreadsheet size={15} /> Exportar a Excel
+          </button>
+        </div>
 
         {/* Pantallas anchas: tabla compacta (4 columnas) para que quepa junto al menú y el panel lateral. */}
         <div className="hidden lg:block rounded-xl border border-slate-100 overflow-hidden">

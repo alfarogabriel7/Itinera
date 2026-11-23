@@ -6,8 +6,9 @@ import PageHeader from './common/PageHeader';
 import MasUSD from './common/MasUSD';
 import Paginacion, { SelectorPorPagina } from './common/Paginacion';
 import { useListadoRemoto } from '../hooks/useListadoRemoto';
-import { Wallet, Search, AlarmClock, AlertTriangle, ListChecks, CreditCard, MessageCircle, Download } from 'lucide-react';
+import { Wallet, Search, AlarmClock, AlertTriangle, ListChecks, CreditCard, MessageCircle, FileSpreadsheet } from 'lucide-react';
 import { avisarError } from '../utils/avisos';
+import { descargarExcel, nombreArchivo, diaDeViaje } from '../utils/excel';
 
 const URGENCIAS = [
   { key: 'todas', label: 'Todas' },
@@ -78,25 +79,58 @@ function AccionesCobranza({ fila: f, onAbonar }) {
   );
 }
 
-function exportarCSV(filas, conAgente) {
-  const encabezados = ['Cliente', 'Teléfono', 'Correo', 'Destino', 'Inicio del viaje', 'Fin del viaje', 'Días para viajar',
-    ...(conAgente ? ['Agente'] : []), 'Moneda', 'Total', 'Pagado', 'Saldo', 'Abonos', 'Último abono'];
-  const celda = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lineas = filas.map(f => [
-    f.cliente?.nombre, f.cliente?.telefono, f.cliente?.correo, f.destino,
-    fechaViaje(f.fechaEntrada), fechaViaje(f.fechaSalida), diasHasta(f.fechaEntrada),
-    ...(conAgente ? [f.agente] : []),
-    f.moneda || 'MXN', f.total.toFixed(2), f.pagado.toFixed(2), f.saldo.toFixed(2), f.abonos,
-    f.ultimoAbono ? fechaCorta(f.ultimoAbono) : '',
-  ].map(celda).join(','));
-  // BOM para que Excel abra los acentos correctamente.
-  const blob = new Blob(['﻿' + [encabezados.map(celda).join(','), ...lineas].join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `cobranza-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+// Cobranza en Excel (.xlsx): montos como números y fechas como fechas. Arriba,
+// los totales por moneda (pesos y dólares nunca se suman entre sí).
+function exportarExcel(filas, filtrosTexto) {
+  const porMoneda = {};
+  for (const f of filas) {
+    const m = f.moneda || 'MXN';
+    porMoneda[m] ||= { total: 0, pagado: 0, saldo: 0, n: 0 };
+    porMoneda[m].total += f.total; porMoneda[m].pagado += f.pagado; porMoneda[m].saldo += f.saldo; porMoneda[m].n++;
+  }
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const monedas = Object.keys(porMoneda).sort();
+  const unaMoneda = monedas.length === 1;
+  descargarExcel(nombreArchivo('cobranza'), {
+    hoja: 'Cobranza',
+    titulo: 'Cobranza de clientes',
+    datos: [
+      ['Generado', new Date(), 'fecha'],
+      ...(filtrosTexto ? [['Filtros', filtrosTexto]] : []),
+      ['Reservaciones', filas.length, 'numero'],
+      ...monedas.flatMap(m => [
+        [`Por cobrar (${m})`, r2(porMoneda[m].saldo), 'moneda'],
+        [`Cobrado (${m})`, r2(porMoneda[m].pagado), 'moneda'],
+      ]),
+    ],
+    columnas: [
+      { titulo: 'Cliente', ancho: 28 },
+      { titulo: 'Teléfono', ancho: 14 },
+      { titulo: 'Correo', ancho: 28 },
+      { titulo: 'Destino', ancho: 22 },
+      { titulo: 'Inicio del viaje', tipo: 'fecha', ancho: 15 },
+      { titulo: 'Fin del viaje', tipo: 'fecha', ancho: 14 },
+      { titulo: 'Días para viajar', tipo: 'numero', ancho: 15 },
+      { titulo: 'Agente', ancho: 22 },
+      { titulo: 'Moneda', ancho: 9 },
+      { titulo: 'Total', tipo: 'moneda' },
+      { titulo: 'Pagado', tipo: 'moneda' },
+      { titulo: 'Saldo', tipo: 'moneda' },
+      { titulo: 'Abonos', tipo: 'numero', ancho: 9 },
+      { titulo: 'Último abono', tipo: 'fecha', ancho: 14 },
+    ],
+    filas: filas.map(f => [
+      f.cliente?.nombre || '', f.cliente?.telefono || '', f.cliente?.correo || '', f.destino,
+      diaDeViaje(f.fechaEntrada), diaDeViaje(f.fechaSalida), diasHasta(f.fechaEntrada),
+      f.agente || '', f.moneda || 'MXN', f.total, f.pagado, f.saldo, f.abonos,
+      f.ultimoAbono ? new Date(f.ultimoAbono) : null,
+    ]),
+    // Con una sola moneda se puede totalizar la tabla; con pesos y dólares, solo arriba por moneda.
+    ...(unaMoneda && filas.length ? {
+      totales: ['Total', null, null, null, null, null, null, null, monedas[0],
+        r2(porMoneda[monedas[0]].total), r2(porMoneda[monedas[0]].pagado), r2(porMoneda[monedas[0]].saldo), null, null],
+    } : {}),
+  });
 }
 
 const INDICADORES_VACIOS = { porCobrar: 0, reservaciones: 0, proximos: { cantidad: 0, monto: 0 }, iniciados: { cantidad: 0, monto: 0 } };
@@ -131,12 +165,19 @@ export default function Cobranza({ onAbonar }) {
   const { error, datos: filtradas, cargando: loading } = listado;
   const indicadores = listado.extra.indicadores || INDICADORES_VACIOS;
 
-  // El CSV trae todo lo que coincide con los filtros (no solo la página visible).
+  // El Excel trae todo lo que coincide con los filtros (no solo la página visible).
   const handleExportar = async () => {
     setExportando(true);
     try {
-      const r = await pagosApi.cobranza({ ...filtros, q: listado.busqueda.trim(), exportar: 1, porPagina: 5000 });
-      exportarCSV(r.datos, true);
+      const q = listado.busqueda.trim();
+      const r = await pagosApi.cobranza({ ...filtros, q, exportar: 1, porPagina: 5000 });
+      const filtrosTexto = [
+        urgencia !== 'todas' && URGENCIAS.find(u => u.key === urgencia)?.label,
+        agente === 'mios' ? 'Mis ventas' : agente && `Agente: ${agentes.find(a => a._id === agente)?.nombre || ''}`,
+        q && `Búsqueda: "${q}"`,
+        incluirLiquidadas && 'Incluye liquidadas',
+      ].filter(Boolean).join(' · ');
+      exportarExcel(r.datos, filtrosTexto);
     } catch (err) {
       avisarError(err.message);
     } finally {
@@ -154,7 +195,7 @@ export default function Cobranza({ onAbonar }) {
         subtitle="Reservaciones activas con saldo pendiente, de la más próxima a viajar a la más lejana."
         action={
           <button onClick={handleExportar} disabled={listado.total === 0 || exportando} className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 shadow-sm">
-            <Download size={16} /> {exportando ? 'Exportando...' : 'Exportar a Excel (CSV)'}
+            <FileSpreadsheet size={16} /> {exportando ? 'Exportando...' : 'Exportar a Excel'}
           </button>
         }
       />

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { pagosApi, reservacionesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
-import { imprimirRecibo, folioDePago } from '../utils/recibo';
+import { imprimirRecibo, imprimirEstadoCuenta, folioDePago } from '../utils/recibo';
+import { descargarExcel, nombreArchivo } from '../utils/excel';
 import { TIPOS_COMPROBANTE, validarComprobante, abrirComprobante } from '../utils/comprobantes';
 import PageHeader from './common/PageHeader';
 import SelectorRemoto from './common/SelectorRemoto';
@@ -9,7 +10,7 @@ import { SelectorFecha, aTexto } from './common/Calendario';
 import CampoMonto from './common/CampoMonto';
 import PagosProveedor from './PagosProveedor';
 import { dinero, fechaCorta, fechaViaje } from '../utils/formato';
-import { DollarSign, CreditCard, Ban, CheckCircle2, Paperclip, Upload, Printer, FileCheck, Users, Truck, Clock } from 'lucide-react';
+import { DollarSign, CreditCard, Ban, CheckCircle2, Paperclip, Upload, Printer, FileCheck, Users, Truck, Clock, FileSpreadsheet, FileText } from 'lucide-react';
 import { avisarExito, avisarAdvertencia, avisarError } from '../utils/avisos';
 import { confirmar, pedirTexto } from '../utils/confirmar';
 
@@ -173,6 +174,48 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
 
   const verComprobante = (pago) => abrirComprobante(() => pagosApi.descargarComprobante(pago._id));
 
+  // Historial completo (incluye cancelados y por autorizar, con su estatus) en Excel.
+  const exportarAbonos = () => {
+    const r = resumen;
+    const moneda = r.moneda || 'MXN';
+    const pagos = [...r.pagos].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const cuentan = (p) => p.estatus !== 'Cancelado' && p.estatus !== 'Pendiente';
+    descargarExcel(nombreArchivo('abonos', r.cliente, r.destino), {
+      hoja: 'Abonos',
+      titulo: 'Historial de abonos del cliente',
+      datos: [
+        ['Cliente', r.cliente],
+        ['Viaje', r.destino],
+        ['Fechas', `${fechaViaje(r.fechaEntrada)} al ${fechaViaje(r.fechaSalida)}`],
+        ['Vendió', r.vendedor || '—'],
+        ['Moneda', moneda],
+        ['Total de la reservación', r.total, 'moneda'],
+        ['Abonado', r.pagado, 'moneda'],
+        ['Saldo pendiente', r.saldo, 'moneda'],
+        ...(r.porAutorizar > 0 ? [['Por autorizar', r.porAutorizar, 'moneda']] : []),
+      ],
+      columnas: [
+        { titulo: 'Fecha del pago', tipo: 'fecha' },
+        { titulo: 'Folio', ancho: 11 },
+        { titulo: 'Monto', tipo: 'moneda' },
+        { titulo: 'Forma de pago', ancho: 18 },
+        { titulo: 'Referencia', ancho: 20 },
+        { titulo: 'Capturó', ancho: 22 },
+        { titulo: 'Capturado el', tipo: 'fecha' },
+        { titulo: 'Estatus', ancho: 14 },
+        { titulo: 'Autorizó', ancho: 22 },
+        { titulo: 'Motivo de cancelación', ancho: 36 },
+      ],
+      filas: pagos.map(p => [
+        new Date(p.fecha), folioDePago(p), p.monto, p.formaPago, p.referencia || '', p.agente?.nombre || '',
+        p.createdAt ? new Date(p.createdAt) : null,
+        p.estatus === 'Pendiente' ? 'Por autorizar' : (p.estatus || 'Aplicado'),
+        p.autorizadoPor?.nombre || '', p.estatus === 'Cancelado' ? p.motivoCancelacion || '' : '',
+      ]),
+      totales: ['Total aplicado', null, Math.round(pagos.filter(cuentan).reduce((a, p) => a + p.monto, 0) * 100) / 100],
+    });
+  };
+
   const liquidada = resumen && resumen.saldo <= 0;
   // Lo registrado que espera autorización ya ocupa saldo: no se puede volver a cobrar.
   const porAutorizar = resumen?.porAutorizar || 0;
@@ -214,7 +257,7 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
         )}
 
         {resumen && pestana === 'proveedores' && (
-          <PagosProveedor idReservacion={selectedReservaId} esAdministrador={esAdministrador} />
+          <PagosProveedor idReservacion={selectedReservaId} esAdministrador={esAdministrador} cliente={resumen.cliente} />
         )}
 
         {resumen && pestana === 'cobros' && (
@@ -303,7 +346,21 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
             )}
 
             <div>
-              <div className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-3">Historial de Abonos</div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="font-semibold text-slate-700 text-xs uppercase tracking-wider">Historial de Abonos</div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={exportarAbonos} disabled={resumen.pagos.length === 0}
+                    title={resumen.pagos.length === 0 ? 'Aún no hay abonos para exportar' : 'Descargar el historial de abonos en Excel'}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/30 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                    <FileSpreadsheet size={15} /> Exportar a Excel
+                  </button>
+                  <button type="button" onClick={() => imprimirEstadoCuenta(resumen)}
+                    title="Estado de cuenta imprimible (o para guardar en PDF) con los abonos, el total y el saldo"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-brand-petroleo/30 bg-white px-3 py-1.5 text-xs font-semibold text-brand-petroleo hover:bg-brand-petroleo/5">
+                    <FileText size={15} /> Estado de cuenta
+                  </button>
+                </div>
+              </div>
               <div className="overflow-x-auto rounded-xl border border-slate-100">
                 <table className="w-full text-left border-collapse">
                   <thead>

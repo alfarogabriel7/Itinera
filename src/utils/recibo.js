@@ -86,6 +86,138 @@ export function folioDePago(pago) {
   return String(pago._id).slice(-8).toUpperCase();
 }
 
+// Encabezado de la empresa (logo, nombre, RFC y contacto) que comparten el recibo y el estado de cuenta.
+function datosEmpresa(e) {
+  const paleta = (TEMAS[e.tema] || TEMAS[TEMA_PREDETERMINADO]).colores;
+  const contacto = [e.direccion, e.colonia && `Col. ${e.colonia}`, e.codigoPostal && `C.P. ${e.codigoPostal}`, e.ciudad, e.estado, e.telefonoPrincipal && `Tel. ${e.telefonoPrincipal}`, e.correo]
+    .filter(Boolean)
+    .map(escapar)
+    .join(' · ');
+  return { paleta, contacto };
+}
+
+function abrirVentana(texto) {
+  const ventana = window.open('', '_blank');
+  if (!ventana) {
+    avisarError('El navegador bloqueó la ventana. Permite las ventanas emergentes para este sitio.');
+    return null;
+  }
+  ventana.document.write(`<p style="font-family:system-ui;padding:32px;color:#64748b">${texto}</p>`);
+  return ventana;
+}
+
+// Estado de cuenta del cliente para una reservación: datos del viaje, abonos
+// aplicados (con el saldo después de cada uno), total, abonado y saldo.
+// Los abonos cancelados y los que esperan autorización no se incluyen.
+export async function imprimirEstadoCuenta(resumen) {
+  const ventana = abrirVentana('Generando estado de cuenta…');
+  if (!ventana) return;
+  const logo = await logoComoDataUrl(resumen.empresa);
+  const e = resumen.empresa || {};
+  const { paleta, contacto } = datosEmpresa(e);
+  const moneda = escapar(resumen.moneda || 'MXN');
+
+  const aplicados = resumen.pagos
+    .filter((p) => p.estatus !== 'Cancelado' && p.estatus !== 'Pendiente')
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha) || new Date(a.createdAt) - new Date(b.createdAt));
+  let acumulado = 0;
+  const renglones = aplicados.map((p) => {
+    acumulado += p.monto;
+    const saldo = Math.round((resumen.total - acumulado) * 100) / 100;
+    return `<tr>
+      <td>${escapar(fechaLarga(p.fecha))}</td>
+      <td class="mono">${escapar(folioDePago(p))}</td>
+      <td>${escapar(p.formaPago)}${p.referencia ? `<div class="ref">Ref. ${escapar(p.referencia)}</div>` : ''}</td>
+      <td class="num">${dinero(p.monto)}</td>
+      <td class="num">${saldo <= 0 ? 'Liquidado' : dinero(saldo)}</td>
+    </tr>`;
+  }).join('');
+  const liquidada = resumen.saldo <= 0;
+
+  const html = `<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<title>Estado de cuenta · ${escapar(resumen.cliente)} · ${escapar(resumen.destino)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1e293b; margin: 0; padding: 32px; }
+  .hoja { max-width: 800px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 12px; padding: 32px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 24px; border-bottom: 2px solid ${paleta.noche}; padding-bottom: 16px; }
+  .marca { display: flex; align-items: center; gap: 16px; }
+  .logo { max-width: 160px; max-height: 72px; object-fit: contain; }
+  h1 { margin: 0; font-size: 20px; color: ${paleta.noche}; }
+  .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+  .doc { text-align: right; font-size: 12px; color: #64748b; }
+  .doc strong { display: block; font-size: 18px; color: #1e293b; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin: 24px 0 8px; }
+  .datos { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .datos td { padding: 5px 0; vertical-align: top; }
+  .datos td:first-child { color: #64748b; width: 32%; }
+  .resumen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+  .caja { background: ${paleta.arena}; border-radius: 10px; padding: 14px 16px; }
+  .caja span { display: block; font-size: 12px; color: #64748b; }
+  .caja strong { display: block; font-size: 20px; margin-top: 4px; color: ${paleta.noche}; }
+  .caja.saldo { border: 1px solid ${paleta.coral}; }
+  .caja.saldo strong { color: ${liquidada ? '#047857' : '#b91c1c'}; }
+  .letra { font-size: 12px; color: #334155; margin-top: 8px; }
+  .abonos { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .abonos th { background: ${paleta.noche}; color: #fff; text-align: left; padding: 8px 10px; font-weight: 600; }
+  .abonos td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  .abonos tfoot td { font-weight: 700; border-top: 2px solid ${paleta.noche}; border-bottom: none; }
+  .num { text-align: right; white-space: nowrap; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  .ref { font-size: 11px; color: #64748b; }
+  .vacio { text-align: center; color: #94a3b8; padding: 16px; }
+  .nota { font-size: 12px; color: #64748b; margin-top: 16px; }
+  footer { margin-top: 32px; font-size: 11px; color: #94a3b8; text-align: center; }
+  @media print { body { padding: 0; } .hoja { border: none; } .abonos th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .caja { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head>
+<body><div class="hoja">
+  <header>
+    <div class="marca">
+      ${logo ? `<img class="logo" src="${logo}" alt="">` : ''}
+      <div>
+        <h1>${escapar(e.nombreEmpresa || 'Estado de cuenta')}</h1>
+        ${e.rfc ? `<div class="sub">RFC ${escapar(e.rfc)}</div>` : ''}
+        ${contacto ? `<div class="sub">${contacto}</div>` : ''}
+      </div>
+    </div>
+    <div class="doc">Estado de cuenta<strong>${escapar(fechaLarga(new Date()))}</strong></div>
+  </header>
+
+  <h2>Cliente y viaje</h2>
+  <table class="datos">
+    <tr><td>Cliente</td><td><strong>${escapar(resumen.cliente)}</strong>${resumen.telefonoCliente ? ` · Tel. ${escapar(resumen.telefonoCliente)}` : ''}</td></tr>
+    <tr><td>Viaje</td><td>${escapar(resumen.destino)}</td></tr>
+    ${resumen.descripcion ? `<tr><td>Descripción</td><td style="white-space:pre-line">${escapar(resumen.descripcion)}</td></tr>` : ''}
+    <tr><td>Fechas</td><td>${escapar(fechaViajeLarga(resumen.fechaEntrada))} al ${escapar(fechaViajeLarga(resumen.fechaSalida))}</td></tr>
+    ${resumen.vendedor ? `<tr><td>Agente</td><td>${escapar(resumen.vendedor)}</td></tr>` : ''}
+  </table>
+
+  <div class="resumen">
+    <div class="caja"><span>Total de la reservación</span><strong>${dinero(resumen.total)} ${moneda}</strong></div>
+    <div class="caja"><span>Abonado</span><strong>${dinero(resumen.pagado)} ${moneda}</strong></div>
+    <div class="caja saldo"><span>Saldo pendiente</span><strong>${liquidada ? 'Liquidado' : `${dinero(resumen.saldo)} ${moneda}`}</strong></div>
+  </div>
+  ${liquidada ? '' : `<div class="letra">Saldo: ${escapar(montoEnLetra(resumen.saldo, resumen.moneda))}</div>`}
+
+  <h2>Abonos</h2>
+  <table class="abonos">
+    <thead><tr><th>Fecha</th><th>Folio</th><th>Forma de pago</th><th class="num">Monto</th><th class="num">Saldo</th></tr></thead>
+    <tbody>${renglones || '<tr><td colspan="5" class="vacio">Aún no hay abonos registrados.</td></tr>'}</tbody>
+    ${aplicados.length ? `<tfoot><tr><td colspan="3">Total abonado</td><td class="num">${dinero(resumen.pagado)}</td><td class="num">${liquidada ? 'Liquidado' : dinero(resumen.saldo)}</td></tr></tfoot>` : ''}
+  </table>
+  ${resumen.porAutorizar > 0 ? `<p class="nota">Hay ${dinero(resumen.porAutorizar)} ${moneda} en pagos recibidos que están en revisión; se reflejarán al confirmarse.</p>` : ''}
+
+  <footer>Documento informativo generado el ${escapar(new Date().toLocaleString('es-MX'))}. No es un comprobante fiscal.</footer>
+</div>
+<script>window.onload = () => window.print();</script>
+</body></html>`;
+
+  ventana.document.open();
+  ventana.document.write(html);
+  ventana.document.close();
+}
+
 export async function imprimirRecibo(resumen, pago) {
   // La ventana se abre de inmediato (dentro del clic) para que el navegador no
   // la bloquee; el contenido se escribe cuando ya se tiene el logo.
