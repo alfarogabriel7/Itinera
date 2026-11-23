@@ -45,6 +45,16 @@ export async function registrarCambios({ entidad, entidadId, anterior, nuevo, us
  * Registra un evento puntual que no es un cambio de campo (alta de un registro,
  * conversión de prospecto, etc.). Se guarda con campo = evento.
  */
+// Texto de un evento listo para mostrarse. Los abonos y pagos a proveedores
+// registrados antes de 2026-11-22 guardaban "reservación <id de Mongo> (Destino)"
+// y a veces "·Forma" sin espacio: se muestran como "viaje a Destino" sin tocar la base.
+export function textoBitacora(valor) {
+  if (typeof valor !== 'string') return valor;
+  return valor
+    .replace(/ · reservación [0-9a-f]{24} \(([^)]*)\)/g, ' · viaje a $1')
+    .replace(/ ·(?=\S)/g, ' · ');
+}
+
 export async function registrarEvento({ entidad, entidadId, empresa, evento, detalle, usuario }) {
   await Bitacora.create({
     entidad,

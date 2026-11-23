@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ArrowLeft, Ban, CheckCircle2, CreditCard, MessageCircle, Pencil, Plus, Send, Trash2, X,
+  ArrowLeft, Ban, CheckCircle2, CreditCard, FileSpreadsheet, FileText, MessageCircle, Pencil, Plus, Send, Trash2, X,
 } from 'lucide-react';
-import { reservacionesApi } from '../api';
+import { reservacionesApi, pagosApi, pagosProveedorApi } from '../api';
+import { exportarAbonosExcel, exportarPagosProveedorExcel } from '../utils/exportaciones';
+import { imprimirEstadoCuenta } from '../utils/recibo';
 import { dinero, fechaViaje, telefono } from '../utils/formato';
 import { PendientesDeRegistro } from './pendientes/Pendientes';
 import { avisarError } from '../utils/avisos';
@@ -59,6 +61,16 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
     try { setF(await reservacionesApi.ficha(id)); setError(''); } catch (err) { setError(err.message); }
   };
   useEffect(() => { setF(null); cargar(); window.scrollTo({ top: 0 }); }, [id]);
+
+  // Exportaciones: los datos se piden al momento (la ficha no trae el detalle de cada pago).
+  const [descargando, setDescargando] = useState('');
+  const descargar = async (cual, fn) => {
+    setDescargando(cual);
+    try { await fn(); } catch (err) { avisarError(err.message); } finally { setDescargando(''); }
+  };
+  const exportarAbonos = () => descargar('abonos', async () => exportarAbonosExcel(await pagosApi.resumen(id)));
+  const exportarPagosProveedor = () => descargar('proveedores', async () =>
+    exportarPagosProveedorExcel(await pagosProveedorApi.estadoReservacion(id), f?.cliente?.nombre || ''));
 
   const accion = async (fn) => {
     setOcupado(true);
@@ -139,6 +151,16 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
           <div className="mt-1 font-semibold text-slate-800">{f.cobro.saldo > 0.005 ? `Saldo ${dinero(f.cobro.saldo)}` : 'Liquidado'}</div>
           <div className="mb-1 text-xs text-slate-500">Total {dinero(f.cobro.total)} · abonado {dinero(f.cobro.abonado)}</div>
           <Barra valor={f.cobro.abonado} total={f.cobro.total} />
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+            <button type="button" onClick={exportarAbonos} disabled={descargando === 'abonos'} title="Descargar el historial de abonos del cliente en Excel"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/30 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+              <FileSpreadsheet size={14} /> {descargando === 'abonos' ? 'Descargando…' : 'Excel'}
+            </button>
+            <button type="button" onClick={() => imprimirEstadoCuenta(pagosApi.resumen(r._id))} title="Estado de cuenta imprimible (o para guardar en PDF) con los abonos, el total y el saldo"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-brand-petroleo/30 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-petroleo hover:bg-brand-petroleo/5">
+              <FileText size={14} /> Estado de cuenta
+            </button>
+          </div>
         </div>
         <div className={tarjeta}>
           <div className="text-xs font-medium text-slate-500">Pago a proveedores</div>
@@ -219,7 +241,15 @@ export default function FichaReservacion({ id, onVolver, onEditar, onCancelar, o
 
           {/* Servicios */}
           <section className={tarjeta}>
-            <h2 className="mb-3 text-base font-bold text-slate-800">Servicios y proveedores</h2>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-bold text-slate-800">Servicios y proveedores</h2>
+              {f.servicios.length > 0 && (
+                <button type="button" onClick={exportarPagosProveedor} disabled={descargando === 'proveedores'} title="Descargar el historial de pagos a proveedores en Excel"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/30 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                  <FileSpreadsheet size={14} /> {descargando === 'proveedores' ? 'Descargando…' : 'Exportar pagos a Excel'}
+                </button>
+              )}
+            </div>
             {/* Un bloque por servicio (no tabla): esta columna es angosta y una tabla de 6 columnas hacía scroll. */}
             <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {f.servicios.map(s => {

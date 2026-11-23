@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { pagosApi, reservacionesApi } from '../api';
 import { obtenerSesion } from '../utils/sesion';
 import { imprimirRecibo, imprimirEstadoCuenta, folioDePago } from '../utils/recibo';
-import { descargarExcel, nombreArchivo } from '../utils/excel';
+import { exportarAbonosExcel } from '../utils/exportaciones';
 import { TIPOS_COMPROBANTE, validarComprobante, abrirComprobante } from '../utils/comprobantes';
 import PageHeader from './common/PageHeader';
 import SelectorRemoto from './common/SelectorRemoto';
@@ -175,46 +175,7 @@ export default function Pagos({ reservaInicial = '', pestanaInicial = 'cobros' }
   const verComprobante = (pago) => abrirComprobante(() => pagosApi.descargarComprobante(pago._id));
 
   // Historial completo (incluye cancelados y por autorizar, con su estatus) en Excel.
-  const exportarAbonos = () => {
-    const r = resumen;
-    const moneda = r.moneda || 'MXN';
-    const pagos = [...r.pagos].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-    const cuentan = (p) => p.estatus !== 'Cancelado' && p.estatus !== 'Pendiente';
-    descargarExcel(nombreArchivo('abonos', r.cliente, r.destino), {
-      hoja: 'Abonos',
-      titulo: 'Historial de abonos del cliente',
-      datos: [
-        ['Cliente', r.cliente],
-        ['Viaje', r.destino],
-        ['Fechas', `${fechaViaje(r.fechaEntrada)} al ${fechaViaje(r.fechaSalida)}`],
-        ['Vendió', r.vendedor || '—'],
-        ['Moneda', moneda],
-        ['Total de la reservación', r.total, 'moneda'],
-        ['Abonado', r.pagado, 'moneda'],
-        ['Saldo pendiente', r.saldo, 'moneda'],
-        ...(r.porAutorizar > 0 ? [['Por autorizar', r.porAutorizar, 'moneda']] : []),
-      ],
-      columnas: [
-        { titulo: 'Fecha del pago', tipo: 'fecha' },
-        { titulo: 'Folio', ancho: 11 },
-        { titulo: 'Monto', tipo: 'moneda' },
-        { titulo: 'Forma de pago', ancho: 18 },
-        { titulo: 'Referencia', ancho: 20 },
-        { titulo: 'Capturó', ancho: 22 },
-        { titulo: 'Capturado el', tipo: 'fecha' },
-        { titulo: 'Estatus', ancho: 14 },
-        { titulo: 'Autorizó', ancho: 22 },
-        { titulo: 'Motivo de cancelación', ancho: 36 },
-      ],
-      filas: pagos.map(p => [
-        new Date(p.fecha), folioDePago(p), p.monto, p.formaPago, p.referencia || '', p.agente?.nombre || '',
-        p.createdAt ? new Date(p.createdAt) : null,
-        p.estatus === 'Pendiente' ? 'Por autorizar' : (p.estatus || 'Aplicado'),
-        p.autorizadoPor?.nombre || '', p.estatus === 'Cancelado' ? p.motivoCancelacion || '' : '',
-      ]),
-      totales: ['Total aplicado', null, Math.round(pagos.filter(cuentan).reduce((a, p) => a + p.monto, 0) * 100) / 100],
-    });
-  };
+  const exportarAbonos = () => exportarAbonosExcel(resumen);
 
   const liquidada = resumen && resumen.saldo <= 0;
   // Lo registrado que espera autorización ya ocupa saldo: no se puede volver a cobrar.

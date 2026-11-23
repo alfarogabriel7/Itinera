@@ -244,7 +244,7 @@ router.post('/', async (req, res, next) => {
       });
       await registrarEvento({
         entidad: 'PagoProveedor', entidadId: pendiente._id, empresa: pendiente.empresa, evento: 'pago a proveedor por autorizar',
-        detalle: `$${monto.toFixed(2)} ${pendiente.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · ${detalle.idProveedor.nombreProveedor} (${detalle.claveReservacion}) · reservación ${reservacion._id} (${reservacion.destino})`,
+        detalle: `$${monto.toFixed(2)} ${pendiente.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · ${detalle.idProveedor.nombreProveedor} (${detalle.claveReservacion}) · viaje a ${reservacion.destino}`,
         usuario: usuarioDeLaSesion(req),
       });
       await crearSeguimientoAutorizacion({
@@ -302,7 +302,7 @@ router.post('/', async (req, res, next) => {
     }
     await registrarEvento({
       entidad: 'PagoProveedor', entidadId: pago._id, empresa: pago.empresa, evento: 'pago a proveedor',
-      detalle: `$${monto.toFixed(2)} ${pago.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · ${detalle.idProveedor.nombreProveedor} (${detalle.claveReservacion}) · reservación ${reservacion._id} (${reservacion.destino})`,
+      detalle: `$${monto.toFixed(2)} ${pago.moneda} · pagado el ${fechaCortaMx(fecha)} · ${formaPago}${referencia ? ` · ref. ${referencia}` : ''} · ${detalle.idProveedor.nombreProveedor} (${detalle.claveReservacion}) · viaje a ${reservacion.destino}`,
       usuario: usuarioDeLaSesion(req),
     });
     res.status(201).json(await pago.populate([

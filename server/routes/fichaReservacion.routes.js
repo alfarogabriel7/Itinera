@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import {
-  Reservacion, Pago, PagoProveedor, Pendiente, Bitacora, registrarEvento,
+  Reservacion, Pago, PagoProveedor, Pendiente, Bitacora, registrarEvento, textoBitacora,
 } from '../../database/index.js';
 import { ESTATUS_PETICION, ESTATUS_DOCUMENTO, DOCUMENTOS_BASE } from '../../database/models/Reservacion.js';
 import { perteneceAlAlcance, sinSuperAdmin, usuarioDeLaSesion, errorHttp, idDe } from '../middleware/tenant.js';
@@ -112,7 +112,7 @@ router.get('/:id/ficha', async (req, res, next) => {
       documentos: r.documentos,
       bitacora: bitacora.map((b) => ({
         _id: b._id, fecha: b.fecha, entidad: b.entidad, campo: b.campo,
-        anterior: b.valorAnterior ?? null, nuevo: b.valorNuevo ?? null, usuario: b.usuario?.nombre || null,
+        anterior: textoBitacora(b.valorAnterior ?? null), nuevo: textoBitacora(b.valorNuevo ?? null), usuario: b.usuario?.nombre || null,
       })),
       permisos: {
         operar: puedeOperar,
