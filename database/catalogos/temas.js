@@ -11,12 +11,12 @@ export const TEMAS = {
   rutana: {
     nombre: 'Ninguno (Rutana)',
     colores: {
-      noche: '#0F2A4A', // azul marino de la marca: barra lateral, encabezados de tablas, títulos
-      petroleo: '#1F4E79', // botones principales, foco, íconos
-      petroleoMedio: '#5B7FA6', // barras de gráficas
+      noche: '#083E48', // verde petróleo oscuro: barra lateral, encabezados de tablas, títulos
+      petroleo: '#0B4F5C', // verde petróleo de la marca: botones principales, foco, íconos
+      petroleoMedio: '#4F8C94', // barras de gráficas
       coral: '#F26B4F', // coral de la marca (punto de destino): acciones destacadas
       coralClaro: '#F79A86', // botones de editar, trofeos
-      arena: '#F4F6F9', // fondo general
+      arena: '#F2F6F6', // fondo general
     },
   },
   felizviaje: {

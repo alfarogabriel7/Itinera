@@ -10,7 +10,7 @@ import React from 'react';
 //   <RutanaLogo slogan={false} />       sin "Gestión para agencias de viajes"
 //   <RutanaIsotipo size={32} />         solo la R
 
-const MARINO = '#0F2A4A';
+const MARINO = '#0B4F5C'; // verde petróleo de la marca
 const CORAL = '#F26B4F';
 
 export function RutanaIsotipo({ size = 40, color = MARINO, titulo = 'Rutana', className = '' }) {
@@ -27,7 +27,7 @@ export function RutanaIsotipo({ size = 40, color = MARINO, titulo = 'Rutana', cl
 
 export default function RutanaLogo({ variante = 'color', slogan = true, alto = 48, className = '' }) {
   const principal = variante === 'blanco' ? '#FFFFFF' : MARINO;
-  const secundario = variante === 'blanco' ? '#C9D3E0' : '#3B4C63';
+  const secundario = variante === 'blanco' ? '#CFE0E2' : '#36575D';
   return (
     <div className={`inline-flex items-center ${className}`} style={{ gap: alto * 0.28 }}>
       <RutanaIsotipo size={alto} color={principal} />
